@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import { PLAN_LIMITS, ALLOWED_MODELS } from '../types/index.js';
 import { ForbiddenError, NotFoundError } from '../lib/errors.js';
+import { writeAuditLog } from './admin.service.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -88,7 +89,7 @@ export async function createAgent(
 
   const { skills, ...agentData } = input;
 
-  return prisma.agent.create({
+  const agent = await prisma.agent.create({
     data: {
       tenantId: tenant.id,
       ...agentData,
@@ -99,6 +100,9 @@ export async function createAgent(
       skillHumorDetection: skills?.humorDetection ?? false,
     },
   });
+
+  writeAuditLog(tenant.id, 'agent_created', 'agent', agent.id, { name: agent.name, model: agent.model });
+  return agent;
 }
 
 export async function getAgent(tenantId: string, agentId: string) {
@@ -167,6 +171,7 @@ export async function deleteAgent(tenantId: string, agentId: string) {
     throw new NotFoundError('Agent not found');
   }
   await prisma.agent.delete({ where: { id: agentId } });
+  writeAuditLog(tenantId, 'agent_deleted', 'agent', agentId, { name: existing.name });
 }
 
 export async function toggleAgent(tenantId: string, agentId: string) {
@@ -182,5 +187,6 @@ export async function toggleAgent(tenantId: string, agentId: string) {
     data: { isActive: !existing.isActive },
   });
 
+  writeAuditLog(tenantId, agent.isActive ? 'agent_activated' : 'agent_deactivated', 'agent', agentId);
   return { id: agent.id, isActive: agent.isActive };
 }

@@ -48,6 +48,7 @@
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
     "redis": "^4.6.13",
+    "socket.io": "^4.8.3",
     "stripe": "^14.13.0",
     "xlsx": "^0.18.5",
     "youtube-transcript": "^1.0.6",

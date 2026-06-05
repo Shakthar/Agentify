@@ -10,6 +10,7 @@ import {
 } from '../lib/auth.js';
 import { PLAN_LIMITS } from '../types/index.js';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../lib/errors.js';
+import { writeAuditLog } from './admin.service.js';
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -69,6 +70,8 @@ export async function signup(input: SignupInput) {
   });
 
   const tokens = await issueTokens(tenant);
+
+  writeAuditLog(tenant.id, 'tenant_signup', 'tenant', tenant.id, { email: tenant.email, plan });
 
   return {
     id: tenant.id,

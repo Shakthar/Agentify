@@ -7,6 +7,7 @@ import {
   PaymentRequiredError,
   UpstreamError,
 } from '../lib/errors.js';
+import { writeAuditLog } from './admin.service.js';
 
 interface ListConversationsParams {
   skip?: number;
@@ -75,7 +76,7 @@ export async function createConversation(tenantId: string, input: CreateConversa
     throw new NotFoundError('Agent not found or inactive');
   }
 
-  return prisma.conversation.create({
+  const conversation = await prisma.conversation.create({
     data: {
       tenantId,
       agentId: input.agentId,
@@ -85,6 +86,9 @@ export async function createConversation(tenantId: string, input: CreateConversa
       modelUsed: agent.model,
     },
   });
+
+  writeAuditLog(tenantId, 'conversation_created', 'conversation', conversation.id, { agentId: input.agentId, channel: input.channelType });
+  return conversation;
 }
 
 export async function getConversation(tenantId: string, conversationId: string) {
@@ -270,5 +274,6 @@ export async function closeConversation(tenantId: string, conversationId: string
     data: { totalConversations: { increment: 1 } },
   });
 
+  writeAuditLog(tenantId, 'conversation_closed', 'conversation', conversationId);
   return conversation;
 }

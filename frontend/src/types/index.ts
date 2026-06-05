@@ -62,6 +62,22 @@ export interface Conversation {
   _count?: { messages: number };
 }
 
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  resourceType: string | null;
+  resourceId: string | null;
+  details: unknown;
+  createdAt: string;
+}
+
+export interface AdminMetrics {
+  agents: { total: number; active: number };
+  conversations: { total: number; today: number; open: number };
+  messages: { total: number };
+  credits: { total: number; used: number; available: number; usedPercent: number };
+}
+
 export interface CreditLog {
   id: string;
   amount: number;

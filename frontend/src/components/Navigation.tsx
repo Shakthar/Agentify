@@ -8,7 +8,7 @@ const navItems = [
   { href: ROUTES.dashboard, label: 'Dashboard', icon: '◈' },
   { href: ROUTES.agents, label: 'Agentes', icon: '🤖' },
   { href: ROUTES.billing, label: 'Créditos', icon: '💳' },
-  { href: ROUTES.analytics, label: 'Analytics', icon: '📊' },
+  { href: ROUTES.admin, label: 'Admin', icon: '🛡️' },
 ];
 
 export default function Navigation() {
