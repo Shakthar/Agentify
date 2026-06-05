@@ -7,12 +7,17 @@ type Tab = 'login' | 'signup';
 
 export default function Home() {
   const router = useRouter();
-  const { tenant, login, signup, loading, error, clearError } = useAuth();
+  const {
+    tenant, login, signup, loading, error, clearError,
+    pendingTwoFactor, completeTwoFactorLogin, cancelTwoFactor,
+  } = useAuth();
+
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   useEffect(() => {
     if (tenant) router.replace(ROUTES.dashboard);
@@ -26,12 +31,75 @@ export default function Home() {
         await login(email, password);
       } else {
         await signup(email, password, name, company || undefined);
+        router.push(ROUTES.dashboard);
       }
-      router.push(ROUTES.dashboard);
     } catch {
       // error is set in the store
     }
   };
+
+  const handleTwoFactor = async (e: FormEvent) => {
+    e.preventDefault();
+    clearError();
+    try {
+      await completeTwoFactorLogin(twoFactorCode);
+      router.push(ROUTES.dashboard);
+    } catch {
+      setTwoFactorCode('');
+    }
+  };
+
+  // --- Ecrã de 2FA ---
+  if (pendingTwoFactor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white px-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-brand-700">Agentfy</h1>
+            <p className="text-gray-500 mt-2 text-sm">Verificação em dois passos</p>
+          </div>
+          <div className="card">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-3">🔐</div>
+              <h2 className="text-lg font-semibold text-gray-900">Código de autenticação</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Abre o teu Google Authenticator, Authy ou similar e introduz o código de 6 dígitos.
+              </p>
+            </div>
+            <form onSubmit={handleTwoFactor} className="space-y-4">
+              <input
+                className="input text-center text-2xl tracking-widest font-mono"
+                type="text"
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                value={twoFactorCode}
+                onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+                autoFocus
+                required
+              />
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
+              <button type="submit" className="btn-primary w-full py-2.5" disabled={loading || twoFactorCode.length !== 6}>
+                {loading ? 'A verificar...' : 'Verificar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { cancelTwoFactor(); clearError(); }}
+                className="w-full text-sm text-gray-400 hover:text-gray-600 py-1"
+              >
+                ← Voltar ao login
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white px-4">

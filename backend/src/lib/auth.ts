@@ -47,3 +47,15 @@ export function generateRefreshToken(): string {
 export function generateEncryptionKey(): string {
   return crypto.randomBytes(32).toString('hex');
 }
+
+/** Token temporário (5 min) emitido após password correta quando 2FA está ativo.
+ *  Não é um access token — só serve para completar o segundo fator. */
+export function signTwoFactorToken(tenantId: string): string {
+  return jwt.sign({ tenantId, type: 'pending_2fa' }, JWT_SECRET, { expiresIn: '5m' } as jwt.SignOptions);
+}
+
+export function verifyTwoFactorToken(token: string): { tenantId: string } {
+  const payload = jwt.verify(token, JWT_SECRET) as { tenantId: string; type: string };
+  if (payload.type !== 'pending_2fa') throw new Error('Invalid token type');
+  return { tenantId: payload.tenantId };
+}

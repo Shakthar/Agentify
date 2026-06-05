@@ -7,7 +7,12 @@ interface AuthState {
   tenant: Tenant | null;
   loading: boolean;
   error: string | null;
+  // Estado intermédio quando 2FA está ativo
+  pendingTwoFactor: boolean;
+  twoFactorToken: string | null;
   login: (email: string, password: string) => Promise<void>;
+  completeTwoFactorLogin: (code: string) => Promise<void>;
+  cancelTwoFactor: () => void;
   signup: (email: string, password: string, name: string, companyName?: string) => Promise<void>;
   logout: () => Promise<void>;
   loadMe: () => Promise<void>;
@@ -18,11 +23,20 @@ export const useAuth = create<AuthState>((set, get) => ({
   tenant: getSavedTenant<Tenant>(),
   loading: false,
   error: null,
+  pendingTwoFactor: false,
+  twoFactorToken: null,
 
   login: async (email, password) => {
     set({ loading: true, error: null });
     try {
       const { data } = await api.post('/api/auth/login', { email, password });
+
+      if (data.requiresTwoFactor) {
+        // Primeiro fator OK — aguarda o código TOTP
+        set({ pendingTwoFactor: true, twoFactorToken: data.twoFactorToken, loading: false });
+        return;
+      }
+
       setTokens(data.token, data.refreshToken);
       saveTenant(data.tenant);
       set({ tenant: data.tenant, loading: false });
@@ -31,6 +45,26 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
+  },
+
+  completeTwoFactorLogin: async (code: string) => {
+    const { twoFactorToken } = get();
+    if (!twoFactorToken) return;
+    set({ loading: true, error: null });
+    try {
+      const { data } = await api.post('/api/auth/2fa/verify', { twoFactorToken, code });
+      setTokens(data.token, data.refreshToken);
+      saveTenant(data.tenant);
+      set({ tenant: data.tenant, pendingTwoFactor: false, twoFactorToken: null, loading: false });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Código inválido';
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  cancelTwoFactor: () => {
+    set({ pendingTwoFactor: false, twoFactorToken: null, error: null });
   },
 
   signup: async (email, password, name, companyName) => {
@@ -57,7 +91,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       await api.post('/api/auth/logout');
     } finally {
       clearTokens();
-      set({ tenant: null });
+      set({ tenant: null, pendingTwoFactor: false, twoFactorToken: null });
     }
   },
 

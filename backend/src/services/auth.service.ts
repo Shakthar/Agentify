@@ -7,6 +7,7 @@ import {
   hashToken,
   generateRefreshToken,
   generateEncryptionKey,
+  signTwoFactorToken,
 } from '../lib/auth.js';
 import { PLAN_LIMITS } from '../types/index.js';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../lib/errors.js';
@@ -98,6 +99,12 @@ export async function login(email: string, password: string) {
 
   if (!tenant || !valid) {
     throw new UnauthorizedError('Invalid credentials');
+  }
+
+  // 2FA: se ativo, emite um token temporário (5 min) e indica ao frontend que precisa do código
+  if (tenant.twoFactorEnabled) {
+    const twoFactorToken = signTwoFactorToken(tenant.id);
+    return { requiresTwoFactor: true as const, twoFactorToken };
   }
 
   const tokens = await issueTokens(tenant);

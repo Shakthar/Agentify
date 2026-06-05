@@ -13,6 +13,7 @@ import billingRouter from './routes/billing.js';
 import suggestRouter from './routes/suggest.js';
 import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
+import twoFactorRouter from './routes/twoFactor.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
 
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/billing', billingRouter);
 app.use('/api/suggest', suggestRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/auth/2fa', twoFactorRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);

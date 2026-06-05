@@ -10,6 +10,7 @@ export const ROUTES = {
   agentDetail: (id: string) => `/dashboard/${id}`,
   billing: '/dashboard/billing',
   admin: '/dashboard/admin',
+  settings: '/dashboard/settings',
 } as const;
 
 export const CREDIT_ALERT_THRESHOLDS = [70, 80, 90] as const;
