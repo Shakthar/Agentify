@@ -1,0 +1,146 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "agents": "Agentes",
+    "billing": "Créditos",
+    "admin": "Admin",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "signup": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "name": "Nombre",
+    "companyName": "Nombre de la empresa",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?",
+    "loginTitle": "Inicia sesión en tu cuenta",
+    "signupTitle": "Crear una cuenta",
+    "twoFactor": {
+      "title": "Verificación en dos pasos",
+      "description": "Introduce el código de 6 dígitos de tu aplicación autenticadora.",
+      "code": "Código",
+      "verify": "Verificar",
+      "back": "Volver al inicio de sesión",
+      "invalidCode": "Código inválido"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Bienvenido",
+    "activeAgents": "Agentes activos",
+    "totalConversations": "Conversaciones totales",
+    "creditsUsed": "Créditos usados"
+  },
+  "agents": {
+    "title": "Agentes",
+    "create": "Crear agente",
+    "noAgents": "Aún no tienes agentes.",
+    "name": "Nombre",
+    "description": "Descripción",
+    "model": "Modelo",
+    "status": {
+      "active": "Activo",
+      "inactive": "Inactivo"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "toggle": "Activar/Desactivar",
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    },
+    "systemPrompt": "Prompt del sistema",
+    "temperature": "Temperatura",
+    "suggest": "Sugerir configuración con IA"
+  },
+  "billing": {
+    "title": "Créditos y Plan",
+    "currentPlan": "Plan actual",
+    "total": "Total",
+    "used": "Usados",
+    "available": "Disponibles",
+    "usage": "Uso",
+    "history": "Historial reciente",
+    "plans": "Planes disponibles",
+    "upgrade": "Mejorar plan",
+    "downgrade": "Reducir plan",
+    "current": "Actual",
+    "creditsPerMonth": "créditos/mes",
+    "creditsOneTime": "créditos (único, sin reinicio)",
+    "agents": "agentes",
+    "almostFull": "⚠️ ¡Créditos casi agotados!",
+    "lowCredits": "⚡ Tienes menos del 30% de tus créditos restantes",
+    "remaining": "restantes",
+    "percentUsed": "% usado"
+  },
+  "admin": {
+    "title": "Panel de administración",
+    "metrics": {
+      "agents": "Agentes",
+      "conversations": "Conversaciones",
+      "messages": "Mensajes",
+      "credits": "Créditos usados"
+    },
+    "auditLog": {
+      "title": "Registro de actividad",
+      "action": "Acción",
+      "resource": "Recurso",
+      "date": "Fecha",
+      "noLogs": "Sin registros",
+      "previous": "Anterior",
+      "next": "Siguiente"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "account": "Cuenta",
+    "email": "Correo electrónico",
+    "plan": "Plan",
+    "twoFactor": {
+      "title": "Autenticación de dos factores",
+      "status": {
+        "active": "Activo",
+        "inactive": "Inactivo"
+      },
+      "setup": "Configurar 2FA",
+      "disable": "Desactivar 2FA",
+      "scanQr": "Escanea este código QR con tu aplicación autenticadora (Google Authenticator, Authy, 1Password, etc.)",
+      "enterCode": "Código de confirmación",
+      "confirm": "Confirmar y activar",
+      "enterCodeToDisable": "Introduce el código actual para desactivar",
+      "confirmDisable": "Confirmar desactivación",
+      "cancel": "Cancelar"
+    }
+  },
+  "chat": {
+    "placeholder": "Escribe un mensaje...",
+    "send": "Enviar",
+    "typing": "Escribiendo...",
+    "online": "En línea",
+    "offline": "Desconectado",
+    "poweredBy": "Powered by Agentify",
+    "connecting": "Conectando...",
+    "error": "Ocurrió un error. Inténtalo de nuevo."
+  },
+  "common": {
+    "loading": "Cargando...",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "confirm": "Confirmar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "close": "Cerrar",
+    "yes": "Sí",
+    "no": "No",
+    "error": "Error",
+    "success": "Éxito",
+    "or": "o"
+  }
+}

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTES } from '../utils/constants';
 import { Plan, PLAN_LABELS, PLAN_COLORS } from '../types';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const navItems = [
   { href: ROUTES.dashboard, label: 'Dashboard', icon: '◈' },
@@ -52,6 +53,10 @@ export default function Navigation() {
           );
         })}
       </nav>
+
+      <div className="mb-4 px-2">
+          <LanguageSwitcher />
+        </div>
 
       {/* Credits bar */}
       {tenant && (

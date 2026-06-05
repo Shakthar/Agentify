@@ -1,0 +1,146 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "agents": "Agents",
+    "billing": "Credits",
+    "admin": "Admin",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "auth": {
+    "login": "Sign in",
+    "signup": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "companyName": "Company name",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginTitle": "Sign in to your account",
+    "signupTitle": "Create an account",
+    "twoFactor": {
+      "title": "Two-step verification",
+      "description": "Enter the 6-digit code from your authenticator app.",
+      "code": "Code",
+      "verify": "Verify",
+      "back": "Back to login",
+      "invalidCode": "Invalid code"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome",
+    "activeAgents": "Active agents",
+    "totalConversations": "Total conversations",
+    "creditsUsed": "Credits used"
+  },
+  "agents": {
+    "title": "Agents",
+    "create": "Create agent",
+    "noAgents": "You have no agents yet.",
+    "name": "Name",
+    "description": "Description",
+    "model": "Model",
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "toggle": "Enable/Disable",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "systemPrompt": "System prompt",
+    "temperature": "Temperature",
+    "suggest": "Suggest config with AI"
+  },
+  "billing": {
+    "title": "Credits & Plan",
+    "currentPlan": "Current plan",
+    "total": "Total",
+    "used": "Used",
+    "available": "Available",
+    "usage": "Usage",
+    "history": "Recent history",
+    "plans": "Available plans",
+    "upgrade": "Upgrade",
+    "downgrade": "Downgrade",
+    "current": "Current",
+    "creditsPerMonth": "credits/month",
+    "creditsOneTime": "credits (one-time, no reset)",
+    "agents": "agents",
+    "almostFull": "⚠️ Credits almost depleted!",
+    "lowCredits": "⚡ You have less than 30% of your credits remaining",
+    "remaining": "remaining",
+    "percentUsed": "% used"
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "metrics": {
+      "agents": "Agents",
+      "conversations": "Conversations",
+      "messages": "Messages",
+      "credits": "Credits used"
+    },
+    "auditLog": {
+      "title": "Activity log",
+      "action": "Action",
+      "resource": "Resource",
+      "date": "Date",
+      "noLogs": "No logs",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "email": "Email",
+    "plan": "Plan",
+    "twoFactor": {
+      "title": "Two-factor authentication",
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "setup": "Set up 2FA",
+      "disable": "Disable 2FA",
+      "scanQr": "Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc.)",
+      "enterCode": "Confirmation code",
+      "confirm": "Confirm and activate",
+      "enterCodeToDisable": "Enter your current code to disable",
+      "confirmDisable": "Confirm deactivation",
+      "cancel": "Cancel"
+    }
+  },
+  "chat": {
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "typing": "Typing...",
+    "online": "Online",
+    "offline": "Offline",
+    "poweredBy": "Powered by Agentify",
+    "connecting": "Connecting...",
+    "error": "An error occurred. Please try again."
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Error",
+    "success": "Success",
+    "or": "or"
+  }
+}
