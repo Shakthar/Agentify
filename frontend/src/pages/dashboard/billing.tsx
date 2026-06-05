@@ -112,10 +112,13 @@ export default function BillingPage() {
                   <span className="absolute -top-2.5 left-4 bg-brand-600 text-white text-xs px-2 py-0.5 rounded-full">Atual</span>
                 )}
                 <p className="font-semibold text-gray-900 mb-1">{plan.label}</p>
-                <p className="text-2xl font-bold text-brand-700 mb-3">{plan.price}<span className="text-sm text-gray-400 font-normal">/mês</span></p>
+                <p className="text-2xl font-bold text-brand-700 mb-3">
+                  {plan.price}
+                  {plan.id !== 'free' && <span className="text-sm text-gray-400 font-normal">/mês</span>}
+                </p>
                 <ul className="text-sm text-gray-600 space-y-1">
                   <li>✓ {plan.agents === 999 ? '30+ agentes' : `${plan.agents} agentes`}</li>
-                  <li>✓ {plan.credits} créditos/mês</li>
+                  <li>✓ {plan.credits} créditos{plan.id === 'free' ? ' (único, sem reset)' : '/mês'}</li>
                 </ul>
                 {tenant.plan !== plan.id && (
                   <button className="btn-primary w-full mt-4 text-sm" disabled>
