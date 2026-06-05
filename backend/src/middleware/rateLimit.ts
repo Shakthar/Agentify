@@ -11,6 +11,7 @@ export const globalLimiter = rateLimit({
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
+  skipSuccessfulRequests: true, // só conta tentativas falhadas
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many auth attempts, please try again later' },

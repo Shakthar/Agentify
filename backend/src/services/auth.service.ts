@@ -85,9 +85,18 @@ export async function signup(input: SignupInput) {
   };
 }
 
+// Hash dummy — garante tempo de resposta constante mesmo quando o email não existe,
+// impedindo ataques de timing que revelam quais emails estão registados.
+const DUMMY_HASH = '$2a$12$invalidhashusedtoblindattackersonlyXXXXXXXXXXXXXXXXXX';
+
 export async function login(email: string, password: string) {
   const tenant = await prisma.tenant.findUnique({ where: { email, deletedAt: null } });
-  if (!tenant || !(await comparePassword(password, tenant.passwordHash))) {
+
+  // Corre sempre o compare (mesmo com tenant null) para normalizar o tempo de resposta
+  const passwordToCheck = tenant?.passwordHash ?? DUMMY_HASH;
+  const valid = await comparePassword(password, passwordToCheck);
+
+  if (!tenant || !valid) {
     throw new UnauthorizedError('Invalid credentials');
   }
 

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { Server as SocketIOServer } from 'socket.io';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -33,6 +34,11 @@ app.use(cors({
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+}));
+app.use(helmet({
+  // Permite embeber o widget de chat em iframes de clientes
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(globalLimiter);
