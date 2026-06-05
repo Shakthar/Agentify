@@ -5,6 +5,12 @@ import * as conversationsService from '../services/conversations.service.js';
 
 const router = Router();
 
+// ─── GET /api/webhooks/whatsapp/status ──────────────────────────────────────
+// Indica ao frontend se o WHATSAPP_TOKEN está configurado
+router.get('/whatsapp/status', (_req: Request, res: Response) => {
+  res.json({ configured: !!process.env.WHATSAPP_TOKEN });
+});
+
 // ─── GET /api/webhooks/whatsapp ───────────────────────────────────────────────
 // Meta chama este endpoint para verificar o webhook (challenge handshake)
 router.get('/whatsapp', (req: Request, res: Response) => {

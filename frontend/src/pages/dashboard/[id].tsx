@@ -46,6 +46,7 @@ export default function AgentDetailPage() {
   const [wpEnabled, setWpEnabled] = useState(false);
   const [wpSaving, setWpSaving] = useState(false);
   const [wpMsg, setWpMsg] = useState('');
+  const [wpTokenOk, setWpTokenOk] = useState(true);
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
@@ -56,6 +57,7 @@ export default function AgentDetailPage() {
       setPhoneId(data.whatsappNumber ?? '');
       setWpEnabled(data.whatsappEnabled ?? false);
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
+    api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
 
   const handleSave = async () => {
@@ -300,13 +302,21 @@ export default function AgentDetailPage() {
                 </div>
               </div>
 
-              <div className="card bg-amber-50 border-amber-200">
-                <p className="text-sm text-amber-800">
-                  <strong>⚠️ Falta no servidor:</strong> abre <code className="bg-amber-100 px-1 rounded">backend/.env</code> e preenche:
-                </p>
-                <pre className="mt-2 text-xs bg-amber-100 rounded p-3 font-mono">{`WHATSAPP_TOKEN="<token gerado no Meta>"`}</pre>
-                <p className="text-xs text-amber-700 mt-1">Reinicia o backend depois.</p>
-              </div>
+              {wpTokenOk ? (
+                <div className="card bg-green-50 border-green-200">
+                  <p className="text-sm text-green-700">
+                    ✅ <strong>Token configurado.</strong> O backend está pronto para enviar e receber mensagens WhatsApp.
+                  </p>
+                </div>
+              ) : (
+                <div className="card bg-amber-50 border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    <strong>⚠️ Falta no servidor:</strong> abre <code className="bg-amber-100 px-1 rounded">backend/.env</code> e preenche:
+                  </p>
+                  <pre className="mt-2 text-xs bg-amber-100 rounded p-3 font-mono">{`WHATSAPP_TOKEN="<token gerado no Meta>"`}</pre>
+                  <p className="text-xs text-amber-700 mt-1">Reinicia o backend depois.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
