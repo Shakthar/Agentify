@@ -60,7 +60,8 @@ model Agent {
   
   // Channels
   whatsappEnabled       Boolean    @default(false)
-  whatsappNumber        String?
+  whatsappNumber        String?    // phone_number_id do Meta
+  whatsappToken         String?    // System User Access Token do cliente (encriptado)
   whatsappWebhookUrl    String?
   webChatEnabled        Boolean    @default(true)
   emailEnabled          Boolean    @default(false)

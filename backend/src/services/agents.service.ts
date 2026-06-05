@@ -2,6 +2,7 @@ import prisma from '../lib/prisma.js';
 import { PLAN_LIMITS, ALLOWED_MODELS } from '../types/index.js';
 import { ForbiddenError, NotFoundError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
+import { encrypt } from '../lib/encryption.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -21,6 +22,7 @@ interface CreateAgentInput {
   skills?: AgentSkills;
   whatsappEnabled?: boolean;
   whatsappNumber?: string;
+  whatsappToken?: string;   // token em claro — será encriptado antes de persistir
   webChatEnabled?: boolean;
   emailEnabled?: boolean;
   offHoursMessage?: string;
@@ -87,12 +89,23 @@ export async function createAgent(
     throw new ForbiddenError(`Agent limit (${limits.agents}) reached for ${plan} plan`);
   }
 
-  const { skills, ...agentData } = input;
+  const { skills, whatsappToken, ...agentData } = input;
+
+  // Encriptar token do WhatsApp se fornecido
+  let encryptedWhatsappToken: string | undefined;
+  if (whatsappToken) {
+    const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
+    if (tenantRecord?.encryptionKey) {
+      const { ciphertext, iv } = encrypt(whatsappToken, tenantRecord.encryptionKey);
+      encryptedWhatsappToken = `${iv}:${ciphertext}`;
+    }
+  }
 
   const agent = await prisma.agent.create({
     data: {
       tenantId: tenant.id,
       ...agentData,
+      whatsappToken: encryptedWhatsappToken,
       skillHandoff: skills?.handoff ?? true,
       skillDataCollection: skills?.dataCollection ?? true,
       skillScheduling: skills?.scheduling ?? false,
@@ -113,8 +126,11 @@ export async function getAgent(tenantId: string, agentId: string) {
     throw new NotFoundError('Agent not found');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { whatsappToken: _omit, ...safeAgent } = agent;
   return {
-    ...agent,
+    ...safeAgent,
+    whatsappTokenConfigured: !!agent.whatsappToken, // indica se está configurado sem expor o valor
     skills: {
       handoff: agent.skillHandoff,
       dataCollection: agent.skillDataCollection,
@@ -146,7 +162,18 @@ export async function updateAgent(
     assertModelAllowed(tenant.plan, input.model);
   }
 
-  const { skills, ...updateData } = input;
+  const { skills, whatsappToken, ...updateData } = input;
+
+  // Encriptar token do WhatsApp se fornecido no update
+  let encryptedWhatsappToken: string | undefined;
+  if (whatsappToken) {
+    const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
+    if (tenantRecord?.encryptionKey) {
+      const { ciphertext, iv } = encrypt(whatsappToken, tenantRecord.encryptionKey);
+      encryptedWhatsappToken = `${iv}:${ciphertext}`;
+    }
+  }
+
   const skillsUpdate = skills
     ? {
         skillHandoff: skills.handoff,
@@ -159,7 +186,7 @@ export async function updateAgent(
 
   return prisma.agent.update({
     where: { id: agentId },
-    data: { ...updateData, ...skillsUpdate },
+    data: { ...updateData, ...(encryptedWhatsappToken ? { whatsappToken: encryptedWhatsappToken } : {}), ...skillsUpdate },
   });
 }
 
