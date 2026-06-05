@@ -18,6 +18,8 @@ pnpm-lock.yaml
 /.next
 /out
 *.tsbuildinfo
+frontend/.next/
+backend/dist/
 
 # IDE
 .vscode/
