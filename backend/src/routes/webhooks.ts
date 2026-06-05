@@ -69,7 +69,8 @@ router.post('/whatsapp', asyncHandler(async (req: Request, res: Response) => {
             tenantId:    agent.tenantId,
             channelType: 'whatsapp',
             externalId:  from,
-            status:      'open',
+            resolved:    false,
+            closedAt:    null,
           },
         });
 
@@ -81,7 +82,6 @@ router.post('/whatsapp', asyncHandler(async (req: Request, res: Response) => {
               channelType: 'whatsapp',
               externalId:  from,
               visitorId:   from,
-              status:      'open',
             },
           });
         }
