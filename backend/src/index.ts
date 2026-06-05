@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -13,8 +13,6 @@ import suggestRouter from './routes/suggest.js';
 import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
-
-dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
