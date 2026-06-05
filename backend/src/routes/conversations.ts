@@ -234,7 +234,7 @@ router.post('/:id/messages', chatLimiter, async (req: AuthenticatedRequest, res:
         tenantId: req.tenant!.id,
         amount: -llmResponse.creditsUsed,
         reason: 'chat',
-        details: JSON.stringify({ agentId: conversation.agentId, model: llmResponse.model }),
+        details: { agentId: conversation.agentId, model: llmResponse.model },
       },
     }),
   ]);

@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // PgBouncer (porta 6543) — para queries
+  directUrl = env("DIRECT_URL")     // Ligação direta (porta 5432) — para migrations
 }
 
 // ===== TENANTS (Revendedores) =====
@@ -155,7 +156,7 @@ model CreditLog {
   tenantId              String
   amount                Int        // positive = added, negative = consumed
   reason                String     // chat, signup-bonus, purchase, refund, monthly-reset
-  details               String?    @db.Json // { agentId, model, messageCount, etc }
+  details               Json?                  // { agentId, model, messageCount, etc }
   
   createdAt             DateTime   @default(now())
 
@@ -259,7 +260,7 @@ model Embedding {
 model StripeEvent {
   id                    String     @id
   type                  String
-  data                  String     @db.Json
+  data                  Json
   processed             Boolean    @default(false)
   error                 String?
   createdAt             DateTime   @default(now())
@@ -274,7 +275,7 @@ model AuditLog {
   action                String     // create_agent, delete_conversation, purchase_credits, etc
   resourceType          String?
   resourceId            String?
-  details               String?    @db.Json
+  details               Json?
   
   createdAt             DateTime   @default(now())
 
