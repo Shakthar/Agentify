@@ -66,18 +66,18 @@ export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conver
 };
 
 export const ALLOWED_MODELS: Record<Plan, string[]> = {
-  free:       ['claude-haiku-3', 'gpt-4o-mini'],
-  starter:    ['claude-haiku-3', 'gpt-4o-mini', 'claude-sonnet-4'],
-  pro:        ['claude-haiku-3', 'gpt-4o-mini', 'claude-sonnet-4', 'gpt-4o'],
-  business:   ['claude-haiku-3', 'gpt-4o-mini', 'claude-sonnet-4', 'gpt-4o', 'gemini-1.5-pro'],
-  enterprise: ['claude-haiku-3', 'gpt-4o-mini', 'claude-sonnet-4', 'gpt-4o', 'gemini-1.5-pro', 'claude-opus-4'],
+  free:       ['claude-haiku-4-5-20251001', 'gpt-4o-mini'],
+  starter:    ['claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929'],
+  pro:        ['claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o'],
+  business:   ['claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gemini-1.5-pro'],
+  enterprise: ['claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gemini-1.5-pro', 'claude-opus-4-5-20251101'],
 };
 
 export const TOKEN_COSTS: Record<string, number> = {
-  'claude-haiku-3':   1,
-  'gpt-4o-mini':      1,
-  'claude-sonnet-4':  3,
-  'gpt-4o':           5,
-  'gemini-1.5-pro':   4,
-  'claude-opus-4':    15,
+  'claude-haiku-4-5-20251001':  1,
+  'gpt-4o-mini':                1,
+  'claude-sonnet-4-5-20250929': 3,
+  'gpt-4o':                     5,
+  'gemini-1.5-pro':             4,
+  'claude-opus-4-5-20251101':   15,
 };

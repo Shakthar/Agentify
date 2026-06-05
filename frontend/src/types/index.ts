@@ -124,10 +124,10 @@ export const PLAN_COLORS: Record<Plan, string> = {
 };
 
 export const MODEL_LABELS: Record<string, string> = {
-  'claude-haiku-3':   'Claude Haiku 3',
-  'gpt-4o-mini':      'GPT-4o Mini',
-  'claude-sonnet-4':  'Claude Sonnet 4',
-  'gpt-4o':           'GPT-4o',
-  'gemini-1.5-pro':   'Gemini 1.5 Pro',
-  'claude-opus-4':    'Claude Opus 4',
+  'claude-haiku-4-5-20251001':  'Claude Haiku 4.5',
+  'gpt-4o-mini':                'GPT-4o Mini',
+  'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5',
+  'gpt-4o':                     'GPT-4o',
+  'gemini-1.5-pro':             'Gemini 1.5 Pro',
+  'claude-opus-4-5-20251101':   'Claude Opus 4.5',
 };

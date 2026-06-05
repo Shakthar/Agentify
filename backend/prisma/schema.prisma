@@ -50,7 +50,7 @@ model Agent {
   name                  String
   description           String?
   systemPrompt          String     @db.Text
-  model                 String     @default("claude-sonnet-4") // claude-haiku, claude-sonnet-4, gpt-4o-mini, etc
+  model                 String     @default("claude-haiku-4-5-20251001") // claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929, gpt-4o-mini, etc
   temperature           Float      @default(0.7)
   maxTokens             Int        @default(2000)
   
