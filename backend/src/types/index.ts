@@ -57,6 +57,13 @@ export interface SendMessageInput {
 
 export type Plan = 'free' | 'starter' | 'pro' | 'business' | 'enterprise';
 
+/**
+ * Limites por plano.
+ * - free: créditos concedidos UMA VEZ no signup, nunca resetam.
+ *         Para obter mais, o utilizador tem de fazer upgrade.
+ * - starter/pro/business/enterprise: créditos resetam mensalmente
+ *         via webhook do Stripe (implementação pendente).
+ */
 export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number }> = {
   free:       { agents: 3,  credits: 3000,  conversations: 100 },
   starter:    { agents: 10, credits: 10000, conversations: Infinity },
