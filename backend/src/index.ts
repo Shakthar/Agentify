@@ -7,6 +7,7 @@ import authRouter from './routes/auth.js';
 import agentsRouter from './routes/agents.js';
 import conversationsRouter from './routes/conversations.js';
 import billingRouter from './routes/billing.js';
+import suggestRouter from './routes/suggest.js';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/agents', agentsRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/suggest', suggestRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);
