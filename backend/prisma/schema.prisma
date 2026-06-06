@@ -45,6 +45,7 @@ model Tenant {
   creditHistory         CreditLog[]
   refreshTokens         RefreshToken[]
   knowledgeBases        KnowledgeBase[]
+  agentDocs             AgentDoc[]
 }
 
 // ===== AGENTS =====
@@ -94,6 +95,7 @@ model Agent {
   conversations         Conversation[]
   creditAllocations     CreditAllocation[]
   knowledgeBase         KnowledgeBase?
+  agentDocs             AgentDoc[]
 
   @@index([tenantId])
 }
@@ -292,4 +294,25 @@ model AuditLog {
 
   @@index([tenantId])
   @@index([createdAt])
+}
+
+// ===== AGENT DOCS (documentos que o agente pode enviar aos clientes) =====
+model AgentDoc {
+  id          String   @id @default(cuid())
+  agentId     String
+  tenantId    String
+  name        String           // Nome de exibição
+  description String?          // Descrição opcional
+  fileUrl     String           // URL pública no Supabase Storage
+  fileName    String           // Nome original do ficheiro
+  mimeType    String
+  fileSize    Int      @default(0)
+  storageKey  String           // Caminho no bucket (para delete)
+  createdAt   DateTime @default(now())
+
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([tenantId])
 }

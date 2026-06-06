@@ -166,7 +166,7 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
         }
 
         // Processar mensagem no LLM
-        let result: { content: string };
+        let result: { content: string; docAttachment?: { id: string; name: string; url: string } | null };
         try {
           result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
         } catch (err) {
@@ -183,12 +183,38 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
 
         // Enviar resposta de volta ao WhatsApp
         await sendWhatsAppReply(phoneId, from, result.content, effectiveToken);
+        // Enviar documento separado se o agente o indicou
+        if (result.docAttachment) {
+          await sendWhatsAppDocument(phoneId, from, result.docAttachment.url, result.docAttachment.name, effectiveToken);
+        }
       }
     }
   }
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function sendWhatsAppDocument(phoneId: string, to: string, fileUrl: string, filename: string, token: string | undefined): Promise<void> {
+  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+  if (!token) return;
+
+  const url = `https://graph.facebook.com/${version}/${phoneId}/messages`;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'document',
+        document: { link: fileUrl, filename },
+      }),
+    });
+    if (!resp.ok) console.error('[WhatsApp] Erro ao enviar documento:', await resp.text());
+  } catch (err) {
+    console.error('[WhatsApp] Falha ao enviar documento:', err);
+  }
+}
 
 async function sendWhatsAppReply(phoneId: string, to: string, text: string, token: string | undefined): Promise<void> {
   const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';

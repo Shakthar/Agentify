@@ -17,6 +17,7 @@ import chatRouter from './routes/chat.js';
 import twoFactorRouter from './routes/twoFactor.js';
 import webhooksRouter from './routes/webhooks.js';
 import knowledgeRouter from './routes/knowledge.js';
+import agentDocsRouter from './routes/agentDocs.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
 import { startIngestionWorker, stopIngestionWorker } from './workers/ingestion.worker.js';
 import { closeQueue } from './lib/queue.js';
@@ -99,6 +100,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/agents', agentsRouter);
 app.use('/api/agents/:agentId/knowledge', knowledgeRouter);
+app.use('/api/agents/:agentId/docs', agentDocsRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/suggest', suggestRouter);

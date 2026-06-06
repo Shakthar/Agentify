@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Navigation from '../../components/Navigation';
 import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
+import AgentDocs from '../../components/AgentDocs';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgent } from '../../hooks/useAgent';
 import { ROUTES, API_URL, AVAILABLE_MODELS_BY_PLAN } from '../../utils/constants';
@@ -39,7 +40,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs'>('overview');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
   const [error, setError] = useState<string | null>(null);
   // WhatsApp state
@@ -144,6 +145,7 @@ export default function AgentDetailPage() {
                           { key: 'overview',   label: '📊 Visão geral' },
               { key: 'chat',       label: '💬 Testar chat' },
               { key: 'knowledge',  label: '🧠 Conhecimento' },
+              { key: 'docs',       label: '📎 Documentos' },
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
               { key: 'edit',       label: '✏️ Editar' },
@@ -327,6 +329,11 @@ export default function AgentDetailPage() {
           {/* ─── Knowledge Base ─── */}
           {activeTab === 'knowledge' && agent && (
             <KnowledgeBase agentId={agent.id} />
+          )}
+
+          {/* ─── Documentos enviáveis ─── */}
+          {activeTab === 'docs' && agent && (
+            <AgentDocs agentId={agent.id} />
           )}
 
           {/* ─── Web Embed ─── */}

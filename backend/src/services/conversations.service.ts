@@ -192,6 +192,23 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     /* ignora falhas de RAG e segue com o prompt base */
   }
 
+  // Injeta lista de documentos disponíveis para envio
+  try {
+    const agentDocs = await prisma.agentDoc.findMany({
+      where: { agentId: conversation.agentId },
+      select: { id: true, name: true, description: true },
+    });
+    if (agentDocs.length > 0) {
+      systemPrompt += '\n\n---\nDocumentos que podes enviar ao cliente (usa exatamente o marcador indicado na tua resposta quando o cliente pedir esse documento):\n';
+      for (const doc of agentDocs) {
+        systemPrompt += `- [SEND_DOC:${doc.id}] ${doc.name}${doc.description ? ` — ${doc.description}` : ''}\n`;
+      }
+      systemPrompt += 'Exemplo: "Aqui está o nosso menu! [SEND_DOC:abc123]"\n';
+    }
+  } catch {
+    /* ignorar falhas de doc injection */
+  }
+
   // Chamada ao LLM
   let llmResponse;
   try {
@@ -207,11 +224,22 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     throw new UpstreamError(`LLM error: ${msg}`);
   }
 
-  // Persiste a resposta do assistente (cifrada)
-  let assistantContent = llmResponse.content;
+  // Parseia [SEND_DOC:id] da resposta do LLM
+  const sendDocMatch = llmResponse.content.match(/\[SEND_DOC:([a-z0-9]+)\]/i);
+  const docId = sendDocMatch?.[1] ?? null;
+  const cleanContent = llmResponse.content.replace(/\[SEND_DOC:[a-z0-9]+\]/gi, '').trim();
+
+  let docAttachment: { id: string; name: string; url: string } | null = null;
+  if (docId) {
+    const doc = await prisma.agentDoc.findUnique({ where: { id: docId }, select: { id: true, name: true, fileUrl: true } });
+    if (doc) docAttachment = { id: doc.id, name: doc.name, url: doc.fileUrl };
+  }
+
+  // Persiste a resposta do assistente (cifrada, sem o marcador [SEND_DOC])
+  let assistantContent = cleanContent;
   let assistantIV: string | undefined;
   if (dataKey) {
-    const enc = encrypt(llmResponse.content, dataKey);
+    const enc = encrypt(cleanContent, dataKey);
     assistantContent = enc.ciphertext;
     assistantIV = enc.iv;
   }
@@ -263,11 +291,12 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   return {
     id: assistantMsg.id,
     role: 'assistant',
-    content: llmResponse.content,
+    content: cleanContent,
     tokens: totalTokens,
     creditsUsed: llmResponse.creditsUsed,
     sentiment,
     timestamp: assistantMsg.timestamp,
+    docAttachment,
   };
 }
 

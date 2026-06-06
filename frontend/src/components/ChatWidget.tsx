@@ -14,6 +14,7 @@ interface SendResult {
   content: string;
   timestamp: string;
   creditsUsed: number;
+  docAttachment?: { id: string; name: string; url: string } | null;
 }
 
 export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
@@ -68,7 +69,9 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
       const assistantMsg: Message = {
         id: data.id,
         role: 'assistant',
-        content: data.content,
+        content: data.content + (data.docAttachment
+          ? `\n\n[DOC:${data.docAttachment.url}|${data.docAttachment.name}]`
+          : ''),
         tokens: 0,
         timestamp: data.timestamp,
       };
@@ -119,12 +122,32 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
             key={msg.id}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+            <div className={`max-w-[80%] rounded-2xl text-sm leading-relaxed ${
               msg.role === 'user'
-                ? 'bg-brand-600 text-white rounded-br-sm'
+                ? 'bg-brand-600 text-white rounded-br-sm px-4 py-2 whitespace-pre-wrap'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm'
             }`}>
-              {msg.content}
+              {msg.role === 'assistant' ? (() => {
+                const docMatch = msg.content.match(/\[DOC:(https?:\/\/[^|]+)\|([^\]]+)\]/);
+                const text = msg.content.replace(/\[DOC:[^\]]+\]/g, '').trim();
+                return (
+                  <div className="px-4 py-2">
+                    {text && <p className="whitespace-pre-wrap">{text}</p>}
+                    {docMatch && (
+                      <a
+                        href={docMatch[1]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 text-brand-600 dark:text-brand-400 hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors"
+                      >
+                        <span>📎</span>
+                        <span className="text-xs font-medium truncate">{docMatch[2]}</span>
+                        <span className="text-xs text-gray-400 ml-auto shrink-0">Download</span>
+                      </a>
+                    )}
+                  </div>
+                );
+              })() : <span className="px-4 py-2 block whitespace-pre-wrap">{msg.content}</span>}
             </div>
           </div>
         ))}
