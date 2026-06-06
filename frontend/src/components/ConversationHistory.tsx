@@ -56,14 +56,14 @@ function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function WhatsAppConversations({ agentId }: Props) {
+export default function ConversationHistory({ agentId }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState<ConversationWithMessages | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'web'>('whatsapp');
+  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'web'>('all');
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const TAKE = 30;
@@ -152,7 +152,7 @@ export default function WhatsAppConversations({ agentId }: Props) {
             <div className="p-4 text-center text-xs text-gray-400">A carregar...</div>
           ) : displayed.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-400">
-              {filter === 'whatsapp' ? 'Sem conversas WhatsApp ainda.' : 'Sem conversas ainda.'}
+              {filter === 'whatsapp' ? 'Sem conversas WhatsApp ainda.' : filter === 'web' ? 'Sem conversas Web ainda.' : 'Sem conversas ainda.'}
             </div>
           ) : (
             displayed.map((conv) => (

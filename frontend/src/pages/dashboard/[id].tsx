@@ -5,7 +5,7 @@ import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
 import AgentDocs from '../../components/AgentDocs';
 import Orders from '../../components/Orders';
-import WhatsAppConversations from '../../components/WhatsAppConversations';
+import ConversationHistory from '../../components/ConversationHistory';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgent } from '../../hooks/useAgent';
 import { ROUTES, API_URL, AVAILABLE_MODELS_BY_PLAN } from '../../utils/constants';
@@ -154,7 +154,7 @@ export default function AgentDetailPage() {
               { key: 'orders',     label: '🛒 Pedidos' },
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
-              { key: 'history',    label: '📋 Histórico' },
+              { key: 'history',    label: '� Histórico' },
               { key: 'edit',       label: '✏️ Editar' },
             ] as { key: typeof activeTab; label: string }[]).map((t) => (
               <button
@@ -388,7 +388,7 @@ export default function AgentDetailPage() {
 
           {/* ─── Histórico de conversas ─── */}
           {activeTab === 'history' && agent && (
-            <WhatsAppConversations agentId={agent.id} />
+            <ConversationHistory agentId={agent.id} />
           )}
 
           {/* ─── WhatsApp ─── */}
