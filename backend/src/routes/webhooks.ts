@@ -171,6 +171,13 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
           result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
         } catch (err) {
           console.error('[WhatsApp] Erro ao processar mensagem:', err);
+          // Informar o utilizador que algo falhou em vez de silêncio total
+          await sendWhatsAppReply(
+            phoneId,
+            from,
+            '⚠️ Ocorreu um erro ao processar a sua mensagem. Por favor, tente novamente mais tarde.',
+            effectiveToken,
+          );
           continue;
         }
 
