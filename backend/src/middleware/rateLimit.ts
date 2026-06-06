@@ -2,9 +2,10 @@ import rateLimit from 'express-rate-limit';
 
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
-  max: 300,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/api/health',
   message: { error: 'Too many requests, please try again later' },
 });
 

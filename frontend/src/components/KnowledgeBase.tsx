@@ -121,16 +121,18 @@ export default function KnowledgeBase({ agentId }: Props) {
     }
   }, [agentId]);
 
+  // Carga inicial
   useEffect(() => {
     void refresh();
-    // Polling automático enquanto há documentos a processar
-    const interval = setInterval(() => {
-      if (docs.some((d) => d.status === 'pending' || d.status === 'processing')) {
-        void refresh();
-      }
-    }, 4000);
+  }, [agentId]);
+
+  // Polling separado — só arranca quando há documentos pendentes
+  useEffect(() => {
+    const hasPending = docs.some((d) => d.status === 'pending' || d.status === 'processing');
+    if (!hasPending) return;
+    const interval = setInterval(() => { void refresh(); }, 5000);
     return () => clearInterval(interval);
-  }, [refresh, docs]);
+  }, [docs, refresh]);
 
   // ── Upload de ficheiro ──────────────────────────────────────────────────
 
