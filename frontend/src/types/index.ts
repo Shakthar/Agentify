@@ -81,6 +81,32 @@ export interface AdminMetrics {
   credits: { total: number; used: number; available: number; usedPercent: number };
 }
 
+export interface PlatformExpense {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  recurring: boolean;
+  period: string;
+  createdAt: string;
+}
+
+export interface PlatformMetrics {
+  tenants: { total: number; byPlan: Record<string, number> };
+  agents: { total: number; active: number };
+  conversations: { total: number; today: number };
+  messages: { total: number };
+  revenue: { mrr: number; arr: number };
+  expenses: { monthly: number; items: PlatformExpense[] };
+  usage: {
+    creditsConsumed: number;  // créditos internos consumidos (todos os tenants)
+    inputTokens: number;      // tokens reais enviados ao LLM
+    outputTokens: number;     // tokens reais recebidos do LLM
+    realApiCostEur: number;   // custo real EUR pago à Anthropic/OpenAI
+  };
+  balance: number;
+}
+
 export interface CreditLog {
   id: string;
   amount: number;

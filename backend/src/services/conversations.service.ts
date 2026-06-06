@@ -330,7 +330,13 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
         tenantId,
         amount: -llmResponse.creditsUsed,
         reason: 'chat',
-        details: { agentId: conversation.agentId, model: llmResponse.model },
+        details: {
+          agentId: conversation.agentId,
+          model: llmResponse.model,
+          inputTokens: llmResponse.inputTokens,
+          outputTokens: llmResponse.outputTokens,
+          apiCostEur: llmResponse.apiCostEur, // custo real pago ao fornecedor
+        },
       },
     }),
   ]);

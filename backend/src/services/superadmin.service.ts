@@ -22,6 +22,7 @@ export async function getPlatformMetrics() {
     totalMessages,
     tenantsByPlan,
     expenses,
+    creditLogs,
   ] = await Promise.all([
     prisma.tenant.count({ where: { deletedAt: null } }),
     prisma.agent.count(),
@@ -31,6 +32,10 @@ export async function getPlatformMetrics() {
     prisma.message.count(),
     prisma.tenant.groupBy({ by: ['plan'], _count: { id: true }, where: { deletedAt: null } }),
     prisma.platformExpense.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.creditLog.findMany({
+      where: { reason: 'chat' },
+      select: { amount: true, details: true },
+    }),
   ]);
 
   // Revenue
@@ -48,6 +53,21 @@ export async function getPlatformMetrics() {
   const totalExpenses   = monthlyExpenses.reduce((s, e) => s + e.amount, 0)
                         + yearlyExpenses.reduce((s, e) => s + e.amount / 12, 0);
 
+  // Aggregate real API costs from CreditLog details
+  let totalCreditsConsumed = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let realApiCostEur = 0;
+  for (const log of creditLogs) {
+    totalCreditsConsumed += Math.abs(log.amount);
+    const d = log.details as Record<string, number> | null;
+    if (d) {
+      totalInputTokens  += d.inputTokens  ?? 0;
+      totalOutputTokens += d.outputTokens ?? 0;
+      realApiCostEur    += d.apiCostEur   ?? 0;
+    }
+  }
+
   return {
     tenants: { total: totalTenants, byPlan: planBreakdown },
     agents:  { total: totalAgents, active: activeAgents },
@@ -57,6 +77,12 @@ export async function getPlatformMetrics() {
     expenses: {
       monthly: totalExpenses,
       items: expenses,
+    },
+    usage: {
+      creditsConsumed: totalCreditsConsumed, // unidade interna
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      realApiCostEur: Math.round(realApiCostEur * 100) / 100, // custo real EUR
     },
     balance: mrr - totalExpenses,
   };

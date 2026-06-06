@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { TOKEN_COSTS } from '../types/index.js';
+import { TOKEN_COSTS, API_EUR_COST } from '../types/index.js';
 
 // Lazy initialization — env vars may not be populated at module load time in ESM
 let _anthropic: Anthropic | null = null;
@@ -33,6 +33,7 @@ export interface LLMResponse {
   outputTokens: number;
   model: string;
   creditsUsed: number;
+  apiCostEur: number; // custo real pago ao fornecedor LLM (EUR)
 }
 
 /**
@@ -85,8 +86,12 @@ async function callAnthropic(
   const outputTokens = response.usage.output_tokens;
   const costMultiplier = TOKEN_COSTS[model] ?? 3;
   const creditsUsed = Math.ceil(((inputTokens + outputTokens) / 1000) * costMultiplier);
+  const price = API_EUR_COST[model];
+  const apiCostEur = price
+    ? (inputTokens / 1000) * price.inputPer1K + (outputTokens / 1000) * price.outputPer1K
+    : 0;
 
-  return { content, inputTokens, outputTokens, model, creditsUsed };
+  return { content, inputTokens, outputTokens, model, creditsUsed, apiCostEur };
 }
 
 async function callOpenAI(
@@ -111,8 +116,12 @@ async function callOpenAI(
   const outputTokens = response.usage?.completion_tokens ?? 0;
   const costMultiplier = TOKEN_COSTS[model] ?? 2;
   const creditsUsed = Math.ceil(((inputTokens + outputTokens) / 1000) * costMultiplier);
+  const price = API_EUR_COST[model];
+  const apiCostEur = price
+    ? (inputTokens / 1000) * price.inputPer1K + (outputTokens / 1000) * price.outputPer1K
+    : 0;
 
-  return { content, inputTokens, outputTokens, model, creditsUsed };
+  return { content, inputTokens, outputTokens, model, creditsUsed, apiCostEur };
 }
 
 

@@ -16,6 +16,12 @@ interface PlatformMetrics {
   messages: { total: number };
   revenue: { mrr: number; arr: number };
   expenses: { monthly: number; items: Expense[] };
+  usage: {
+    creditsConsumed: number;   // créditos internos (unidade virtual)
+    inputTokens: number;       // tokens reais enviados ao LLM
+    outputTokens: number;      // tokens reais recebidos do LLM
+    realApiCostEur: number;    // custo real em EUR pago à Anthropic/OpenAI
+  };
   balance: number;
 }
 
@@ -214,8 +220,50 @@ export default function AdminPage() {
                   label="Balanço mensal"
                   value={`€${metrics.balance.toFixed(2)}`}
                   accent={metrics.balance >= 0 ? 'text-green-600' : 'text-red-600'}
-                  sub={`Despesas: €${metrics.expenses.monthly.toFixed(2)}/mês`}
+                  sub={`Despesas fixas: €${metrics.expenses.monthly.toFixed(2)}/mês`}
                 />
+              </div>
+              {/* Créditos vs custo real LLM */}
+              <div className="card">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">
+                  🤖 Consumo LLM — créditos internos vs custo real API
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Créditos consumidos</p>
+                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                      {(metrics.usage?.creditsConsumed ?? 0).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-gray-400">unidade virtual</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Tokens enviados</p>
+                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                      {((metrics.usage?.inputTokens ?? 0) / 1000).toFixed(1)}K
+                    </p>
+                    <p className="text-[10px] text-gray-400">input tokens</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Tokens recebidos</p>
+                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                      {((metrics.usage?.outputTokens ?? 0) / 1000).toFixed(1)}K
+                    </p>
+                    <p className="text-[10px] text-gray-400">output tokens</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Custo real API</p>
+                    <p className="text-xl font-bold text-red-500">
+                      €{(metrics.usage?.realApiCostEur ?? 0).toFixed(4)}
+                    </p>
+                    <p className="text-[10px] text-gray-400">EUR pago à Anthropic/OpenAI</p>
+                  </div>
+                </div>
+                {(metrics.usage?.creditsConsumed ?? 0) > 0 && (
+                  <p className="text-[10px] text-gray-400 mt-3 border-t border-gray-100 dark:border-gray-700 pt-2">
+                    💡 Eficiência: €{((metrics.usage?.realApiCostEur ?? 0) / (metrics.usage?.creditsConsumed ?? 1) * 1000).toFixed(4)} por 1 000 créditos consumidos
+                    {' · '}Receita por 1 000 créditos: €{(metrics.revenue.mrr / ((metrics.usage?.creditsConsumed ?? 1) / 1000)).toFixed(2)}
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <PlanBar byPlan={metrics.tenants.byPlan} />
@@ -280,9 +328,9 @@ export default function AdminPage() {
                   <p className="text-xs text-gray-400 mt-1">ARR: €{metrics.revenue.arr.toFixed(2)}</p>
                 </div>
                 <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">❤️ Despesas mensais</p>
+                  <p className="text-xs text-gray-500 mb-1">❤️ Despesas fixas/mês</p>
                   <p className="text-3xl font-bold text-red-500">€{metrics.expenses.monthly.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400 mt-1">{metrics.expenses.items.length} itens</p>
+                  <p className="text-xs text-gray-400 mt-1">{metrics.expenses.items.length} itens registados</p>
                 </div>
                 <div className="card">
                   <p className="text-xs text-gray-500 mb-1">⚖️ Balanço líquido</p>
@@ -291,6 +339,45 @@ export default function AdminPage() {
                   </p>
                   <p className="text-xs text-gray-400 mt-1">{metrics.balance >= 0 ? 'Positivo ✓' : '⚠️ Negativo'}</p>
                 </div>
+              </div>
+
+              {/* Custo real LLM (variável) */}
+              <div className="card border border-orange-100 dark:border-orange-900/30">
+                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3">
+                  🔌 Custo variável LLM — rastreado automaticamente
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Créditos consumidos</p>
+                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                      {(metrics.usage?.creditsConsumed ?? 0).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-gray-400">unidades internas</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Input tokens</p>
+                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                      {((metrics.usage?.inputTokens ?? 0) / 1000).toFixed(1)}K
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Output tokens</p>
+                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                      {((metrics.usage?.outputTokens ?? 0) / 1000).toFixed(1)}K
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Custo real pago (EUR)</p>
+                    <p className="text-lg font-bold text-orange-600">
+                      €{(metrics.usage?.realApiCostEur ?? 0).toFixed(4)}
+                    </p>
+                    <p className="text-[10px] text-gray-400">à Anthropic / OpenAI</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 bg-orange-50 dark:bg-orange-900/10 rounded p-2">
+                  ℹ️ Os créditos são a moeda interna da plataforma. O custo real EUR é calculado pelos tokens efetivamente processados × preço do modelo.
+                  Os planos de Anthropic/OpenAI nas despesas abaixo são estimativas manuais — compare com este valor rastreado.
+                </p>
               </div>
 
               <div className="card">

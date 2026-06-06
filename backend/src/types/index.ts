@@ -89,3 +89,18 @@ export const TOKEN_COSTS: Record<string, number> = {
   'gemini-1.5-pro':             4,
   'claude-opus-4-5-20251101':   15,
 };
+
+/**
+ * Custo real da API em EUR por 1 000 tokens (input e output separados).
+ * Baseado nos preços oficiais dos fornecedores (USD × 0.93 ≈ EUR, Jun 2026).
+ * inputPer1K  = custo por 1 K tokens de entrada (prompt)
+ * outputPer1K = custo por 1 K tokens de saída (completion)
+ */
+export const API_EUR_COST: Record<string, { inputPer1K: number; outputPer1K: number }> = {
+  'claude-haiku-4-5-20251001':  { inputPer1K: 0.000233, outputPer1K: 0.001163 }, // $0.25/$1.25 per M
+  'gpt-4o-mini':                { inputPer1K: 0.000140, outputPer1K: 0.000558 }, // $0.15/$0.60 per M
+  'claude-sonnet-4-5-20250929': { inputPer1K: 0.002790, outputPer1K: 0.013950 }, // $3/$15 per M
+  'gpt-4o':                     { inputPer1K: 0.004650, outputPer1K: 0.013950 }, // $5/$15 per M
+  'gemini-1.5-pro':             { inputPer1K: 0.001163, outputPer1K: 0.004650 }, // $1.25/$5 per M
+  'claude-opus-4-5-20251101':   { inputPer1K: 0.013950, outputPer1K: 0.069750 }, // $15/$75 per M
+};
