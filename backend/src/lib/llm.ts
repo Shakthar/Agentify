@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { TOKEN_COSTS } from '../types/index.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface LLMMessage {
   role: 'user' | 'assistant';
@@ -16,6 +18,17 @@ export interface LLMResponse {
   creditsUsed: number;
 }
 
+/**
+ * Selecciona o modelo para modo automático.
+ * - Historial curto (< 2000 chars totais) → modelo rápido/barato
+ * - Historial longo ou sistema prompt complexo → modelo mais capaz
+ */
+function autoSelectModel(systemPrompt: string, messages: LLMMessage[]): string {
+  const totalChars = systemPrompt.length + messages.reduce((s, m) => s + m.content.length, 0);
+  if (totalChars > 4000) return 'claude-sonnet-4-5-20250929';
+  return 'claude-haiku-4-5-20251001';
+}
+
 export async function callLLM(
   model: string,
   systemPrompt: string,
@@ -23,11 +36,16 @@ export async function callLLM(
   maxTokens = 2000,
   temperature = 0.7,
 ): Promise<LLMResponse> {
-  if (model.startsWith('claude')) {
-    return callAnthropic(model, systemPrompt, messages, maxTokens, temperature);
+  const resolvedModel = model === 'auto' ? autoSelectModel(systemPrompt, messages) : model;
+
+  if (resolvedModel.startsWith('claude')) {
+    return callAnthropic(resolvedModel, systemPrompt, messages, maxTokens, temperature);
+  }
+  if (resolvedModel.startsWith('gpt')) {
+    return callOpenAI(resolvedModel, systemPrompt, messages, maxTokens, temperature);
   }
 
-  throw new Error(`Model ${model} not yet supported`);
+  throw new Error(`Model "${resolvedModel}" não suportado`);
 }
 
 async function callAnthropic(
@@ -53,6 +71,33 @@ async function callAnthropic(
 
   return { content, inputTokens, outputTokens, model, creditsUsed };
 }
+
+async function callOpenAI(
+  model: string,
+  systemPrompt: string,
+  messages: LLMMessage[],
+  maxTokens: number,
+  temperature: number,
+): Promise<LLMResponse> {
+  const response = await openai.chat.completions.create({
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+    ],
+  });
+
+  const content = response.choices[0]?.message?.content ?? '';
+  const inputTokens = response.usage?.prompt_tokens ?? 0;
+  const outputTokens = response.usage?.completion_tokens ?? 0;
+  const costMultiplier = TOKEN_COSTS[model] ?? 2;
+  const creditsUsed = Math.ceil(((inputTokens + outputTokens) / 1000) * costMultiplier);
+
+  return { content, inputTokens, outputTokens, model, creditsUsed };
+}
+
 
 export function detectSentiment(text: string): number {
   // Simple heuristic — will be replaced by LLM-based analysis

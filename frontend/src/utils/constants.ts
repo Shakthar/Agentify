@@ -15,35 +15,40 @@ export const ROUTES = {
 
 export const CREDIT_ALERT_THRESHOLDS = [70, 80, 90] as const;
 
-export const AVAILABLE_MODELS_BY_PLAN: Record<string, { value: string; label: string }[]> = {
+export const AVAILABLE_MODELS_BY_PLAN: Record<string, { value: string; label: string; description: string; badge?: string }[]> = {
   free: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (rapido)' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rapido)' },
+    { value: 'auto',                    label: '⚡ Automático',             description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',        description: 'Rápido e eficiente — ideal para FAQs e suporte simples' },
+    { value: 'gpt-4o-mini',             label: 'GPT-4o Mini',               description: 'Modelo OpenAI leve e rápido' },
   ],
   starter: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (rapido)' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rapido)' },
-    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (recomendado)' },
+    { value: 'auto',                      label: '⚡ Automático',            description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',        description: 'Rápido e eficiente — ideal para FAQs e suporte simples' },
+    { value: 'gpt-4o-mini',               label: 'GPT-4o Mini',             description: 'Modelo OpenAI leve e rápido' },
+    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5',      description: 'Respostas mais elaboradas e contexto mais longo' },
   ],
   pro: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (rapido)' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rapido)' },
-    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (recomendado)' },
-    { value: 'gpt-4o', label: 'GPT-4o (avancado)' },
+    { value: 'auto',                      label: '⚡ Automático',            description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',        description: 'Rápido e eficiente — ideal para FAQs e suporte simples' },
+    { value: 'gpt-4o-mini',               label: 'GPT-4o Mini',             description: 'Modelo OpenAI leve e rápido' },
+    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5',      description: 'Respostas mais elaboradas e contexto mais longo' },
+    { value: 'gpt-4o',                    label: 'GPT-4o',                  description: 'Modelo OpenAI avançado para tarefas complexas' },
   ],
   business: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (rapido)' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rapido)' },
-    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (recomendado)' },
-    { value: 'gpt-4o', label: 'GPT-4o (avancado)' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+    { value: 'auto',                      label: '⚡ Automático',            description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',        description: 'Rápido e eficiente — ideal para FAQs e suporte simples' },
+    { value: 'gpt-4o-mini',               label: 'GPT-4o Mini',             description: 'Modelo OpenAI leve e rápido' },
+    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5',      description: 'Respostas mais elaboradas e contexto mais longo' },
+    { value: 'gpt-4o',                    label: 'GPT-4o',                  description: 'Modelo OpenAI avançado para tarefas complexas' },
+    { value: 'gemini-1.5-pro',            label: 'Gemini 1.5 Pro',          description: 'Google — janela de contexto de 1M tokens' },
   ],
   enterprise: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (rapido)' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rapido)' },
-    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (recomendado)' },
-    { value: 'gpt-4o', label: 'GPT-4o (avancado)' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5 (exclusivo)' },
+    { value: 'auto',                      label: '⚡ Automático',            description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5',        description: 'Rápido e eficiente — ideal para FAQs e suporte simples' },
+    { value: 'gpt-4o-mini',               label: 'GPT-4o Mini',             description: 'Modelo OpenAI leve e rápido' },
+    { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5',      description: 'Respostas mais elaboradas e contexto mais longo' },
+    { value: 'gpt-4o',                    label: 'GPT-4o',                  description: 'Modelo OpenAI avançado para tarefas complexas' },
+    { value: 'gemini-1.5-pro',            label: 'Gemini 1.5 Pro',          description: 'Google — janela de contexto de 1M tokens' },
+    { value: 'claude-opus-4-5-20251101',  label: 'Claude Opus 4.5',         description: 'Máxima inteligência — exclusivo Enterprise', badge: 'Premium' },
   ],
 };

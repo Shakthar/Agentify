@@ -5,7 +5,7 @@ import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgent } from '../../hooks/useAgent';
-import { ROUTES, API_URL } from '../../utils/constants';
+import { ROUTES, API_URL, AVAILABLE_MODELS_BY_PLAN } from '../../utils/constants';
 import { Agent } from '../../types';
 import api from '../../utils/api';
 
@@ -54,7 +54,7 @@ export default function AgentDetailPage() {
     if (!id) return;
     api.get(`/api/agents/${id}`).then(({ data }) => {
       setAgent(data);
-      setEditForm({ name: data.name, description: data.description, systemPrompt: data.systemPrompt, model: data.model });
+      setEditForm({ name: data.name, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature, maxTokens: data.maxTokens });
       setPhoneId(data.whatsappNumber ?? '');
       setWpEnabled(data.whatsappEnabled ?? false);
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
@@ -120,7 +120,7 @@ export default function AgentDetailPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.name}</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{agent.model}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{agent.description || agent.model}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -161,11 +161,55 @@ export default function AgentDetailPage() {
           </div>
 
           {/* Overview */}
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' && (() => {
+            const plan = tenant.plan ?? 'free';
+            const modelList = AVAILABLE_MODELS_BY_PLAN[plan] ?? AVAILABLE_MODELS_BY_PLAN.free;
+            const modelInfo = modelList.find((m) => m.value === agent.model);
+            return (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="card"><p className="text-sm text-gray-500">Conversas</p><p className="text-2xl font-bold">{agent.totalConversations}</p></div>
-              <div className="card"><p className="text-sm text-gray-500">Mensagens</p><p className="text-2xl font-bold">{agent.totalMessages}</p></div>
-              <div className="card"><p className="text-sm text-gray-500">Taxa de resolução</p><p className="text-2xl font-bold">{Math.round((agent.averageResolution ?? 0) * 100)}%</p></div>
+              <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Conversas</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.totalConversations}</p></div>
+              <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Mensagens</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.totalMessages}</p></div>
+              <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Taxa de resolução</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Math.round((agent.averageResolution ?? 0) * 100)}%</p></div>
+
+              {/* Configuração de IA */}
+              <div className="card col-span-full">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Modelo de IA</p>
+                <div className="flex flex-wrap gap-3 items-start">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        {modelInfo?.label ?? agent.model}
+                      </span>
+                      {modelInfo?.badge && (
+                        <span className="text-xs bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-2 py-0.5 rounded-full font-medium">{modelInfo.badge}</span>
+                      )}
+                      {agent.model === 'auto' && (
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">Seleção dinâmica</span>
+                      )}
+                    </div>
+                    {modelInfo?.description && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{modelInfo.description}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-4 text-sm shrink-0">
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Temperatura</p>
+                      <p className="font-semibold text-gray-700 dark:text-gray-200">{agent.temperature}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Máx. tokens</p>
+                      <p className="font-semibold text-gray-700 dark:text-gray-200">{agent.maxTokens}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('edit')}
+                    className="text-xs text-brand-600 dark:text-brand-400 hover:underline shrink-0"
+                  >
+                    Alterar modelo →
+                  </button>
+                </div>
+              </div>
+
               <div className="card col-span-full">
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">System Prompt</p>
                 <pre className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap font-sans bg-gray-50 dark:bg-gray-700 rounded-lg p-3 max-h-48 overflow-y-auto">
@@ -183,7 +227,8 @@ export default function AgentDetailPage() {
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Chat test */}
           {activeTab === 'chat' && (
@@ -191,7 +236,10 @@ export default function AgentDetailPage() {
           )}
 
           {/* Edit */}
-          {activeTab === 'edit' && (
+          {activeTab === 'edit' && (() => {
+            const plan = tenant.plan ?? 'free';
+            const modelList = AVAILABLE_MODELS_BY_PLAN[plan] ?? AVAILABLE_MODELS_BY_PLAN.free;
+            return (
             <div className="card space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome</label>
@@ -205,13 +253,76 @@ export default function AgentDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System Prompt</label>
                 <textarea className="input resize-none" rows={10} value={editForm.systemPrompt ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, systemPrompt: e.target.value }))} />
               </div>
+
+              {/* Modelo de IA */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Modelo de IA</label>
+                <div className="space-y-2">
+                  {modelList.map((m) => (
+                    <label
+                      key={m.value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        editForm.model === m.value
+                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 dark:border-brand-500'
+                          : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        className="accent-brand-600 mt-0.5 shrink-0"
+                        checked={editForm.model === m.value}
+                        onChange={() => setEditForm((f) => ({ ...f, model: m.value }))}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{m.label}</span>
+                          {m.badge && (
+                            <span className="text-xs bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-2 py-0.5 rounded-full">{m.badge}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{m.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Temperatura + tokens */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Temperatura: <span className="text-brand-600">{editForm.temperature ?? agent.temperature}</span>
+                  </label>
+                  <input
+                    type="range" min="0" max="2" step="0.1"
+                    value={editForm.temperature ?? agent.temperature}
+                    onChange={(e) => setEditForm((f) => ({ ...f, temperature: parseFloat(e.target.value) }))}
+                    className="w-full accent-brand-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                    <span>Preciso</span><span>Criativo</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Máx. tokens</label>
+                  <select
+                    className="input"
+                    value={editForm.maxTokens ?? agent.maxTokens}
+                    onChange={(e) => setEditForm((f) => ({ ...f, maxTokens: parseInt(e.target.value) }))}
+                  >
+                    {[500, 1000, 2000, 4000, 8000].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
               <div className="flex gap-3">
                 <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'A guardar...' : 'Guardar'}</button>
                 <button className="btn-secondary" onClick={() => setActiveTab('overview')}>Cancelar</button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ─── Knowledge Base ─── */}
           {activeTab === 'knowledge' && agent && (

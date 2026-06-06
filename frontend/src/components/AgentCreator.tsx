@@ -49,7 +49,7 @@ const DEFAULT_FORM: FormData = {
   name: '',
   description: '',
   systemPrompt: '',
-  model: 'claude-haiku-4-5-20251001',
+  model: 'auto',
   temperature: 0.7,
   maxTokens: 2000,
   skills: { handoff: true, dataCollection: true, scheduling: false, fileUpload: false },
@@ -257,11 +257,17 @@ export default function AgentCreator() {
             <h2 className="text-lg font-semibold">Modelo de IA</h2>
             <div className="space-y-2">
               {models.map((m) => (
-                <label key={m.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                <label key={m.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                   form.model === m.value ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'
                 }`}>
-                  <input type="radio" className="accent-brand-600" checked={form.model === m.value} onChange={() => update('model', m.value)} />
-                  <span className="text-sm font-medium">{m.label}</span>
+                  <input type="radio" className="accent-brand-600 mt-0.5 shrink-0" checked={form.model === m.value} onChange={() => update('model', m.value)} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{m.label}</span>
+                      {m.badge && <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">{m.badge}</span>}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>
+                  </div>
                 </label>
               ))}
             </div>
