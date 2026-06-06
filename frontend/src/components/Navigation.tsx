@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 import { ROUTES } from '../utils/constants';
 import { Plan, PLAN_LABELS, PLAN_COLORS } from '../types';
 import LanguageSwitcher from './LanguageSwitcher';
+import Logo from './Logo';
 
 const navItems = [
   { href: ROUTES.dashboard, label: 'Dashboard', icon: '◈' },
@@ -16,6 +18,7 @@ const navItems = [
 export default function Navigation() {
   const router = useRouter();
   const { tenant, logout } = useAuth();
+  const { toggle, isDark } = useTheme();
 
   const handleLogout = async () => {
     await logout();
@@ -27,10 +30,17 @@ export default function Navigation() {
     : 0;
 
   return (
-    <aside className="flex flex-col w-60 min-h-screen bg-white border-r border-gray-200 px-4 py-6">
+    <aside className="flex flex-col w-60 min-h-screen bg-white border-r border-gray-200 px-4 py-6 dark:bg-gray-900 dark:border-gray-800">
       {/* Logo */}
-      <div className="mb-8 px-2">
-        <span className="text-xl font-bold text-brand-700">Agentfy</span>
+      <div className="mb-8 px-2 flex items-center justify-between">
+        <Logo />
+        <button
+          onClick={toggle}
+          title={isDark ? 'Modo claro' : 'Modo escuro'}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors dark:hover:bg-gray-800 dark:hover:text-gray-200"
+        >
+          {isDark ? '☀️' : '🌙'}
+        </button>
       </div>
 
       {/* Nav links */}
@@ -43,8 +53,8 @@ export default function Navigation() {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
               }`}
             >
               <span>{item.icon}</span>
@@ -55,17 +65,17 @@ export default function Navigation() {
       </nav>
 
       <div className="mb-4 px-2">
-          <LanguageSwitcher />
-        </div>
+        <LanguageSwitcher />
+      </div>
 
       {/* Credits bar */}
       {tenant && (
         <div className="mb-4 px-2">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <div className="flex justify-between text-xs text-gray-500 mb-1 dark:text-gray-400">
             <span>Créditos</span>
             <span>{tenant.creditsTotal - tenant.creditsUsed} restantes</span>
           </div>
-          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-gray-700">
             <div
               className={`h-full rounded-full transition-all ${
                 usedPercent >= 90 ? 'bg-red-500' : usedPercent >= 70 ? 'bg-yellow-500' : 'bg-brand-500'
@@ -73,19 +83,19 @@ export default function Navigation() {
               style={{ width: `${usedPercent}%` }}
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1">{usedPercent}% utilizado</p>
+          <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">{usedPercent}% utilizado</p>
         </div>
       )}
 
       {/* User info */}
       {tenant && (
-        <div className="border-t border-gray-200 pt-4 px-2">
+        <div className="border-t border-gray-200 pt-4 px-2 dark:border-gray-700">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm">
+            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm dark:bg-brand-900/40 dark:text-brand-400">
               {tenant.name?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{tenant.name}</p>
+              <p className="text-sm font-medium text-gray-900 truncate dark:text-gray-100">{tenant.name}</p>
               <span className={`inline-block text-xs px-1.5 py-0.5 rounded-full ${PLAN_COLORS[tenant.plan as Plan]}`}>
                 {PLAN_LABELS[tenant.plan as Plan]}
               </span>
@@ -93,7 +103,7 @@ export default function Navigation() {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full text-left text-sm text-gray-500 hover:text-gray-900 transition-colors mt-1 px-1"
+            className="w-full text-left text-sm text-gray-500 hover:text-gray-900 transition-colors mt-1 px-1 dark:text-gray-400 dark:hover:text-gray-100"
           >
             Sair
           </button>

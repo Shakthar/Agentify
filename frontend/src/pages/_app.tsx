@@ -4,6 +4,15 @@ import { useEffect } from 'react';
 import i18n from '../lib/i18n';
 import '../styles/globals.css';
 
+// Aplica o tema salvo ANTES do primeiro render para evitar flash branco
+const ThemeScript = () => (
+  <script
+    dangerouslySetInnerHTML={{
+      __html: `(function(){try{var t=localStorage.getItem('theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+    }}
+  />
+);
+
 export default function App({ Component, pageProps }: AppProps) {
   const { locale } = useRouter();
 
@@ -13,5 +22,10 @@ export default function App({ Component, pageProps }: AppProps) {
     }
   }, [locale]);
 
-  return <Component {...pageProps} />;
+  return (
+    <>
+      <ThemeScript />
+      <Component {...pageProps} />
+    </>
+  );
 }

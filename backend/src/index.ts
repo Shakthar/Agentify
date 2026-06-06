@@ -30,7 +30,12 @@ app.set('trust proxy', 1);   // confiar no proxy (Railway) para IPs reais no rat
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'];
+const allowedOrigins = [
+  ...(process.env.ALLOWED_ORIGINS?.split(',') ?? []),
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+].map((o) => o.trim()).filter(Boolean);
+
+if (allowedOrigins.length === 0) allowedOrigins.push('http://localhost:3000');
 
 // Socket.io — chat em tempo real para visitantes
 const io = new SocketIOServer(httpServer, {
