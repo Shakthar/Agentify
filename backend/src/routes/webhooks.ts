@@ -28,11 +28,11 @@ function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
 const router = Router();
 
 // ─── GET /api/webhooks/whatsapp/debug ─────────────────────────────────────
-// Diagnóstico: mostra o estado da configuração do WhatsApp
+// Diagnóstico: mostra o estado da configuração do WhatsApp + todos os agentes
 router.get('/whatsapp/debug', asyncHandler(async (_req: Request, res: Response) => {
-  const agents = await prisma.agent.findMany({
-    where: { whatsappEnabled: true, isActive: true },
-    select: { id: true, name: true, whatsappNumber: true, whatsappEnabled: true },
+  const allAgents = await prisma.agent.findMany({
+    where: { whatsappEnabled: true },
+    select: { id: true, name: true, whatsappNumber: true, whatsappEnabled: true, isActive: true },
   });
   res.json({
     config: {
@@ -41,8 +41,50 @@ router.get('/whatsapp/debug', asyncHandler(async (_req: Request, res: Response) 
       WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ?? null,
       WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION ?? 'v20.0',
     },
-    whatsappAgents: agents,
+    whatsappAgents: allAgents,
+    hint: 'whatsappNumber deve ser o Phone Number ID do Meta (não o Business Account ID nem o número de telefone)',
   });
+}));
+
+// ─── POST /api/webhooks/whatsapp/simulate ─────────────────────────────────────
+// Testa o fluxo completo sem necessitar de mensagem real do WhatsApp
+router.post('/whatsapp/simulate', asyncHandler(async (req: Request, res: Response) => {
+  const { phoneNumberId, text = 'Olá!' } = req.body as { phoneNumberId?: string; text?: string };
+  if (!phoneNumberId) {
+    res.status(400).json({ error: 'phoneNumberId é obrigatório' });
+    return;
+  }
+
+  const agent = await prisma.agent.findFirst({
+    where: { whatsappNumber: phoneNumberId, whatsappEnabled: true, isActive: true },
+    select: { id: true, name: true, tenantId: true },
+  });
+
+  if (!agent) {
+    const allAgents = await prisma.agent.findMany({
+      where: { whatsappEnabled: true },
+      select: { name: true, whatsappNumber: true, isActive: true },
+    });
+    res.status(404).json({
+      error: `Nenhum agente encontrado para phoneNumberId="${phoneNumberId}"`,
+      agentesWhatsAppAtivos: allAgents,
+      solucao: 'O campo whatsappNumber do agente deve ser exactamente igual ao Phone Number ID do Meta',
+    });
+    return;
+  }
+
+  // Simular processamento sem enviar mensagem real
+  let conversation = await prisma.conversation.findFirst({
+    where: { agentId: agent.id, tenantId: agent.tenantId, channelType: 'whatsapp', externalId: 'simulate_test', resolved: false, closedAt: null },
+  });
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: { agentId: agent.id, tenantId: agent.tenantId, channelType: 'whatsapp', externalId: 'simulate_test', visitorId: 'simulate_test' },
+    });
+  }
+
+  const result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
+  res.json({ success: true, agent: agent.name, userMessage: text, agentResponse: result.content });
 }));
 
 // ─── GET /api/webhooks/whatsapp/status ────────────────────────────────────────
