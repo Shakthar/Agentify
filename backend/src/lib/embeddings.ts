@@ -48,7 +48,18 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`OpenAI embeddings falhou (${res.status}): ${detail.slice(0, 300)}`);
+    if (res.status === 429) {
+      // Distingue quota esgotada de rate limit temporário
+      const isQuota = detail.includes('exceeded your current quota') || detail.includes('insufficient_quota');
+      if (isQuota) {
+        throw new Error('Conta OpenAI sem créditos. Adiciona saldo em platform.openai.com/settings/billing');
+      }
+      throw new Error('OpenAI: limite de pedidos atingido. Tenta novamente em alguns segundos.');
+    }
+    if (res.status === 401) {
+      throw new Error('OPENAI_API_KEY inválida ou revogada');
+    }
+    throw new Error(`OpenAI embeddings falhou (${res.status}): ${detail.slice(0, 200)}`);
   }
 
   const json = (await res.json()) as OpenAIEmbeddingResponse;
