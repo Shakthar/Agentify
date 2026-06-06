@@ -80,7 +80,16 @@ export const useAuth = create<AuthState>((set, get) => ({
       saveTenant(tenant);
       set({ tenant, loading: false });
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Signup failed';
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string } }; message?: string; code?: string };
+      let msg = axiosErr?.response?.data?.error;
+      if (!msg) {
+        // Sem resposta do servidor — mostra causa real
+        if (axiosErr?.code === 'ERR_NETWORK' || !axiosErr?.response) {
+          msg = `Sem resposta do servidor. Verifique se o backend está online. (${axiosErr?.message ?? 'Network Error'})`;
+        } else {
+          msg = `Erro ${axiosErr?.response?.status ?? ''}: ${axiosErr?.message ?? 'Signup failed'}`;
+        }
+      }
       set({ error: msg, loading: false });
       throw new Error(msg);
     }

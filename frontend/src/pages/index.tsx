@@ -1,7 +1,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
-import { ROUTES } from '../utils/constants';
+import { ROUTES, API_URL } from '../utils/constants';
 import Logo from '../components/Logo';
 
 type Tab = 'login' | 'signup';
@@ -190,6 +190,13 @@ export default function Home() {
               {loading ? 'A processar...' : tab === 'login' ? 'Entrar' : 'Criar conta'}
             </button>
           </form>
+
+          {/* Diagnóstico — só visível se o URL não for de produção */}
+          {API_URL.includes('localhost') && (
+            <p className="mt-4 text-xs text-center text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+              ⚠️ A chamar backend local: <code className="font-mono">{API_URL}</code>
+            </p>
+          )}
         </div>
       </div>
     </div>
