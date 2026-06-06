@@ -1,7 +1,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
-import { ROUTES, API_URL } from '../utils/constants';
+import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
 
 type Tab = 'login' | 'signup';
@@ -190,11 +190,6 @@ export default function Home() {
               {loading ? 'A processar...' : tab === 'login' ? 'Entrar' : 'Criar conta'}
             </button>
           </form>
-
-          {/* Diagnóstico — mostra sempre o backend URL para facilitar debug */}
-          <p className="mt-4 text-xs text-center text-gray-400 dark:text-gray-600">
-            API: <code className="font-mono">{API_URL}</code>
-          </p>
         </div>
       </div>
     </div>
