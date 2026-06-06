@@ -20,10 +20,10 @@ function CopyBox({ value, label }: { value: string; label: string }) {
   };
   return (
     <div>
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
       <div className="flex items-stretch gap-2">
-        <pre className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-700 overflow-x-auto whitespace-pre-wrap break-all">{value}</pre>
-        <button onClick={copy} className="shrink-0 px-3 rounded-lg border border-gray-200 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+        <pre className="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-xs font-mono text-gray-700 dark:text-gray-200 overflow-x-auto whitespace-pre-wrap break-all">{value}</pre>
+        <button onClick={copy} className="shrink-0 px-3 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           {copied ? '✓' : 'Copiar'}
         </button>
       </div>
@@ -110,17 +110,17 @@ export default function AgentDetailPage() {
   return (
     <div className="flex min-h-screen">
       <Navigation />
-      <main className="flex-1 p-8 overflow-y-auto">
+        <main className="flex-1 p-8 overflow-y-auto bg-gray-50 dark:bg-gray-900">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xl">
+              <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold text-xl">
                 {agent.name[0]}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{agent.name}</h1>
-                <p className="text-sm text-gray-500">{agent.model}</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.name}</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{agent.model}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -139,7 +139,7 @@ export default function AgentDetailPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 mb-6 gap-1 flex-wrap">
+          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1 flex-wrap">
             {([
                           { key: 'overview',   label: '📊 Visão geral' },
               { key: 'chat',       label: '💬 Testar chat' },
@@ -152,7 +152,7 @@ export default function AgentDetailPage() {
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}
                 className={`px-3 pb-2 text-sm font-medium transition-colors ${
-                  activeTab === t.key ? 'border-b-2 border-brand-600 text-brand-700' : 'text-gray-500 hover:text-gray-700'
+                  activeTab === t.key ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 {t.label}
@@ -167,8 +167,8 @@ export default function AgentDetailPage() {
               <div className="card"><p className="text-sm text-gray-500">Mensagens</p><p className="text-2xl font-bold">{agent.totalMessages}</p></div>
               <div className="card"><p className="text-sm text-gray-500">Taxa de resolução</p><p className="text-2xl font-bold">{Math.round((agent.averageResolution ?? 0) * 100)}%</p></div>
               <div className="card col-span-full">
-                <p className="text-sm text-gray-500 mb-2">System Prompt</p>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">System Prompt</p>
+                <pre className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap font-sans bg-gray-50 dark:bg-gray-700 rounded-lg p-3 max-h-48 overflow-y-auto">
                   {agent.systemPrompt}
                 </pre>
               </div>
@@ -194,15 +194,15 @@ export default function AgentDetailPage() {
           {activeTab === 'edit' && (
             <div className="card space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome</label>
                 <input className="input" value={editForm.name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição</label>
                 <input className="input" value={editForm.description ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System Prompt</label>
                 <textarea className="input resize-none" rows={10} value={editForm.systemPrompt ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, systemPrompt: e.target.value }))} />
               </div>
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
@@ -227,21 +227,21 @@ export default function AgentDetailPage() {
             return (
               <div className="space-y-6">
                 <div className="card">
-                  <h2 className="font-semibold text-gray-900 mb-1">URL direta</h2>
-                  <p className="text-sm text-gray-500 mb-3">Partilha este link ou abre numa nova aba para testar.</p>
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">URL direta</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Partilha este link ou abre numa nova aba para testar.</p>
                   <CopyBox value={chatUrl} label="URL do chat" />
                   <a href={chatUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs mt-3 inline-block">Abrir em nova aba →</a>
                 </div>
 
                 <div className="card">
-                  <h2 className="font-semibold text-gray-900 mb-1">Opção 1 — iframe</h2>
-                  <p className="text-sm text-gray-500 mb-3">Cola este HTML onde queres que o chat apareça na página.</p>
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Opção 1 — iframe</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Cola este HTML onde queres que o chat appareça na página.</p>
                   <CopyBox value={iframe} label="Código HTML" />
                 </div>
 
                 <div className="card">
-                  <h2 className="font-semibold text-gray-900 mb-1">Opção 2 — Widget flutuante <span className="text-xs text-brand-600 font-normal">(recomendado)</span></h2>
-                  <p className="text-sm text-gray-500 mb-3">Cola antes do <code className="bg-gray-100 px-1 rounded">&lt;/body&gt;</code>. Aparece como botão roxo no canto inferior direito.</p>
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Opção 2 — Widget flutuante <span className="text-xs text-brand-600 font-normal">(recomendado)</span></h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Cola antes do <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">&lt;/body&gt;</code>. Appareçe como botão roxo no canto inferior direito.</p>
                   <CopyBox value={widget} label="Snippet JavaScript" />
                 </div>
 
@@ -260,8 +260,8 @@ export default function AgentDetailPage() {
           {activeTab === 'whatsapp' && (
             <div className="space-y-6">
               <div className="card">
-                <h2 className="font-semibold text-gray-900 mb-3">Passo 1 — Conta Meta for Developers</h2>
-                <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
+                <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
                   <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria uma App do tipo <strong>Business</strong>.</li>
                   <li>Adiciona o produto <strong>WhatsApp</strong> à app.</li>
                   <li>Em <em>WhatsApp → Getting Started</em>, copia o <strong>Phone Number ID</strong> (número longo — não é o número de telefone).</li>
@@ -270,21 +270,21 @@ export default function AgentDetailPage() {
               </div>
 
               <div className="card">
-                <h2 className="font-semibold text-gray-900 mb-3">Passo 2 — Configurar Webhook no Meta</h2>
-                <p className="text-sm text-gray-500 mb-3">Em <em>WhatsApp → Configuration → Webhook</em>:</p>
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 2 — Configurar Webhook no Meta</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Em <em>WhatsApp → Configuration → Webhook</em>:</p>
                 <div className="space-y-3">
                   <CopyBox value={WEBHOOK_URL} label="Callback URL" />
                   <CopyBox value="agentify_whatsapp_verify_2025" label="Verify Token" />
                 </div>
-                <p className="text-xs text-gray-400 mt-2">Subscreve o campo <code className="bg-gray-100 px-1 rounded">messages</code>.</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Subscreve o campo <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">messages</code>.</p>
               </div>
 
               <div className="card">
-                <h2 className="font-semibold text-gray-900 mb-3">Passo 3 — Ligar este agente</h2>
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 3 — Ligar este agente</h2>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone Number ID <span className="text-gray-400 font-normal">(ID numérico do Meta)</span>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Phone Number ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico do Meta)</span>
                     </label>
                     <input className="input" placeholder="ex: 123456789012345" value={phoneId} onChange={(e) => setPhoneId(e.target.value)} />
                   </div>
@@ -298,7 +298,7 @@ export default function AgentDetailPage() {
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${wpEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
-                    <span className="text-sm text-gray-700">WhatsApp ativo neste agente</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">WhatsApp ativo neste agente</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={handleSaveWhatsApp} disabled={wpSaving} className="btn-primary">

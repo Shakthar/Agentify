@@ -91,7 +91,7 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
   if (!conversation) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
-        <p className="text-gray-500 text-sm">Clique para iniciar uma conversa de teste com o agente</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Clique para iniciar uma conversa de teste com o agente</p>
         <button className="btn-primary" onClick={startConversation} disabled={starting}>
           {starting ? 'A iniciar...' : 'Iniciar conversa'}
         </button>
@@ -101,7 +101,7 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-[480px] border border-gray-200 rounded-xl overflow-hidden bg-white">
+    <div className="flex flex-col h-[480px] border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
       {/* Header */}
       <div className="bg-brand-600 text-white px-4 py-3 flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-green-400" />
@@ -110,9 +110,9 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-gray-800">
         {messages.length === 0 && (
-          <p className="text-center text-gray-400 text-sm pt-8">Escreva uma mensagem para começar</p>
+          <p className="text-center text-gray-400 dark:text-gray-500 text-sm pt-8">Escreva uma mensagem para começar</p>
         )}
         {messages.map((msg) => (
           <div
@@ -122,7 +122,7 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
             <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
               msg.role === 'user'
                 ? 'bg-brand-600 text-white rounded-br-sm'
-                : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm'
             }`}>
               {msg.content}
             </div>
@@ -130,11 +130,11 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm">
+            <div className="bg-gray-100 dark:bg-gray-700 px-4 py-3 rounded-2xl rounded-bl-sm">
               <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
             </div>
           </div>
@@ -146,9 +146,9 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-3 flex gap-2 items-end">
+      <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex gap-2 items-end bg-white dark:bg-gray-800">
         <textarea
-          className="flex-1 resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 max-h-28"
+          className="flex-1 resize-none rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 max-h-28"
           rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
