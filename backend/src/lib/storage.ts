@@ -3,20 +3,20 @@
  * Usa a REST API do Supabase Storage diretamente (sem SDK extra).
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
-const BUCKET       = 'agent-docs';
+const BUCKET = 'agent-docs';
 
 function storageBase(): string {
-  if (!SUPABASE_URL) throw new Error('SUPABASE_URL não configurado');
-  return `${SUPABASE_URL}/storage/v1`;
+  const url = process.env.SUPABASE_URL;
+  if (!url) throw new Error('SUPABASE_URL não configurado');
+  return `${url}/storage/v1`;
 }
 
 function headers(extra: Record<string, string> = {}): Record<string, string> {
-  if (!SERVICE_KEY) throw new Error('SUPABASE_SERVICE_KEY não configurado');
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!key) throw new Error('SUPABASE_SERVICE_KEY não configurado');
   return {
-    Authorization: `Bearer ${SERVICE_KEY}`,
-    apikey: SERVICE_KEY,
+    Authorization: `Bearer ${key}`,
+    apikey: key,
     ...extra,
   };
 }
@@ -73,8 +73,9 @@ export async function uploadFile(
 
 /** Devolve a URL pública de um ficheiro no bucket. */
 export function getPublicUrl(storageKey: string): string {
-  if (!SUPABASE_URL) throw new Error('SUPABASE_URL não configurado');
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storageKey}`;
+  const url = process.env.SUPABASE_URL;
+  if (!url) throw new Error('SUPABASE_URL não configurado');
+  return `${url}/storage/v1/object/public/${BUCKET}/${storageKey}`;
 }
 
 /** Apaga um ficheiro do bucket. */

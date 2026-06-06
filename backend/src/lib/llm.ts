@@ -2,8 +2,25 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { TOKEN_COSTS } from '../types/index.js';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy initialization — env vars may not be populated at module load time in ESM
+let _anthropic: Anthropic | null = null;
+let _openai: OpenAI | null = null;
+
+function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY não configurado');
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
+}
+
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurado');
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 export interface LLMMessage {
   role: 'user' | 'assistant';
@@ -55,7 +72,7 @@ async function callAnthropic(
   maxTokens: number,
   temperature: number,
 ): Promise<LLMResponse> {
-  const response = await anthropic.messages.create({
+  const response = await getAnthropic().messages.create({
     model,
     max_tokens: maxTokens,
     temperature,
@@ -79,7 +96,7 @@ async function callOpenAI(
   maxTokens: number,
   temperature: number,
 ): Promise<LLMResponse> {
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model,
     max_tokens: maxTokens,
     temperature,
