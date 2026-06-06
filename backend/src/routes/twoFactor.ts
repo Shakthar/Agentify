@@ -27,7 +27,7 @@ router.post('/setup', authenticate, asyncHandler(async (req: AuthenticatedReques
 }));
 
 // POST /api/auth/2fa/enable — confirma primeiro código e ativa (requer login)
-router.post('/enable', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/enable', authenticate, authLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const parsed = codeSchema.safeParse(req.body);
   if (!parsed.success) throw new BadRequestError('Código deve ter 6 dígitos');
   await twoFactorService.enableTwoFactor(req.tenant!.id, parsed.data.code);
@@ -35,7 +35,7 @@ router.post('/enable', authenticate, asyncHandler(async (req: AuthenticatedReque
 }));
 
 // POST /api/auth/2fa/disable — desativa (requer login + código TOTP)
-router.post('/disable', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/disable', authenticate, authLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const parsed = codeSchema.safeParse(req.body);
   if (!parsed.success) throw new BadRequestError('Código deve ter 6 dígitos');
   await twoFactorService.disableTwoFactor(req.tenant!.id, parsed.data.code);

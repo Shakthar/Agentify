@@ -33,8 +33,8 @@ export async function enableTwoFactor(tenantId: string, code: string): Promise<v
     throw new BadRequestError('2FA já está ativo');
   }
 
-  const valid = verifyOTP({ token: code, secret: tenant.twoFactorSecret });
-  if (!valid) {
+  const result = await verifyOTP({ token: code, secret: tenant.twoFactorSecret });
+  if (!result.valid) {
     throw new UnauthorizedError('Código inválido');
   }
 
@@ -51,8 +51,8 @@ export async function disableTwoFactor(tenantId: string, code: string): Promise<
     throw new BadRequestError('2FA não está ativo');
   }
 
-  const valid = verifyOTP({ token: code, secret: tenant.twoFactorSecret });
-  if (!valid) {
+  const result = await verifyOTP({ token: code, secret: tenant.twoFactorSecret });
+  if (!result.valid) {
     throw new UnauthorizedError('Código inválido');
   }
 
@@ -69,8 +69,8 @@ export async function verifyTwoFactorCode(tenantId: string, code: string): Promi
     throw new UnauthorizedError('2FA não configurado');
   }
 
-  const valid = verifyOTP({ token: code, secret: tenant.twoFactorSecret });
-  if (!valid) {
+  const result = await verifyOTP({ token: code, secret: tenant.twoFactorSecret });
+  if (!result.valid) {
     throw new UnauthorizedError('Código 2FA inválido ou expirado');
   }
 }
