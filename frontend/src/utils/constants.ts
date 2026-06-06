@@ -15,6 +15,14 @@ export const ROUTES = {
 
 export const CREDIT_ALERT_THRESHOLDS = [70, 80, 90] as const;
 
+export const PAYMENT_SKILL_COST: Record<string, number | null> = {
+  free:       null,  // bloqueado
+  starter:    25,    // 25 créditos/transação
+  pro:        15,    // 15 créditos/transação
+  business:   0,     // incluído
+  enterprise: 0,     // incluído
+};
+
 export const AVAILABLE_MODELS_BY_PLAN: Record<string, { value: string; label: string; description: string; badge?: string }[]> = {
   free: [
     { value: 'auto',                    label: '⚡ Automático',             description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },

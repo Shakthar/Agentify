@@ -64,12 +64,12 @@ export type Plan = 'free' | 'starter' | 'pro' | 'business' | 'enterprise';
  * - starter/pro/business/enterprise: créditos resetam mensalmente
  *         via webhook do Stripe (implementação pendente).
  */
-export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number }> = {
-  free:       { agents: 3,  credits: 3000,  conversations: 100 },
-  starter:    { agents: 10, credits: 10000, conversations: Infinity },
-  pro:        { agents: 20, credits: 30000, conversations: Infinity },
-  business:   { agents: 30, credits: 60000, conversations: Infinity },
-  enterprise: { agents: 999, credits: 75000, conversations: Infinity },
+export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number; paymentSkillCost: number | null }> = {
+  free:       { agents: 3,   credits: 3000,  conversations: 100,      paymentSkillCost: null },  // null = bloqueado
+  starter:    { agents: 10,  credits: 10000, conversations: Infinity, paymentSkillCost: 25  },  // 25 créditos/transação
+  pro:        { agents: 20,  credits: 30000, conversations: Infinity, paymentSkillCost: 15  },  // 15 créditos/transação
+  business:   { agents: 30,  credits: 60000, conversations: Infinity, paymentSkillCost: 0   },  // incluído
+  enterprise: { agents: 999, credits: 75000, conversations: Infinity, paymentSkillCost: 0   },  // incluído
 };
 
 export const ALLOWED_MODELS: Record<Plan, string[]> = {

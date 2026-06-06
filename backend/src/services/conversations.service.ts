@@ -4,6 +4,7 @@ import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { buildContextForQuery } from './knowledge.service.js';
 import { createMbwayCharge } from './payments.service.js';
+import { PLAN_LIMITS, Plan } from '../types/index.js';
 import {
   BadRequestError,
   NotFoundError,
@@ -145,7 +146,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { encryptionKey: true, creditsTotal: true, creditsUsed: true },
+    select: { encryptionKey: true, creditsTotal: true, creditsUsed: true, plan: true },
   });
   if (!tenant) {
     throw new NotFoundError('Tenant not found');
@@ -155,6 +156,9 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   if (available <= 0) {
     throw new PaymentRequiredError('No credits available. Please purchase more.');
   }
+
+  const planLimits = PLAN_LIMITS[tenant.plan as Plan] ?? PLAN_LIMITS.free;
+  const paymentSkillCost = planLimits.paymentSkillCost; // null = bloqueado, 0+ = custo em créditos
 
   const dataKey = unwrapDataKey(tenant.encryptionKey);
 
@@ -210,12 +214,14 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     /* ignorar falhas de doc injection */
   }
 
-  // Injeta skill de cobrança MB Way
+  // Injeta skill de cobrança MB Way (apenas para planos com acesso)
   // O agente usa [MBWAY:351912345678|5.00|2x Café] para disparar o pagamento
-  systemPrompt += '\n\n---\nCobrança MB Way: quando o cliente confirmar um pedido e fornecer o número de telmóvel, usa o marcador [MBWAY:NUMERO|VALOR|DESCRICAO] na tua resposta.'
-    + ' Substitui NUMERO pelo número do cliente no formato 351XXXXXXXXX (Portugal) ou código do país + número sem espaços, VALOR pelo montante em euros (ex: 5.50), DESCRICAO pelo resumo do pedido (ex: 2x Café e 1x Bolo).'
-    + ' Exemplo: "Ok! Vou enviar o pedido de \u20ac5.50 para o seu MB Way! [MBWAY:351912345678|5.50|2x Café e 1x Bolo]"'
-    + ' Nunca uses este marcador sem ter o número de telmóvel do cliente. Se não tiveres o número, pede-o primeiro.';
+  if (paymentSkillCost !== null) {
+    systemPrompt += '\n\n---\nCobrança MB Way: quando o cliente confirmar um pedido e fornecer o número de telmóvel, usa o marcador [MBWAY:NUMERO|VALOR|DESCRICAO] na tua resposta.'
+      + ' Substitui NUMERO pelo número do cliente no formato 351XXXXXXXXX (Portugal) ou código do país + número sem espaços, VALOR pelo montante em euros (ex: 5.50), DESCRICAO pelo resumo do pedido (ex: 2x Café e 1x Bolo).'
+      + ' Exemplo: "Ok! Vou enviar o pedido de \u20ac5.50 para o seu MB Way! [MBWAY:351912345678|5.50|2x Café e 1x Bolo]"'
+      + ' Nunca uses este marcador sem ter o número de telmóvel do cliente. Se não tiveres o número, pede-o primeiro.';
+  }
 
   // Chamada ao LLM
   let llmResponse;
@@ -249,9 +255,9 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     if (doc) docAttachment = { id: doc.id, name: doc.name, url: doc.fileUrl };
   }
 
-  // Processa cobrança MB Way se o agente a disparou
+  // Processa cobrança MB Way se o agente a disparou e o plano permite
   let mbwayCharge: { orderId: string; phone: string; amount: number; description: string; mock: boolean } | null = null;
-  if (mbwayMatch) {
+  if (mbwayMatch && paymentSkillCost !== null) {
     const [, rawPhone, rawAmount, rawDesc] = mbwayMatch;
     const phone = rawPhone.replace(/[^0-9]/g, '');
     const amount = parseFloat(rawAmount.replace(',', '.'));
@@ -266,9 +272,10 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
           amount,
           description,
           notifyPhone: conversation.agent.notifyPhone ?? undefined,
+          extraCreditCost: paymentSkillCost, // déduz créditos do plano
         });
         mbwayCharge = { orderId: result.orderId, phone, amount, description, mock: result.mock };
-        console.log(`[Payments] Order MB Way criada: ${result.orderId} (mock=${result.mock})`);
+        console.log(`[Payments] Order MB Way criada: ${result.orderId} (mock=${result.mock}, custo=${paymentSkillCost} créditos)`);
       } catch (err) {
         console.error('[Payments] Falha ao criar cobrança MB Way:', err);
       }

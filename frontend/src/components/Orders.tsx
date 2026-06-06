@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
+import { PAYMENT_SKILL_COST } from '../utils/constants';
 
 interface Order {
   id: string;
@@ -14,7 +15,7 @@ interface Order {
   externalId: string | null;
 }
 
-interface Props { agentId: string }
+interface Props { agentId: string; plan: string }
 
 const STATUS_LABEL: Record<string, { label: string; classes: string }> = {
   pending:  { label: 'Aguarda pagamento', classes: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
@@ -27,7 +28,23 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-export default function Orders({ agentId }: Props) {
+export default function Orders({ agentId, plan }: Props) {
+  const cost = PAYMENT_SKILL_COST[plan] ?? null;
+
+  // Plano sem acesso à skill
+  if (cost === null) {
+    return (
+      <div className="card text-center py-12">
+        <p className="text-4xl mb-3">🔒</p>
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Skill de Pagamentos — Plano Starter+</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+          A skill de cobranças MB Way está disponível a partir do plano <strong>Starter</strong>.
+          Faz upgrade para que o teu agente possa aceitar encomendas e processar pagamentos automaticamente.
+        </p>
+        <a href="/dashboard/billing" className="btn-primary inline-block mt-5 text-sm">Ver planos →</a>
+      </div>
+    );
+  }
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,10 +78,17 @@ export default function Orders({ agentId }: Props) {
     <div className="space-y-5">
       {/* Info card */}
       <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
-        <p className="text-sm text-blue-800 dark:text-blue-300">
-          <strong>Como funciona:</strong> quando o agente usa a skill <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">[MBWAY:351912345678|5.00|Descrição]</code> na resposta,
-          é criado um pedido aqui e enviada uma cobrança MB Way ao cliente. Após pagamento confirmado, o cliente e o dono são notificados via WhatsApp.
-        </p>
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <p className="text-sm text-blue-800 dark:text-blue-300 flex-1">
+            <strong>Como funciona:</strong> quando o agente usa a skill <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">[MBWAY:351912345678|5.00|Descrição]</code> na resposta,
+            é criado um pedido aqui e enviada uma cobrança MB Way ao cliente. Após pagamento confirmado, o cliente e o dono são notificados via WhatsApp.
+          </p>
+          {cost > 0 ? (
+            <span className="shrink-0 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-medium">{cost} créditos/transação</span>
+          ) : (
+            <span className="shrink-0 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded-full font-medium">✓ Incluído no plano</span>
+          )}
+        </div>
       </div>
 
       {/* Filtros + contagem */}

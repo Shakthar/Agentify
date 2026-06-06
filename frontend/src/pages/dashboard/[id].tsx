@@ -343,7 +343,7 @@ export default function AgentDetailPage() {
 
           {/* ─── Pedidos MB Way ─── */}
           {activeTab === 'orders' && agent && (
-            <Orders agentId={agent.id} />
+            <Orders agentId={agent.id} plan={tenant.plan ?? 'free'} />
           )}
 
           {/* ─── Web Embed ─── */}

@@ -13,6 +13,7 @@ export interface MbwayChargeParams {
   amount: number;       // euros, ex: 5.50
   description: string;  // resumo do pedido
   notifyPhone?: string; // WA do dono para notificar após pagamento
+  extraCreditCost: number; // créditos a debitar (0 = gratuito para Business+)
 }
 
 export interface MbwayChargeResult {
@@ -22,7 +23,7 @@ export interface MbwayChargeResult {
 }
 
 export async function createMbwayCharge(params: MbwayChargeParams): Promise<MbwayChargeResult> {
-  const { tenantId, agentId, conversationId, buyerPhone, amount, description, notifyPhone } = params;
+  const { tenantId, agentId, conversationId, buyerPhone, amount, description, notifyPhone, extraCreditCost } = params;
 
   const accountId = process.env.EASYPAY_ACCOUNT_ID;
   const apiKey    = process.env.EASYPAY_API_KEY;
@@ -86,6 +87,23 @@ export async function createMbwayCharge(params: MbwayChargeParams): Promise<Mbwa
       status: 'pending',
     },
   });
+
+  // Debitar créditos extra do plano (skill de pagamentos)
+  if (extraCreditCost > 0) {
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { creditsUsed: { increment: extraCreditCost } },
+    });
+    await prisma.creditLog.create({
+      data: {
+        tenantId,
+        amount: -extraCreditCost,
+        reason: 'payment-skill',
+        details: { orderId: order.id, agentId, buyerPhone, mbwayAmount: amount },
+      },
+    });
+    console.log(`[Payments] Débito de ${extraCreditCost} créditos (skill MB Way) para tenant ${tenantId}`);
+  }
 
   return { orderId: order.id, externalId, mock: isMock };
 }
