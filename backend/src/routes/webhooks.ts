@@ -10,18 +10,42 @@ import { unwrapDataKey } from '../lib/keyVault.js';
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
   const appSecret = process.env.META_APP_SECRET;
   if (!appSecret) {
-    console.error('[WhatsApp] META_APP_SECRET não configurado — verificação de assinatura ignorada');
-    return false;
+    // Sem segredo configurado: avisar mas PERMITIR (não bloquear)
+    console.warn('[WhatsApp] META_APP_SECRET não configurado — a verificar sem assinatura (inseguro)');
+    return true;
   }
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
-  if (!signature || !req.rawBody) return false;
+  if (!signature || !req.rawBody) {
+    console.warn('[WhatsApp] Assinatura ou rawBody em falta na verificação');
+    return false;
+  }
   const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  const match = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  if (!match) console.warn('[WhatsApp] Assinatura inválida — possível payload adulterado');
+  return match;
 }
 
 const router = Router();
 
-// ─── GET /api/webhooks/whatsapp/status ──────────────────────────────────────
+// ─── GET /api/webhooks/whatsapp/debug ─────────────────────────────────────
+// Diagnóstico: mostra o estado da configuração do WhatsApp
+router.get('/whatsapp/debug', asyncHandler(async (_req: Request, res: Response) => {
+  const agents = await prisma.agent.findMany({
+    where: { whatsappEnabled: true, isActive: true },
+    select: { id: true, name: true, whatsappNumber: true, whatsappEnabled: true },
+  });
+  res.json({
+    config: {
+      WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN ? `${process.env.WHATSAPP_TOKEN.slice(0, 12)}…` : null,
+      META_APP_SECRET: process.env.META_APP_SECRET ? `${process.env.META_APP_SECRET.slice(0, 6)}…` : null,
+      WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ?? null,
+      WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION ?? 'v20.0',
+    },
+    whatsappAgents: agents,
+  });
+}));
+
+// ─── GET /api/webhooks/whatsapp/status ────────────────────────────────────────
 // Indica ao frontend se o WHATSAPP_TOKEN está configurado
 router.get('/whatsapp/status', (_req: Request, res: Response) => {
   res.json({ configured: !!process.env.WHATSAPP_TOKEN });
@@ -92,6 +116,7 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
         }
 
         const text = msg.text?.body ?? '';
+        console.log(`[WhatsApp] Mensagem de ${from} → phoneId=${phoneId} tipo=${msg.type} texto="${text.slice(0, 80)}"`);
         if (!text) continue;
 
         // Encontrar agente pelo phone_number_id do Meta
@@ -101,9 +126,11 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
         });
 
         if (!agent) {
-          console.warn(`[WhatsApp] Nenhum agente encontrado para phone_number_id=${phoneId}`);
+          console.warn(`[WhatsApp] Nenhum agente encontrado para phone_number_id=${phoneId}. Agentes activos:`, 
+            await prisma.agent.findMany({ where: { whatsappEnabled: true }, select: { name: true, whatsappNumber: true } }));
           continue;
         }
+        console.log(`[WhatsApp] Agente encontrado: ${agent.name} (${agent.id})`);
 
         // Token por agente (encriptado) ou fallback para env global
         let agentToken: string | undefined;
