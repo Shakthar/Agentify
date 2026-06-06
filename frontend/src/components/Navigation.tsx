@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
-import { useTheme } from '../hooks/useTheme';
 import { ROUTES } from '../utils/constants';
 import { Plan, PLAN_LABELS, PLAN_COLORS } from '../types';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -18,7 +17,6 @@ const navItems = [
 export default function Navigation() {
   const router = useRouter();
   const { tenant, logout } = useAuth();
-  const { toggle, isDark } = useTheme();
 
   const handleLogout = async () => {
     await logout();
@@ -32,15 +30,8 @@ export default function Navigation() {
   return (
     <aside className="flex flex-col w-60 min-h-screen bg-white border-r border-gray-200 px-4 py-6 dark:bg-gray-900 dark:border-gray-800">
       {/* Logo */}
-      <div className="mb-8 px-2 flex items-center justify-between">
+      <div className="mb-8 px-2">
         <Logo />
-        <button
-          onClick={toggle}
-          title={isDark ? 'Modo claro' : 'Modo escuro'}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors dark:hover:bg-gray-800 dark:hover:text-gray-200"
-        >
-          {isDark ? '☀️' : '🌙'}
-        </button>
       </div>
 
       {/* Nav links */}

@@ -1,7 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
-import { useTheme } from '../hooks/useTheme';
 import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
 
@@ -20,8 +19,6 @@ export default function Home() {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
-
-  const { toggle, isDark } = useTheme();
 
   useEffect(() => {
     if (tenant) router.replace(ROUTES.dashboard);
@@ -108,17 +105,9 @@ export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white dark:from-gray-950 dark:to-gray-900 px-4">
       <div className="w-full max-w-md">
-        {/* Header com logo e toggle de tema */}
-        <div className="text-center mb-8 relative">
+        <div className="text-center mb-8">
           <Logo size={52} className="justify-center mb-3" />
           <p className="text-gray-500 mt-2 text-sm">Plataforma SaaS de Agentes IA</p>
-          <button
-            onClick={toggle}
-            className="absolute top-0 right-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors dark:hover:bg-gray-800 dark:hover:text-gray-200"
-            title={isDark ? 'Modo claro' : 'Modo escuro'}
-          >
-            {isDark ? '☀️' : '🌙'}
-          </button>
         </div>
 
         {/* Card */}
