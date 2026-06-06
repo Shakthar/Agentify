@@ -19,12 +19,12 @@ router.post('/start', chatLimiter, asyncHandler(async (req: Request, res: Respon
   }
 
   const agent = await prisma.agent.findFirst({
-    where: { id: agentId, isActive: true },
+    where: { id: agentId, isActive: true, webChatEnabled: true },
     select: { id: true, name: true, tenantId: true, model: true },
   });
 
   if (!agent) {
-    throw new NotFoundError('Agent not found or inactive');
+    throw new NotFoundError('Agent not found or web chat disabled');
   }
 
   const conversation = await prisma.conversation.create({

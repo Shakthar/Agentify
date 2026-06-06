@@ -7,8 +7,31 @@ import { sendMessage } from '../services/conversations.service.js';
  * Visitantes conectam-se com o conversationId e enviam mensagens.
  * O servidor chama o LLM e emite a resposta de volta.
  */
+// ─── Rate limiting por socket (anti-flood / denial of wallet) ────────────────
+const SOCKET_WINDOW_MS = 60_000;   // janela de 1 min
+const SOCKET_MAX_MSGS = 15;        // máximo de mensagens por janela
+
+interface SocketState {
+  windowStart: number;
+  count: number;
+  inFlight: boolean; // bloqueia mensagens concorrentes do mesmo socket
+}
+
+function checkSocketRate(state: SocketState): boolean {
+  const now = Date.now();
+  if (now - state.windowStart > SOCKET_WINDOW_MS) {
+    state.windowStart = now;
+    state.count = 0;
+  }
+  if (state.count >= SOCKET_MAX_MSGS) return false;
+  state.count += 1;
+  return true;
+}
+
 export function registerChatSocket(io: SocketIOServer) {
   io.on('connection', (socket: Socket) => {
+    const state: SocketState = { windowStart: Date.now(), count: 0, inFlight: false };
+
     // Visitante entra na sala da conversa
     socket.on('join', async ({ conversationId }: { conversationId: string }) => {
       if (!conversationId || typeof conversationId !== 'string') return;
@@ -38,6 +61,18 @@ export function registerChatSocket(io: SocketIOServer) {
         socket.emit('error', { message: 'Deve entrar na conversa primeiro' });
         return;
       }
+
+      // Anti-flood: rejeita mensagens concorrentes e excesso por janela
+      if (state.inFlight) {
+        socket.emit('error', { message: 'Aguarde a resposta anterior' });
+        return;
+      }
+      if (!checkSocketRate(state)) {
+        socket.emit('error', { message: 'Demasiadas mensagens. Tente novamente daqui a um minuto.' });
+        return;
+      }
+
+      state.inFlight = true;
 
       // Emite "a escrever..." para feedback imediato
       socket.emit('typing', { conversationId });
@@ -69,6 +104,8 @@ export function registerChatSocket(io: SocketIOServer) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Erro desconhecido';
         socket.emit('error', { message: msg });
+      } finally {
+        state.inFlight = false;
       }
     });
   });

@@ -21,11 +21,11 @@ export function signRefreshToken(payload: JWTPayload): string {
 }
 
 export function verifyAccessToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as JWTPayload;
 }
 
 export function verifyRefreshToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_REFRESH_SECRET) as JWTPayload;
+  return jwt.verify(token, JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as JWTPayload;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -55,7 +55,7 @@ export function signTwoFactorToken(tenantId: string): string {
 }
 
 export function verifyTwoFactorToken(token: string): { tenantId: string } {
-  const payload = jwt.verify(token, JWT_SECRET) as { tenantId: string; type: string };
+  const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { tenantId: string; type: string };
   if (payload.type !== 'pending_2fa') throw new Error('Invalid token type');
   return { tenantId: payload.tenantId };
 }
