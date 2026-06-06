@@ -222,21 +222,21 @@ export default function KnowledgeBase({ agentId }: Props) {
   const storageColor = storagePercent >= 90 ? 'bg-red-500' : storagePercent >= 70 ? 'bg-yellow-400' : 'bg-blue-500';
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-500 animate-pulse">A carregar base de conhecimento…</div>;
+    return <div className="p-6 text-sm text-gray-500 dark:text-gray-400 animate-pulse">A carregar base de conhecimento…</div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Barra de armazenamento */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
         <div className="flex justify-between items-baseline mb-2">
-          <span className="text-sm font-medium text-gray-700">Armazenamento da KB</span>
-          <span className="text-xs text-gray-500 capitalize">{plan}</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Armazenamento da KB</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{plan}</span>
         </div>
-        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
           <div className={`h-2 rounded-full transition-all ${storageColor}`} style={{ width: `${storagePercent}%` }} />
         </div>
-        <p className="mt-1.5 text-xs text-gray-500 text-right">
+        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 text-right">
           {fmtBytes(storageUsed)} / {fmtBytes(storageLimit)} usados
         </p>
         {storagePercent >= 90 && (
@@ -245,9 +245,9 @@ export default function KnowledgeBase({ agentId }: Props) {
       </div>
 
       {/* Painel de adição */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
         {/* Tabs */}
-        <div className="flex border-b border-gray-100">
+        <div className="flex border-b border-gray-100 dark:border-gray-700">
           {(['file', 'url', 'text'] as AddMode[]).map((m) => {
             const labels: Record<AddMode, string> = { file: '📎 Ficheiro', url: '🔗 URL', text: '✏️ Texto' };
             return (
@@ -256,8 +256,8 @@ export default function KnowledgeBase({ agentId }: Props) {
                 onClick={() => setAddMode(m)}
                 className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
                   addMode === m
-                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-b-2 border-blue-600'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
                 {labels[m]}
@@ -270,14 +270,14 @@ export default function KnowledgeBase({ agentId }: Props) {
           {/* Upload de ficheiro */}
           {addMode === 'file' && (
             <div>
-              <p className="text-xs text-gray-500 mb-2">Formatos suportados: PDF, DOCX, CSV, TXT, MD · Máximo 10 MB</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Formatos suportados: PDF, DOCX, CSV, TXT, MD · Máximo 10 MB</p>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.docx,.csv,.txt,.md"
                 onChange={handleFileUpload}
                 disabled={uploading}
-                className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
+                className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
               />
               {uploading && <p className="text-xs text-blue-600 mt-1 animate-pulse">A enviar…</p>}
               {uploadMsg && (
@@ -293,7 +293,7 @@ export default function KnowledgeBase({ agentId }: Props) {
                 <select
                   value={urlType}
                   onChange={(e) => setUrlType(e.target.value as 'youtube' | 'website')}
-                  className="border border-gray-200 rounded-lg text-sm px-2 py-2 text-gray-700 bg-white"
+                  className="border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-2 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700"
                 >
                   <option value="website">Website</option>
                   <option value="youtube">YouTube</option>
@@ -303,7 +303,7 @@ export default function KnowledgeBase({ agentId }: Props) {
                   value={urlVal}
                   onChange={(e) => setUrlVal(e.target.value)}
                   placeholder={urlType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://exemplo.com/artigo'}
-                  className="flex-1 border border-gray-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   disabled={addingUrl}
                 />
                 <button
@@ -328,7 +328,7 @@ export default function KnowledgeBase({ agentId }: Props) {
                 value={textTitle}
                 onChange={(e) => setTextTitle(e.target.value)}
                 placeholder="Título (opcional)"
-                className="w-full border border-gray-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 disabled={addingText}
               />
               <textarea
@@ -336,11 +336,11 @@ export default function KnowledgeBase({ agentId }: Props) {
                 onChange={(e) => setTextContent(e.target.value)}
                 placeholder="Cole aqui o texto que o agente deve aprender…"
                 rows={5}
-                className="w-full border border-gray-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
+                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
                 disabled={addingText}
               />
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-400">{textContent.length.toLocaleString()} / 1 000 000 carateres</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{textContent.length.toLocaleString()} / 1 000 000 carateres</span>
                 <button
                   onClick={handleAddText}
                   disabled={addingText || !textContent.trim()}
@@ -358,30 +358,30 @@ export default function KnowledgeBase({ agentId }: Props) {
       </div>
 
       {/* Lista de documentos */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-700">{docs.length} documento{docs.length !== 1 ? 's' : ''}</span>
-          <button onClick={() => void refresh()} className="text-xs text-gray-400 hover:text-gray-700">↻ Atualizar</button>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{docs.length} documento{docs.length !== 1 ? 's' : ''}</span>
+          <button onClick={() => void refresh()} className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">↻ Atualizar</button>
         </div>
 
         {error && <p className="p-4 text-sm text-red-600">{error}</p>}
 
         {docs.length === 0 && !error && (
-          <p className="p-6 text-sm text-gray-400 text-center">Nenhum documento ainda. Adicione um ficheiro, URL ou texto acima.</p>
+          <p className="p-6 text-sm text-gray-400 dark:text-gray-500 text-center">Nenhum documento ainda. Adicione um ficheiro, URL ou texto acima.</p>
         )}
 
-        <ul className="divide-y divide-gray-50">
+        <ul className="divide-y divide-gray-50 dark:divide-gray-700">
           {docs.map((doc) => (
             <li key={doc.id} className="px-4 py-3 flex items-start gap-3">
               <span className="text-lg mt-0.5 select-none">{typeIcon(doc.type)}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                   {doc.fileName ?? doc.sourceUrl ?? 'Sem título'}
                 </p>
                 <div className="mt-0.5 flex flex-wrap gap-2 items-center">
                   {statusBadge(doc)}
                   {doc.contentBytes > 0 && (
-                    <span className="text-xs text-gray-400">{fmtBytes(doc.contentBytes)}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{fmtBytes(doc.contentBytes)}</span>
                   )}
                   {doc.status === 'failed' && doc.error && (
                     <span className="text-xs text-red-500 truncate max-w-xs" title={doc.error}>{doc.error}</span>
@@ -393,7 +393,7 @@ export default function KnowledgeBase({ agentId }: Props) {
                   <button
                     onClick={() => void handleReingest(doc.id)}
                     title="Reingerir"
-                    className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors text-sm"
+                    className="p-1.5 rounded text-gray-400 dark:text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors text-sm"
                   >
                     ↺
                   </button>
@@ -401,7 +401,7 @@ export default function KnowledgeBase({ agentId }: Props) {
                 <button
                   onClick={() => void handleDelete(doc.id)}
                   title="Apagar"
-                  className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors text-sm"
+                    className="p-1.5 rounded text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-sm"
                 >
                   ✕
                 </button>
