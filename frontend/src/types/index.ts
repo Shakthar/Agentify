@@ -7,6 +7,7 @@ export interface Tenant {
   creditsTotal: number;
   creditsUsed: number;
   createdAt: string;
+  isAdmin?: boolean;
 }
 
 export interface Agent {

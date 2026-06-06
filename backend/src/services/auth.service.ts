@@ -121,6 +121,7 @@ export async function login(email: string, password: string) {
       plan: tenant.plan,
       creditsTotal: tenant.creditsTotal,
       creditsUsed: tenant.creditsUsed,
+      isAdmin: tenant.isAdmin,
     },
   };
 }
@@ -182,7 +183,7 @@ export async function getProfile(tenantId: string) {
       id: true, email: true, name: true, companyName: true,
       plan: true, creditsTotal: true, creditsUsed: true,
       stripeCustomerId: true, monthlyRecurringRevenue: true,
-      createdAt: true,
+      createdAt: true, isAdmin: true,
     },
   });
 }

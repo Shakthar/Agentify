@@ -15,7 +15,7 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
     const payload = verifyAccessToken(token);
     const tenant = await prisma.tenant.findUnique({
       where: { id: payload.tenantId, deletedAt: null },
-      select: { id: true, email: true, plan: true, creditsTotal: true, creditsUsed: true },
+      select: { id: true, email: true, plan: true, creditsTotal: true, creditsUsed: true, isAdmin: true },
     });
 
     if (!tenant) {

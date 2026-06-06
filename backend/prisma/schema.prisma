@@ -35,6 +35,9 @@ model Tenant {
   twoFactorSecret   String?
   twoFactorEnabled  Boolean  @default(false)
 
+  // Platform admin
+  isAdmin           Boolean  @default(false)
+
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
   deletedAt             DateTime?
@@ -47,6 +50,19 @@ model Tenant {
   knowledgeBases        KnowledgeBase[]
   agentDocs             AgentDoc[]
   orders                Order[]
+}
+
+// ===== PLATFORM EXPENSES (superadmin) =====
+model PlatformExpense {
+  id          String   @id @default(cuid())
+  category    String   // hosting, api, support, marketing, misc
+  description String
+  amount      Float    // EUR
+  recurring   Boolean  @default(false)
+  period      String   @default("monthly") // monthly, yearly, one-time
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // ===== AGENTS =====

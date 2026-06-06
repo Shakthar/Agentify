@@ -7,6 +7,7 @@ export interface AuthenticatedRequest extends Request {
     plan: string;
     creditsTotal: number;
     creditsUsed: number;
+    isAdmin: boolean;
   };
 }
 
