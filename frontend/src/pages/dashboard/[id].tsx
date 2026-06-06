@@ -5,6 +5,7 @@ import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
 import AgentDocs from '../../components/AgentDocs';
 import Orders from '../../components/Orders';
+import WhatsAppConversations from '../../components/WhatsAppConversations';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgent } from '../../hooks/useAgent';
 import { ROUTES, API_URL, AVAILABLE_MODELS_BY_PLAN } from '../../utils/constants';
@@ -41,7 +42,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders' | 'history'>('overview');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
   const [error, setError] = useState<string | null>(null);
   // WhatsApp state
@@ -153,6 +154,7 @@ export default function AgentDetailPage() {
               { key: 'orders',     label: '🛒 Pedidos' },
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
+              { key: 'history',    label: '📋 Histórico' },
               { key: 'edit',       label: '✏️ Editar' },
             ] as { key: typeof activeTab; label: string }[]).map((t) => (
               <button
@@ -383,6 +385,11 @@ export default function AgentDetailPage() {
               </div>
             );
           })()}
+
+          {/* ─── Histórico de conversas ─── */}
+          {activeTab === 'history' && agent && (
+            <WhatsAppConversations agentId={agent.id} />
+          )}
 
           {/* ─── WhatsApp ─── */}
           {activeTab === 'whatsapp' && (
