@@ -70,6 +70,20 @@ export function validateEnv(): void {
     issues.push({ level: 'warn', message: 'ALLOWED_ORIGINS em falta — CORS cai no default localhost:3000' });
   }
 
+  // ── Base de conhecimento (RAG) ───────────────────────────────────────────
+  if (!process.env.OPENAI_API_KEY) {
+    issues.push({
+      level: 'warn',
+      message: 'OPENAI_API_KEY em falta — a base de conhecimento (embeddings/RAG) ficará indisponível',
+    });
+  }
+  if (!process.env.REDIS_URL) {
+    issues.push({
+      level: 'warn',
+      message: 'REDIS_URL em falta — a ingestão de documentos correrá em modo inline (sem fila resiliente)',
+    });
+  }
+
   // ── Relatório ────────────────────────────────────────────────────────────
   const errors = issues.filter((i) => i.level === 'error');
   const warnings = issues.filter((i) => i.level === 'warn');

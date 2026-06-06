@@ -2,6 +2,7 @@ import prisma from '../lib/prisma.js';
 import { callLLM, detectSentiment, LLMMessage } from '../lib/llm.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
+import { buildContextForQuery } from './knowledge.service.js';
 import {
   BadRequestError,
   NotFoundError,
@@ -181,12 +182,22 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     },
   });
 
+  // Recupera contexto relevante da base de conhecimento (RAG).
+  // Falhas aqui não devem impedir a conversa.
+  let systemPrompt = conversation.agent.systemPrompt;
+  try {
+    const kbContext = await buildContextForQuery(conversation.agentId, content);
+    if (kbContext) systemPrompt += kbContext;
+  } catch {
+    /* ignora falhas de RAG e segue com o prompt base */
+  }
+
   // Chamada ao LLM
   let llmResponse;
   try {
     llmResponse = await callLLM(
       conversation.agent.model,
-      conversation.agent.systemPrompt,
+      systemPrompt,
       history,
       conversation.agent.maxTokens,
       conversation.agent.temperature,

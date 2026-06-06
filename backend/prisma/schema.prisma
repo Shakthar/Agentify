@@ -227,10 +227,15 @@ model Document {
   id                    String     @id @default(cuid())
   knowledgeBaseId       String
   
-  type                  String     // pdf, docx, xlsx, youtube, website, text
+  type                  String     // pdf, docx, csv, youtube, website, text
   sourceUrl             String?
   fileName              String?
   content               String     @db.Text // Raw content
+
+  // Ingestion status
+  status                String     @default("pending") // pending, processing, completed, failed
+  error                 String?    @db.Text
+  chunkCount            Int        @default(0)
   
   // Embeddings
   embeddings            Embedding[]

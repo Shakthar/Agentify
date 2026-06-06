@@ -16,7 +16,10 @@ import adminRouter from './routes/admin.js';
 import chatRouter from './routes/chat.js';
 import twoFactorRouter from './routes/twoFactor.js';
 import webhooksRouter from './routes/webhooks.js';
+import knowledgeRouter from './routes/knowledge.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
+import { startIngestionWorker, stopIngestionWorker } from './workers/ingestion.worker.js';
+import { closeQueue } from './lib/queue.js';
 
 // Falha rápido se a configuração de ambiente for insegura
 validateEnv();
@@ -90,6 +93,7 @@ app.get('/health', (_req, res) => {
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/agents', agentsRouter);
+app.use('/api/agents/:agentId/knowledge', knowledgeRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/suggest', suggestRouter);
@@ -106,4 +110,18 @@ httpServer.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 Socket.io ready for real-time chat`);
+  // Inicia o worker de ingestão da base de conhecimento (se Redis disponível)
+  startIngestionWorker();
 });
+
+// Graceful shutdown — fecha worker e fila de ingestão
+async function shutdown(signal: string) {
+  console.log(`\n${signal} recebido — a encerrar...`);
+  await stopIngestionWorker().catch(() => undefined);
+  await closeQueue().catch(() => undefined);
+  httpServer.close(() => process.exit(0));
+  // Força saída se não fechar a tempo
+  setTimeout(() => process.exit(0), 10000).unref();
+}
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
