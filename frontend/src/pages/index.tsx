@@ -191,12 +191,10 @@ export default function Home() {
             </button>
           </form>
 
-          {/* Diagnóstico — só visível se o URL não for de produção */}
-          {API_URL.includes('localhost') && (
-            <p className="mt-4 text-xs text-center text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-              ⚠️ A chamar backend local: <code className="font-mono">{API_URL}</code>
-            </p>
-          )}
+          {/* Diagnóstico — mostra sempre o backend URL para facilitar debug */}
+          <p className="mt-4 text-xs text-center text-gray-400 dark:text-gray-600">
+            API: <code className="font-mono">{API_URL}</code>
+          </p>
         </div>
       </div>
     </div>
