@@ -24,6 +24,9 @@
   ],
   "author": "Shakthar",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@prisma/client": "^5.8.1",
