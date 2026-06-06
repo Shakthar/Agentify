@@ -421,9 +421,9 @@ export default function AdminPage() {
                   </tbody>
                 </table>
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
-                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">â† Anterior</button>
-                  <span className="text-xs text-gray-400">{skip + 1}â€“{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
-                  <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">PrÃ³ximo â†’</button>
+                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">← Anterior</button>
+                  <span className="text-xs text-gray-400">{skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
+                  <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">Próximo →</button>
                 </div>
               </div>
             </>
@@ -431,19 +431,5 @@ export default function AdminPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-  return (
-    <tr className="border-b border-gray-100 hover:bg-gray-50">
-      <td className="py-2 px-4 text-xs text-gray-400 whitespace-nowrap">
-        {date.toLocaleDateString('pt-PT')} {date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-      </td>
-      <td className="py-2 px-4">
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{label}</span>
-      </td>
-      <td className="py-2 px-4 text-xs text-gray-500">{log.resourceType ?? '—'}</td>
-      <td className="py-2 px-4 text-xs text-gray-400 font-mono">{log.resourceId?.slice(-8) ?? '—'}</td>
-    </tr>
   );
 }
