@@ -41,6 +41,18 @@ const MAX_TEXT_CHARS = 1_000_000; // 1M caracteres por documento
 const EMBED_BATCH_SIZE = 96;
 const MAX_EMBEDDINGS_SCANNED = 5000; // limite de segurança na pesquisa
 
+// Limites de armazenamento de KB por plano (em bytes)
+const KB_STORAGE_LIMITS: Record<string, number> = {
+  free:       10 * 1024 * 1024,         //   10 MB
+  starter:   100 * 1024 * 1024,         //  100 MB
+  pro:       500 * 1024 * 1024,         //  500 MB
+  business:    2 * 1024 * 1024 * 1024,  //    2 GB
+  enterprise: 10 * 1024 * 1024 * 1024,  //   10 GB
+};
+const DEFAULT_STORAGE_LIMIT = KB_STORAGE_LIMITS.free;
+
+function bytesToMb(b: number) { return (b / (1024 * 1024)).toFixed(1); }
+
 interface TenantCtx {
   id: string;
 }
@@ -67,6 +79,31 @@ async function assertDocumentQuota(knowledgeBaseId: string) {
   const count = await prisma.document.count({ where: { knowledgeBaseId } });
   if (count >= MAX_DOCUMENTS_PER_AGENT) {
     throw new ForbiddenError(`Limite de ${MAX_DOCUMENTS_PER_AGENT} documentos por agente atingido`);
+  }
+}
+
+/** Verifica se o tenant ainda tem espaço de armazenamento disponível para newBytes. */
+async function assertStorageQuota(tenantId: string, newBytes: number): Promise<void> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { plan: true },
+  });
+  const plan = tenant?.plan ?? 'free';
+  const limit = KB_STORAGE_LIMITS[plan] ?? DEFAULT_STORAGE_LIMIT;
+
+  // Soma todos os bytes de KB deste tenant
+  const result = await prisma.document.aggregate({
+    where: { knowledgeBase: { tenantId } },
+    _sum: { contentBytes: true },
+  });
+  const used = result._sum.contentBytes ?? 0;
+
+  if (used + newBytes > limit) {
+    const usedMb = bytesToMb(used);
+    const limitMb = bytesToMb(limit);
+    throw new ForbiddenError(
+      `Limite de armazenamento do plano "${plan}" atingido: ${usedMb} MB / ${limitMb} MB. Faça upgrade para continuar.`,
+    );
   }
 }
 
@@ -103,12 +140,16 @@ export async function addFileDocument(tenant: TenantCtx, agentId: string, input:
   content = content.slice(0, MAX_TEXT_CHARS).trim();
   if (!content) throw new BadRequestError('Não foi possível extrair texto do ficheiro');
 
+  const contentBytes = Buffer.byteLength(content, 'utf8');
+  await assertStorageQuota(tenant.id, contentBytes);
+
   const doc = await prisma.document.create({
     data: {
       knowledgeBaseId: kb.id,
       type: input.type,
       fileName: input.fileName,
       content,
+      contentBytes,
       status: 'pending',
     },
     select: { id: true, type: true, fileName: true, status: true, createdAt: true },
@@ -129,12 +170,14 @@ export async function addUrlDocument(tenant: TenantCtx, agentId: string, input: 
   const kb = await getOrCreateKnowledgeBase(tenant.id, agentId);
   await assertDocumentQuota(kb.id);
 
+  // Sem conteúdo ainda (extração é diferida) — quota será verificada no worker
   const doc = await prisma.document.create({
     data: {
       knowledgeBaseId: kb.id,
       type: input.type,
       sourceUrl: input.url,
       content: '', // extração ocorre na ingestão (rede)
+      contentBytes: 0,
       status: 'pending',
     },
     select: { id: true, type: true, sourceUrl: true, status: true, createdAt: true },
@@ -158,12 +201,16 @@ export async function addTextDocument(tenant: TenantCtx, agentId: string, input:
   const content = input.text.slice(0, MAX_TEXT_CHARS).trim();
   if (!content) throw new BadRequestError('Texto vazio');
 
+  const contentBytes = Buffer.byteLength(content, 'utf8');
+  await assertStorageQuota(tenant.id, contentBytes);
+
   const doc = await prisma.document.create({
     data: {
       knowledgeBaseId: kb.id,
       type: 'text',
       fileName: input.title ?? 'Texto',
       content,
+      contentBytes,
       status: 'pending',
     },
     select: { id: true, type: true, fileName: true, status: true, createdAt: true },
@@ -207,7 +254,14 @@ export async function processDocumentIngestion(documentId: string): Promise<void
       }
       content = (content ?? '').slice(0, MAX_TEXT_CHARS).trim();
       if (content) {
-        await prisma.document.update({ where: { id: documentId }, data: { content } });
+        const contentBytes = Buffer.byteLength(content, 'utf8');
+        // Verificar quota antes de persistir conteúdo remoto
+        const kb = await prisma.knowledgeBase.findUnique({
+          where: { id: doc.knowledgeBaseId },
+          select: { tenantId: true },
+        });
+        if (kb) await assertStorageQuota(kb.tenantId, contentBytes);
+        await prisma.document.update({ where: { id: documentId }, data: { content, contentBytes } });
       }
     }
 
@@ -314,23 +368,36 @@ export async function buildContextForQuery(agentId: string, query: string): Prom
 
 // ── Gestão (listar / detalhe / apagar) ──────────────────────────────────────
 
-/** Lista os documentos da KB de um agente. */
+/** Lista os documentos da KB de um agente, incluindo uso de armazenamento. */
 export async function listDocuments(tenantId: string, agentId: string) {
   const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId }, select: { id: true } });
   if (!agent) throw new NotFoundError('Agent not found');
 
   const kb = await prisma.knowledgeBase.findUnique({ where: { agentId } });
-  if (!kb) return { documents: [], total: 0 };
+  if (!kb) return { documents: [], total: 0, storageUsedBytes: 0, storageLimitBytes: DEFAULT_STORAGE_LIMIT, plan: 'free' };
 
-  const documents = await prisma.document.findMany({
-    where: { knowledgeBaseId: kb.id },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true, type: true, fileName: true, sourceUrl: true,
-      status: true, error: true, chunkCount: true, createdAt: true, updatedAt: true,
-    },
-  });
-  return { documents, total: documents.length };
+  const [documents, storageResult, tenant] = await Promise.all([
+    prisma.document.findMany({
+      where: { knowledgeBaseId: kb.id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, type: true, fileName: true, sourceUrl: true,
+        status: true, error: true, chunkCount: true, contentBytes: true,
+        createdAt: true, updatedAt: true,
+      },
+    }),
+    prisma.document.aggregate({
+      where: { knowledgeBase: { tenantId } },
+      _sum: { contentBytes: true },
+    }),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { plan: true } }),
+  ]);
+
+  const plan = tenant?.plan ?? 'free';
+  const storageUsedBytes = storageResult._sum.contentBytes ?? 0;
+  const storageLimitBytes = KB_STORAGE_LIMITS[plan] ?? DEFAULT_STORAGE_LIMIT;
+
+  return { documents, total: documents.length, storageUsedBytes, storageLimitBytes, plan };
 }
 
 /** Apaga um documento (e os seus embeddings via cascade), com scoping de tenant. */

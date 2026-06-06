@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../../components/Navigation';
 import ChatWidget from '../../components/ChatWidget';
+import KnowledgeBase from '../../components/KnowledgeBase';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgent } from '../../hooks/useAgent';
 import { ROUTES, API_URL } from '../../utils/constants';
@@ -38,7 +39,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge'>('overview');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
   const [error, setError] = useState<string | null>(null);
   // WhatsApp state
@@ -140,11 +141,12 @@ export default function AgentDetailPage() {
           {/* Tabs */}
           <div className="flex border-b border-gray-200 mb-6 gap-1 flex-wrap">
             {([
-              { key: 'overview',  label: '📊 Visão geral' },
-              { key: 'chat',      label: '💬 Testar chat' },
-              { key: 'embed',     label: '🌐 Web Embed' },
-              { key: 'whatsapp',  label: '📱 WhatsApp' },
-              { key: 'edit',      label: '✏️ Editar' },
+                          { key: 'overview',   label: '📊 Visão geral' },
+              { key: 'chat',       label: '💬 Testar chat' },
+              { key: 'knowledge',  label: '🧠 Conhecimento' },
+              { key: 'embed',      label: '🌐 Web Embed' },
+              { key: 'whatsapp',   label: '📱 WhatsApp' },
+              { key: 'edit',       label: '✏️ Editar' },
             ] as { key: typeof activeTab; label: string }[]).map((t) => (
               <button
                 key={t.key}
@@ -209,6 +211,11 @@ export default function AgentDetailPage() {
                 <button className="btn-secondary" onClick={() => setActiveTab('overview')}>Cancelar</button>
               </div>
             </div>
+          )}
+
+          {/* ─── Knowledge Base ─── */}
+          {activeTab === 'knowledge' && agent && (
+            <KnowledgeBase agentId={agent.id} />
           )}
 
           {/* ─── Web Embed ─── */}

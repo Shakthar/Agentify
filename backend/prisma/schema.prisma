@@ -236,6 +236,7 @@ model Document {
   status                String     @default("pending") // pending, processing, completed, failed
   error                 String?    @db.Text
   chunkCount            Int        @default(0)
+  contentBytes          Int        @default(0) // tamanho do conteúdo em bytes (para limites por plano)
   
   // Embeddings
   embeddings            Embedding[]
