@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
