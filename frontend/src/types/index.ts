@@ -116,6 +116,7 @@ export interface CreateAgentInput {
   };
   whatsappEnabled?: boolean;
   whatsappNumber?: string;
+  notifyPhone?: string;
   webChatEnabled?: boolean;
   emailEnabled?: boolean;
   offHoursMessage?: string;
