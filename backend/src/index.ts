@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Server as SocketIOServer } from 'socket.io';
+import { validateEnv } from './lib/env.js';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRouter from './routes/auth.js';
@@ -17,7 +18,12 @@ import twoFactorRouter from './routes/twoFactor.js';
 import webhooksRouter from './routes/webhooks.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
 
+// Falha rápido se a configuração de ambiente for insegura
+validateEnv();
+
 const app = express();
+app.disable('x-powered-by'); // não revelar a stack
+app.set('trust proxy', 1);   // confiar no proxy (Railway) para IPs reais no rate limit
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
@@ -26,7 +32,30 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://local
 // Socket.io — chat em tempo real para visitantes
 const io = new SocketIOServer(httpServer, {
   cors: { origin: allowedOrigins, methods: ['GET', 'POST'], credentials: true },
+  maxHttpBufferSize: 1e5, // 100 KB — evita payloads gigantes
+  pingTimeout: 20000,
+  connectTimeout: 10000,
 });
+
+// Limite de ligações simultâneas por IP (anti-flood de conexões)
+const MAX_SOCKETS_PER_IP = 10;
+const socketsPerIp = new Map<string, number>();
+io.use((socket, next) => {
+  const ip = (socket.handshake.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+    || socket.handshake.address;
+  const count = socketsPerIp.get(ip) ?? 0;
+  if (count >= MAX_SOCKETS_PER_IP) {
+    return next(new Error('Too many connections'));
+  }
+  socketsPerIp.set(ip, count + 1);
+  socket.on('disconnect', () => {
+    const c = (socketsPerIp.get(ip) ?? 1) - 1;
+    if (c <= 0) socketsPerIp.delete(ip);
+    else socketsPerIp.set(ip, c);
+  });
+  next();
+});
+
 registerChatSocket(io);
 
 // Middleware
@@ -41,6 +70,9 @@ app.use(helmet({
   // Permite embeber o widget de chat em iframes de clientes
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  // Força HTTPS nos browsers durante 1 ano (HSTS)
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: 'no-referrer' },
 }));
 app.use(express.json({
   limit: '1mb',

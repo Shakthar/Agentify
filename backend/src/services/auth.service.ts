@@ -12,6 +12,7 @@ import {
 import { PLAN_LIMITS } from '../types/index.js';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
+import { wrapDataKey } from '../lib/keyVault.js';
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -62,7 +63,7 @@ export async function signup(input: SignupInput) {
       companyName: input.companyName,
       plan,
       creditsTotal,
-      encryptionKey: generateEncryptionKey(),
+      encryptionKey: wrapDataKey(generateEncryptionKey()),
     },
   });
 
@@ -138,7 +139,22 @@ export async function refresh(refreshTokenRaw: string | undefined) {
   const tokenHash = hashToken(refreshTokenRaw);
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+  if (!stored) {
+    throw new UnauthorizedError('Refresh token expired or revoked');
+  }
+
+  // Detecção de reuso: um token já revogado a ser reutilizado indica roubo.
+  // Revoga TODOS os refresh tokens do tenant para forçar novo login em todos os dispositivos.
+  if (stored.revokedAt) {
+    await prisma.refreshToken.updateMany({
+      where: { tenantId: stored.tenantId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    writeAuditLog(stored.tenantId, 'refresh_token_reuse_detected', 'tenant', stored.tenantId);
+    throw new UnauthorizedError('Refresh token reuse detected — all sessions revoked');
+  }
+
+  if (stored.expiresAt < new Date()) {
     throw new UnauthorizedError('Refresh token expired or revoked');
   }
 

@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import prisma from '../lib/prisma.js';
 import * as conversationsService from '../services/conversations.service.js';
 import { decrypt } from '../lib/encryption.js';
+import { unwrapDataKey } from '../lib/keyVault.js';
 
 /** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
@@ -77,8 +78,9 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
           });
           let replyToken: string | undefined;
           if (agentForReply?.whatsappToken && agentForReply.tenant.encryptionKey) {
+            const dataKey = unwrapDataKey(agentForReply.tenant.encryptionKey);
             const [iv, ciphertext] = agentForReply.whatsappToken.split(':');
-            try { replyToken = decrypt(ciphertext, iv, agentForReply.tenant.encryptionKey); } catch { /* usa fallback */ }
+            try { if (dataKey) replyToken = decrypt(ciphertext, iv, dataKey); } catch { /* usa fallback */ }
           }
           await sendWhatsAppReply(
             phoneId,
@@ -106,8 +108,9 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
         // Token por agente (encriptado) ou fallback para env global
         let agentToken: string | undefined;
         if (agent.whatsappToken && agent.tenant.encryptionKey) {
+          const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
           const [iv, ciphertext] = agent.whatsappToken.split(':');
-          try { agentToken = decrypt(ciphertext, iv, agent.tenant.encryptionKey); } catch { /* usa fallback */ }
+          try { if (dataKey) agentToken = decrypt(ciphertext, iv, dataKey); } catch { /* usa fallback */ }
         }
         const effectiveToken = agentToken ?? process.env.WHATSAPP_TOKEN;
 

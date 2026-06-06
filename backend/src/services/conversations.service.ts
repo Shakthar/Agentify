@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import { callLLM, detectSentiment, LLMMessage } from '../lib/llm.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
+import { unwrapDataKey } from '../lib/keyVault.js';
 import {
   BadRequestError,
   NotFoundError,
@@ -112,10 +113,11 @@ export async function getConversation(tenantId: string, conversationId: string) 
     select: { encryptionKey: true },
   });
 
+  const dataKey = unwrapDataKey(tenant?.encryptionKey);
   const messages = conversation.messages.map((m) => ({
     id: m.id,
     role: m.role,
-    content: decryptContent(m.content, m.contentIV, tenant?.encryptionKey),
+    content: decryptContent(m.content, m.contentIV, dataKey),
     tokens: m.tokens,
     timestamp: m.timestamp,
   }));
@@ -152,18 +154,20 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     throw new PaymentRequiredError('No credits available. Please purchase more.');
   }
 
+  const dataKey = unwrapDataKey(tenant.encryptionKey);
+
   // Histórico para o LLM (decifrado)
   const history: LLMMessage[] = conversation.messages.map((m) => ({
     role: m.role as 'user' | 'assistant',
-    content: decryptContent(m.content, m.contentIV, tenant.encryptionKey),
+    content: decryptContent(m.content, m.contentIV, dataKey),
   }));
   history.push({ role: 'user', content });
 
   // Persiste a mensagem do utilizador (cifrada)
   let userContent = content;
   let userIV: string | undefined;
-  if (tenant.encryptionKey) {
-    const enc = encrypt(content, tenant.encryptionKey);
+  if (dataKey) {
+    const enc = encrypt(content, dataKey);
     userContent = enc.ciphertext;
     userIV = enc.iv;
   }
@@ -195,8 +199,8 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   // Persiste a resposta do assistente (cifrada)
   let assistantContent = llmResponse.content;
   let assistantIV: string | undefined;
-  if (tenant.encryptionKey) {
-    const enc = encrypt(llmResponse.content, tenant.encryptionKey);
+  if (dataKey) {
+    const enc = encrypt(llmResponse.content, dataKey);
     assistantContent = enc.ciphertext;
     assistantIV = enc.iv;
   }

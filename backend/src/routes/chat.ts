@@ -14,8 +14,14 @@ const router = Router();
 router.post('/start', chatLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { agentId, visitorId } = req.body;
 
-  if (!agentId || typeof agentId !== 'string') {
-    throw new BadRequestError('agentId is required');
+  // agentId é um cuid (ex: clxxxxxxx...). Valida formato para evitar probing/abuso.
+  if (!agentId || typeof agentId !== 'string' || !/^c[a-z0-9]{20,32}$/.test(agentId)) {
+    throw new BadRequestError('Valid agentId is required');
+  }
+
+  // visitorId, se fornecido, deve ser uma string curta e simples
+  if (visitorId !== undefined && (typeof visitorId !== 'string' || visitorId.length > 64)) {
+    throw new BadRequestError('Invalid visitorId');
   }
 
   const agent = await prisma.agent.findFirst({

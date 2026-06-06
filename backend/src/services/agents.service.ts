@@ -3,6 +3,7 @@ import { PLAN_LIMITS, ALLOWED_MODELS } from '../types/index.js';
 import { ForbiddenError, NotFoundError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
 import { encrypt } from '../lib/encryption.js';
+import { unwrapDataKey } from '../lib/keyVault.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -95,8 +96,9 @@ export async function createAgent(
   let encryptedWhatsappToken: string | undefined;
   if (whatsappToken) {
     const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
-    if (tenantRecord?.encryptionKey) {
-      const { ciphertext, iv } = encrypt(whatsappToken, tenantRecord.encryptionKey);
+    const dataKey = unwrapDataKey(tenantRecord?.encryptionKey);
+    if (dataKey) {
+      const { ciphertext, iv } = encrypt(whatsappToken, dataKey);
       encryptedWhatsappToken = `${iv}:${ciphertext}`;
     }
   }
@@ -168,8 +170,9 @@ export async function updateAgent(
   let encryptedWhatsappToken: string | undefined;
   if (whatsappToken) {
     const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
-    if (tenantRecord?.encryptionKey) {
-      const { ciphertext, iv } = encrypt(whatsappToken, tenantRecord.encryptionKey);
+    const dataKey = unwrapDataKey(tenantRecord?.encryptionKey);
+    if (dataKey) {
+      const { ciphertext, iv } = encrypt(whatsappToken, dataKey);
       encryptedWhatsappToken = `${iv}:${ciphertext}`;
     }
   }
