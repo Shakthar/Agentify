@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Image from 'next/image';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
@@ -87,6 +88,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-screen">
+      <Head><title>Agentfy — Definições</title></Head>
       <Navigation />
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-2xl mx-auto">

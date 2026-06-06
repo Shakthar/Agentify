@@ -1,6 +1,7 @@
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
+import Head from 'next/head';
 import i18n from '../lib/i18n';
 import { useTheme } from '../hooks/useTheme';
 import '../styles/globals.css';
@@ -37,6 +38,10 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <>
+      <Head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
       <ThemeScript />
       <ThemeToggle />
       <Component {...pageProps} />

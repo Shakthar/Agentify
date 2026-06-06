@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { useAdmin } from '../../hooks/useAdmin';
@@ -85,6 +86,7 @@ export default function AdminPage() {
   return (
     <div className="flex min-h-screen">
       <Navigation />
+      <Head><title>Agentfy — Administração</title></Head>
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
 

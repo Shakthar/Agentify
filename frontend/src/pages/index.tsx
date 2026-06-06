@@ -1,5 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
@@ -104,6 +105,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white dark:from-gray-950 dark:to-gray-900 px-4">
+      <Head><title>Agentfy — Entrar</title></Head>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Logo size={52} className="justify-center mb-3" />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Link from 'next/link';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
@@ -28,6 +29,7 @@ export default function AgentsPage() {
 
   return (
     <div className="flex min-h-screen">
+      <Head><title>Agentfy — Agentes</title></Head>
       <Navigation />
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-5xl mx-auto">

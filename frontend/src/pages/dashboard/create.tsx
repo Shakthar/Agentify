@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import AgentCreator from '../../components/AgentCreator';
 import { useAuth } from '../../hooks/useAuth';
@@ -17,6 +18,7 @@ export default function CreateAgentPage() {
 
   return (
     <div className="flex min-h-screen">
+      <Head><title>Agentfy — Novo Agente</title></Head>
       <Navigation />
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-2xl mx-auto">

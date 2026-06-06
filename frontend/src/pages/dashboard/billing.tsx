@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../utils/constants';
@@ -39,6 +40,7 @@ export default function BillingPage() {
 
   return (
     <div className="flex min-h-screen">
+      <Head><title>Agentfy — Faturação</title></Head>
       <Navigation />
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-4xl mx-auto">

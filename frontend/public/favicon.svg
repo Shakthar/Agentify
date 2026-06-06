@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background rounded square -->
+  <rect width="32" height="32" rx="8" fill="#3b57f0"/>
+  <!-- Stylized "A" for Agentfy -->
+  <path d="M16 6L7 26h4l1.8-4.5h6.4L21 26h4L16 6zm0 5.5l2.3 6h-4.6L16 11.5z" fill="white"/>
+</svg>

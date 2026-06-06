@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
 import { API_URL } from '../../utils/constants';
@@ -48,6 +49,7 @@ export default function PublicChatPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Head><title>Agentfy — {agentName}</title></Head>
       <div className="w-full max-w-md h-[600px]">
         {state === 'loading' && (
           <div className="flex flex-col items-center justify-center h-full gap-3">
