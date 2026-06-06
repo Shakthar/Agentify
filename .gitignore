@@ -8,9 +8,8 @@
 node_modules/
 /.pnp
 .pnp.js
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# NOTA: lockfiles (package-lock.json) são versionados de propósito para
+# builds reproduzíveis e segurança da cadeia de fornecimento.
 
 # Build outputs
 /dist

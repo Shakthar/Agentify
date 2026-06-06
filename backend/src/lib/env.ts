@@ -49,11 +49,20 @@ export function validateEnv(): void {
   }
 
   // ── Segurança de webhooks Meta ───────────────────────────────────────────
+  // Só é crítico quando a integração WhatsApp/Meta está realmente em uso.
+  const metaInUse = !!(process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN);
   if (!process.env.META_APP_SECRET) {
-    issues.push({
-      level: isProd ? 'error' : 'warn',
-      message: 'META_APP_SECRET em falta — os webhooks do WhatsApp não podem ser verificados (assinatura X-Hub-Signature-256)',
-    });
+    if (metaInUse) {
+      issues.push({
+        level: isProd ? 'error' : 'warn',
+        message: 'META_APP_SECRET em falta mas o WhatsApp está configurado — os webhooks não podem ser verificados (assinatura X-Hub-Signature-256)',
+      });
+    } else {
+      issues.push({
+        level: 'warn',
+        message: 'META_APP_SECRET não definido — defina-o antes de ativar a integração WhatsApp/Meta',
+      });
+    }
   }
 
   // ── CORS ─────────────────────────────────────────────────────────────────
