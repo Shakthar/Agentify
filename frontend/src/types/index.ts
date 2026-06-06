@@ -21,6 +21,7 @@ export interface Agent {
   webChatEnabled: boolean;
   whatsappEnabled: boolean;
   whatsappNumber?: string;
+  notifyPhone?: string;
   emailEnabled: boolean;
   skillHandoff: boolean;
   skillDataCollection: boolean;

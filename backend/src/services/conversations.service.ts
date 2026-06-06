@@ -3,6 +3,7 @@ import { callLLM, detectSentiment, LLMMessage } from '../lib/llm.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { buildContextForQuery } from './knowledge.service.js';
+import { createMbwayCharge } from './payments.service.js';
 import {
   BadRequestError,
   NotFoundError,
@@ -209,6 +210,13 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     /* ignorar falhas de doc injection */
   }
 
+  // Injeta skill de cobrança MB Way
+  // O agente usa [MBWAY:351912345678|5.00|2x Café] para disparar o pagamento
+  systemPrompt += '\n\n---\nCobrança MB Way: quando o cliente confirmar um pedido e fornecer o número de telmóvel, usa o marcador [MBWAY:NUMERO|VALOR|DESCRICAO] na tua resposta.'
+    + ' Substitui NUMERO pelo número do cliente no formato 351XXXXXXXXX (Portugal) ou código do país + número sem espaços, VALOR pelo montante em euros (ex: 5.50), DESCRICAO pelo resumo do pedido (ex: 2x Café e 1x Bolo).'
+    + ' Exemplo: "Ok! Vou enviar o pedido de \u20ac5.50 para o seu MB Way! [MBWAY:351912345678|5.50|2x Café e 1x Bolo]"'
+    + ' Nunca uses este marcador sem ter o número de telmóvel do cliente. Se não tiveres o número, pede-o primeiro.';
+
   // Chamada ao LLM
   let llmResponse;
   try {
@@ -227,12 +235,44 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   // Parseia [SEND_DOC:id] da resposta do LLM
   const sendDocMatch = llmResponse.content.match(/\[SEND_DOC:([a-z0-9]+)\]/i);
   const docId = sendDocMatch?.[1] ?? null;
-  const cleanContent = llmResponse.content.replace(/\[SEND_DOC:[a-z0-9]+\]/gi, '').trim();
+
+  // Parseia [MBWAY:phone|amount|description] da resposta do LLM
+  const mbwayMatch = llmResponse.content.match(/\[MBWAY:([^|\]]+)\|([^|\]]+)\|([^\]]+)\]/i);
+  const cleanContent = llmResponse.content
+    .replace(/\[SEND_DOC:[a-z0-9]+\]/gi, '')
+    .replace(/\[MBWAY:[^\]]+\]/gi, '')
+    .trim();
 
   let docAttachment: { id: string; name: string; url: string } | null = null;
   if (docId) {
     const doc = await prisma.agentDoc.findUnique({ where: { id: docId }, select: { id: true, name: true, fileUrl: true } });
     if (doc) docAttachment = { id: doc.id, name: doc.name, url: doc.fileUrl };
+  }
+
+  // Processa cobrança MB Way se o agente a disparou
+  let mbwayCharge: { orderId: string; phone: string; amount: number; description: string; mock: boolean } | null = null;
+  if (mbwayMatch) {
+    const [, rawPhone, rawAmount, rawDesc] = mbwayMatch;
+    const phone = rawPhone.replace(/[^0-9]/g, '');
+    const amount = parseFloat(rawAmount.replace(',', '.'));
+    const description = rawDesc.trim().slice(0, 255);
+    if (phone && !isNaN(amount) && amount > 0) {
+      try {
+        const result = await createMbwayCharge({
+          tenantId,
+          agentId: conversation.agentId,
+          conversationId: conversation.id,
+          buyerPhone: phone,
+          amount,
+          description,
+          notifyPhone: conversation.agent.notifyPhone ?? undefined,
+        });
+        mbwayCharge = { orderId: result.orderId, phone, amount, description, mock: result.mock };
+        console.log(`[Payments] Order MB Way criada: ${result.orderId} (mock=${result.mock})`);
+      } catch (err) {
+        console.error('[Payments] Falha ao criar cobrança MB Way:', err);
+      }
+    }
   }
 
   // Persiste a resposta do assistente (cifrada, sem o marcador [SEND_DOC])
@@ -297,6 +337,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     sentiment,
     timestamp: assistantMsg.timestamp,
     docAttachment,
+    mbwayCharge,
   };
 }
 

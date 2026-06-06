@@ -46,6 +46,7 @@ model Tenant {
   refreshTokens         RefreshToken[]
   knowledgeBases        KnowledgeBase[]
   agentDocs             AgentDoc[]
+  orders                Order[]
 }
 
 // ===== AGENTS =====
@@ -64,6 +65,7 @@ model Agent {
   whatsappNumber        String?    // phone_number_id do Meta
   whatsappToken         String?    // System User Access Token do cliente (encriptado)
   whatsappWebhookUrl    String?
+  notifyPhone           String?    // Número WA do dono do negócio para notificações de pedidos (ex: 351912345678)
   webChatEnabled        Boolean    @default(true)
   emailEnabled          Boolean    @default(false)
   
@@ -96,6 +98,7 @@ model Agent {
   creditAllocations     CreditAllocation[]
   knowledgeBase         KnowledgeBase?
   agentDocs             AgentDoc[]
+  orders                Order[]
 
   @@index([tenantId])
 }
@@ -315,4 +318,28 @@ model AgentDoc {
 
   @@index([agentId])
   @@index([tenantId])
+}
+
+// ===== ORDERS (pedidos c/ pagamento MB Way) =====
+model Order {
+  id            String    @id @default(cuid())
+  tenantId      String
+  agentId       String
+  conversationId String
+  externalId    String?   // ID do pagamento no Easypay
+  buyerPhone    String    // telm do cliente (para MB Way + WA)
+  amount        Float     // valor em euros
+  description   String    // resumo do pedido
+  status        String    @default("pending") // pending | paid | failed | expired
+  notifyPhone   String?   // WA do dono a notificar após pagamento
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([agentId])
+  @@index([externalId])
+  @@index([status])
 }

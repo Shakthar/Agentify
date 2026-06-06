@@ -4,6 +4,7 @@ import Navigation from '../../components/Navigation';
 import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
 import AgentDocs from '../../components/AgentDocs';
+import Orders from '../../components/Orders';
 import { useAuth } from '../../hooks/useAuth';
 import { useAgent } from '../../hooks/useAgent';
 import { ROUTES, API_URL, AVAILABLE_MODELS_BY_PLAN } from '../../utils/constants';
@@ -40,11 +41,12 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders'>('overview');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
   const [error, setError] = useState<string | null>(null);
   // WhatsApp state
   const [phoneId, setPhoneId] = useState('');
+  const [notifyPhone, setNotifyPhone] = useState('');
   const [wpEnabled, setWpEnabled] = useState(false);
   const [wpSaving, setWpSaving] = useState(false);
   const [wpMsg, setWpMsg] = useState('');
@@ -57,6 +59,7 @@ export default function AgentDetailPage() {
       setAgent(data);
       setEditForm({ name: data.name, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature, maxTokens: data.maxTokens });
       setPhoneId(data.whatsappNumber ?? '');
+      setNotifyPhone(data.notifyPhone ?? '');
       setWpEnabled(data.whatsappEnabled ?? false);
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
@@ -87,7 +90,7 @@ export default function AgentDetailPage() {
     if (!agent) return;
     setWpSaving(true);
     try {
-      const updated = await updateAgent(agent.id, { whatsappNumber: phoneId, whatsappEnabled: wpEnabled });
+      const updated = await updateAgent(agent.id, { whatsappNumber: phoneId, whatsappEnabled: wpEnabled, notifyPhone: notifyPhone || undefined });
       setAgent(updated);
       setWpMsg('Guardado com sucesso!');
       setTimeout(() => setWpMsg(''), 3000);
@@ -147,6 +150,7 @@ export default function AgentDetailPage() {
               { key: 'chat',       label: '💬 Testar chat' },
               { key: 'knowledge',  label: '🧠 Conhecimento' },
               { key: 'docs',       label: '📎 Documentos' },
+              { key: 'orders',     label: '🛒 Pedidos' },
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
               { key: 'edit',       label: '✏️ Editar' },
@@ -337,6 +341,11 @@ export default function AgentDetailPage() {
             <AgentDocs agentId={agent.id} />
           )}
 
+          {/* ─── Pedidos MB Way ─── */}
+          {activeTab === 'orders' && agent && (
+            <Orders agentId={agent.id} />
+          )}
+
           {/* ─── Web Embed ─── */}
           {activeTab === 'embed' && (() => {
             const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.agentify.com';
@@ -406,6 +415,12 @@ export default function AgentDetailPage() {
                       Phone Number ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico do Meta)</span>
                     </label>
                     <input className="input" placeholder="ex: 123456789012345" value={phoneId} onChange={(e) => setPhoneId(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Número de notificação <span className="text-gray-400 dark:text-gray-500 font-normal">(WhatsApp do dono — recebe alerta de pedidos pagos)</span>
+                    </label>
+                    <input className="input" placeholder="ex: 351912345678" value={notifyPhone} onChange={(e) => setNotifyPhone(e.target.value)} />
                   </div>
                   <div className="flex items-center gap-3">
                     <button

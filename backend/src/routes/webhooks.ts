@@ -5,6 +5,7 @@ import prisma from '../lib/prisma.js';
 import * as conversationsService from '../services/conversations.service.js';
 import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
+import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
 
 /** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
@@ -148,7 +149,7 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
             const [iv, ciphertext] = agentForReply.whatsappToken.split(':');
             try { if (dataKey) replyToken = decrypt(ciphertext, iv, dataKey); } catch { /* usa fallback */ }
           }
-          await sendWhatsAppReply(
+          await sendWhatsAppText(
             phoneId,
             from,
             '⚠️ De momento apenas consigo responder a mensagens de texto. Por favor, escreva a sua mensagem.',
@@ -208,13 +209,13 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
         }
 
         // Processar mensagem no LLM
-        let result: { content: string; docAttachment?: { id: string; name: string; url: string } | null };
+        let result: { content: string; docAttachment?: { id: string; name: string; url: string } | null; mbwayCharge?: { orderId: string; phone: string; amount: number; description: string; mock: boolean } | null };
         try {
           result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
         } catch (err) {
           console.error('[WhatsApp] Erro ao processar mensagem:', err);
           // Informar o utilizador que algo falhou em vez de silêncio total
-          await sendWhatsAppReply(
+          await sendWhatsAppText(
             phoneId,
             from,
             '⚠️ Ocorreu um erro ao processar a sua mensagem. Por favor, tente novamente mais tarde.',
@@ -224,10 +225,19 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
         }
 
         // Enviar resposta de volta ao WhatsApp
-        await sendWhatsAppReply(phoneId, from, result.content, effectiveToken);
+        await sendWhatsAppText(phoneId, from, result.content, effectiveToken);
         // Enviar documento separado se o agente o indicou
         if (result.docAttachment) {
           await sendWhatsAppDocument(phoneId, from, result.docAttachment.url, result.docAttachment.name, effectiveToken);
+        }
+        // Notificar sobre cobrança MB Way criada
+        if (result.mbwayCharge) {
+          const { phone, amount, description, mock } = result.mbwayCharge;
+          const amountFmt = amount.toFixed(2).replace('.', ',');
+          const waMsg = mock
+            ? `🧾 *Pedido recebido!* (modo teste)\n\n📋 ${description}\n💶 Total: €${amountFmt}\n\n⚠️ MB Way em modo teste — não é cobrado nada.`
+            : `💳 Enviamos um pedido de pagamento MB Way de *€${amountFmt}* para o número +${phone}.\n\n📱 Abre a app MB Way e aceita o pagamento para confirmar o teu pedido:\n📋 ${description}`;
+          await sendWhatsAppText(phoneId, from, waMsg, effectiveToken);
         }
       }
     }
@@ -235,62 +245,6 @@ router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function sendWhatsAppDocument(phoneId: string, to: string, fileUrl: string, filename: string, token: string | undefined): Promise<void> {
-  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
-  if (!token) return;
-
-  const url = `https://graph.facebook.com/${version}/${phoneId}/messages`;
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to,
-        type: 'document',
-        document: { link: fileUrl, filename },
-      }),
-    });
-    if (!resp.ok) console.error('[WhatsApp] Erro ao enviar documento:', await resp.text());
-  } catch (err) {
-    console.error('[WhatsApp] Falha ao enviar documento:', err);
-  }
-}
-
-async function sendWhatsAppReply(phoneId: string, to: string, text: string, token: string | undefined): Promise<void> {
-  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
-
-  if (!token) {
-    console.warn('[WhatsApp] Token não disponível — resposta não enviada');
-    return;
-  }
-
-  const url = `https://graph.facebook.com/${version}/${phoneId}/messages`;
-
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to,
-        type: 'text',
-        text: { body: text },
-      }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error('[WhatsApp] Erro ao enviar mensagem:', err);
-    }
-  } catch (err) {
-    console.error('[WhatsApp] Falha na chamada à API do Meta:', err);
-  }
-}
 
 // ─── Tipos locais ─────────────────────────────────────────────────────────────
 
