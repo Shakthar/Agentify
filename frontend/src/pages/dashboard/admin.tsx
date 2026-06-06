@@ -433,38 +433,6 @@ export default function AdminPage() {
     </div>
   );
 }
-  agent_created: 'Agente criado',
-  agent_deleted: 'Agente eliminado',
-  agent_activated: 'Agente ativado',
-  agent_deactivated: 'Agente desativado',
-  conversation_created: 'Conversa iniciada',
-  conversation_closed: 'Conversa fechada',
-};
-
-const ACTION_COLORS: Record<string, string> = {
-  tenant_signup: 'bg-blue-100 text-blue-700',
-  agent_created: 'bg-green-100 text-green-700',
-  agent_deleted: 'bg-red-100 text-red-700',
-  agent_activated: 'bg-green-100 text-green-700',
-  agent_deactivated: 'bg-yellow-100 text-yellow-700',
-  conversation_created: 'bg-purple-100 text-purple-700',
-  conversation_closed: 'bg-gray-100 text-gray-700',
-};
-
-function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
-  return (
-    <div className="card">
-      <p className="text-sm text-gray-500 mb-1">{label}</p>
-      <p className="text-3xl font-bold text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-function LogRow({ log }: { log: AuditLogEntry }) {
-  const label = ACTION_LABELS[log.action] ?? log.action;
-  const color = ACTION_COLORS[log.action] ?? 'bg-gray-100 text-gray-700';
-  const date = new Date(log.createdAt);
 
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50">
