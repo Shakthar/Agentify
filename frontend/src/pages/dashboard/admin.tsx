@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Navigation from '../../components/Navigation';
@@ -8,7 +8,7 @@ import { ROUTES } from '../../utils/constants';
 import { AuditLogEntry } from '../../types';
 import api from '../../utils/api';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface PlatformMetrics {
   tenants: { total: number; byPlan: Record<string, number> };
   agents: { total: number; active: number };
@@ -32,7 +32,7 @@ interface Expense {
   amount: number; recurring: boolean; period: string; createdAt: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PLAN_LABELS_LOCAL: Record<string, string> = {
   free: 'Free', starter: 'Starter', pro: 'Pro', business: 'Business', enterprise: 'Enterprise',
 };
@@ -44,8 +44,8 @@ const PLAN_COLORS: Record<string, string> = {
   enterprise: 'bg-amber-100 text-amber-700',
 };
 const CATEGORY_LABELS: Record<string, string> = {
-  hosting: '🖥️ Hosting', api: '🔌 APIs', support: '🛟 Suporte',
-  marketing: '📣 Marketing', misc: '📦 Outros',
+  hosting: 'ðŸ–¥ï¸ Hosting', api: 'ðŸ”Œ APIs', support: 'ðŸ›Ÿ Suporte',
+  marketing: 'ðŸ“£ Marketing', misc: 'ðŸ“¦ Outros',
 };
 const ACTION_LABELS: Record<string, string> = {
   tenant_signup: 'Conta criada', agent_created: 'Agente criado',
@@ -60,7 +60,7 @@ const ACTION_COLORS: Record<string, string> = {
   conversation_closed: 'bg-gray-100 text-gray-700',
 };
 
-// ─── Small components ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Small components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function KpiCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
   return (
     <div className="card">
@@ -80,7 +80,7 @@ function PlanBar({ byPlan }: { byPlan: Record<string, number> }) {
   };
   return (
     <div className="card col-span-full">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">Distribuição por plano</p>
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">DistribuiÃ§Ã£o por plano</p>
       <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
         {plans.map((p) => {
           const count = byPlan[p] ?? 0;
@@ -101,7 +101,7 @@ function PlanBar({ byPlan }: { byPlan: Record<string, number> }) {
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AdminPage() {
   const router = useRouter();
   const { tenant } = useAuth();
@@ -158,17 +158,17 @@ export default function AdminPage() {
   const handleAuditNext = () => { const n = skip + PAGE_SIZE; setSkip(n); fetchAuditLogs(n, PAGE_SIZE); };
 
   const tabList = [
-    { key: 'dashboard', label: '📊 Dashboard' },
-    { key: 'tenants',   label: '🏢 Contas' },
-    { key: 'balance',   label: '💰 Balanço' },
-    { key: 'logs',      label: '📋 Auditoria' },
+    { key: 'dashboard', label: 'ðŸ“Š Dashboard' },
+    { key: 'tenants',   label: 'ðŸ¢ Contas' },
+    { key: 'balance',   label: 'ðŸ’° BalanÃ§o' },
+    { key: 'logs',      label: 'ðŸ“‹ Auditoria' },
   ] as { key: typeof activeTab; label: string }[];
 
   if (!tenant || !isAdmin) return null;
 
   return (
     <div className="flex min-h-screen">
-      <Head><title>Agentfy — Administração</title></Head>
+      <Head><title>Agentfy â€” AdministraÃ§Ã£o</title></Head>
       <Navigation />
       <main className="flex-1 p-8 overflow-y-auto bg-gray-50 dark:bg-gray-900">
         <div className="max-w-6xl mx-auto">
@@ -176,10 +176,10 @@ export default function AdminPage() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Painel Superadmin</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Visão completa da plataforma Agentfy</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">VisÃ£o completa da plataforma Agentfy</p>
             </div>
             <span className="text-xs bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-3 py-1.5 rounded-full font-medium">
-              🔑 {tenant.email}
+              ðŸ”‘ {tenant.email}
             </span>
           </div>
 
@@ -198,7 +198,7 @@ export default function AdminPage() {
             <div className="text-center py-16 text-gray-400 text-sm">A carregar dados da plataforma...</div>
           )}
 
-          {/* ─── Dashboard ─── */}
+          {/* â”€â”€â”€ Dashboard â”€â”€â”€ */}
           {activeTab === 'dashboard' && metrics && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -208,13 +208,13 @@ export default function AdminPage() {
                 <KpiCard label="Mensagens" value={metrics.messages.total.toLocaleString()} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <KpiCard label="MRR" value={`€${metrics.revenue.mrr.toFixed(2)}`} accent="text-green-600" />
-                <KpiCard label="ARR" value={`€${metrics.revenue.arr.toFixed(2)}`} accent="text-green-600" />
+                <KpiCard label="MRR" value={`â‚¬${metrics.revenue.mrr.toFixed(2)}`} accent="text-green-600" />
+                <KpiCard label="ARR" value={`â‚¬${metrics.revenue.arr.toFixed(2)}`} accent="text-green-600" />
                 <KpiCard
-                  label="Balanço mensal"
-                  value={`€${metrics.balance.toFixed(2)}`}
+                  label="BalanÃ§o mensal"
+                  value={`â‚¬${metrics.balance.toFixed(2)}`}
                   accent={metrics.balance >= 0 ? 'text-green-600' : 'text-red-600'}
-                  sub={`Despesas: €${metrics.expenses.monthly.toFixed(2)}/mês`}
+                  sub={`Despesas: â‚¬${metrics.expenses.monthly.toFixed(2)}/mÃªs`}
                 />
               </div>
               <div className="grid grid-cols-1 gap-4">
@@ -223,13 +223,13 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ─── Contas ─── */}
+          {/* â”€â”€â”€ Contas â”€â”€â”€ */}
           {activeTab === 'tenants' && (
             <div className="card overflow-x-auto p-0">
               <table className="w-full text-sm min-w-[700px]">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                    {['Conta', 'Plano', 'Agentes', 'Conversas', 'Créditos', 'MRR', 'Criada'].map((h) => (
+                    {['Conta', 'Plano', 'Agentes', 'Conversas', 'CrÃ©ditos', 'MRR', 'Criada'].map((h) => (
                       <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
                     ))}
                   </tr>
@@ -239,7 +239,7 @@ export default function AdminPage() {
                     <tr key={t.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="py-2 px-3">
                         <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">{t.name}</p>
-                        <p className="text-[10px] text-gray-400">{t.email}{t.isAdmin && ' 🔑'}</p>
+                        <p className="text-[10px] text-gray-400">{t.email}{t.isAdmin && ' ðŸ”‘'}</p>
                       </td>
                       <td className="py-2 px-3">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan] ?? PLAN_COLORS.free}`}>
@@ -258,7 +258,7 @@ export default function AdminPage() {
                         </div>
                         <p className="text-[10px] text-gray-400">{t.creditsUsed.toLocaleString()} / {t.creditsTotal.toLocaleString()}</p>
                       </td>
-                      <td className="py-2 px-3 text-xs font-medium text-green-600">€{t.planPrice}/mês</td>
+                      <td className="py-2 px-3 text-xs font-medium text-green-600">â‚¬{t.planPrice}/mÃªs</td>
                       <td className="py-2 px-3 text-[10px] text-gray-400">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
                     </tr>
                   ))}
@@ -270,26 +270,26 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ─── Balanço ─── */}
+          {/* â”€â”€â”€ BalanÃ§o â”€â”€â”€ */}
           {activeTab === 'balance' && metrics && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">💚 Receita mensal (MRR)</p>
-                  <p className="text-3xl font-bold text-green-600">€{metrics.revenue.mrr.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400 mt-1">ARR: €{metrics.revenue.arr.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mb-1">ðŸ’š Receita mensal (MRR)</p>
+                  <p className="text-3xl font-bold text-green-600">â‚¬{metrics.revenue.mrr.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400 mt-1">ARR: â‚¬{metrics.revenue.arr.toFixed(2)}</p>
                 </div>
                 <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">❤️ Despesas mensais</p>
-                  <p className="text-3xl font-bold text-red-500">€{metrics.expenses.monthly.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mb-1">â¤ï¸ Despesas mensais</p>
+                  <p className="text-3xl font-bold text-red-500">â‚¬{metrics.expenses.monthly.toFixed(2)}</p>
                   <p className="text-xs text-gray-400 mt-1">{metrics.expenses.items.length} itens</p>
                 </div>
                 <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">⚖️ Balanço líquido</p>
+                  <p className="text-xs text-gray-500 mb-1">âš–ï¸ BalanÃ§o lÃ­quido</p>
                   <p className={`text-3xl font-bold ${metrics.balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {metrics.balance >= 0 ? '+' : ''}€{metrics.balance.toFixed(2)}
+                    {metrics.balance >= 0 ? '+' : ''}â‚¬{metrics.balance.toFixed(2)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">{metrics.balance >= 0 ? 'Positivo ✓' : '⚠️ Negativo'}</p>
+                  <p className="text-xs text-gray-400 mt-1">{metrics.balance >= 0 ? 'Positivo âœ“' : 'âš ï¸ Negativo'}</p>
                 </div>
               </div>
 
@@ -304,9 +304,9 @@ export default function AdminPage() {
                     <div key={plan} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
-                        <span className="text-xs text-gray-500">{count} conta{count !== 1 ? 's' : ''} × €{PRICES[plan]}</span>
+                        <span className="text-xs text-gray-500">{count} conta{count !== 1 ? 's' : ''} Ã— â‚¬{PRICES[plan]}</span>
                       </div>
-                      <span className="text-sm font-semibold text-green-600">€{rev.toFixed(2)}/mês</span>
+                      <span className="text-sm font-semibold text-green-600">â‚¬{rev.toFixed(2)}/mÃªs</span>
                     </div>
                   );
                 })}
@@ -325,7 +325,7 @@ export default function AdminPage() {
                       <div key={exp.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
                         <div>
                           <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                            {CATEGORY_LABELS[exp.category] ?? exp.category} — {exp.description}
+                            {CATEGORY_LABELS[exp.category] ?? exp.category} â€” {exp.description}
                           </p>
                           <p className="text-[10px] text-gray-400">
                             {exp.recurring ? `Recorrente (${exp.period === 'monthly' ? 'mensal' : 'anual'})` : 'Pontual'}
@@ -333,10 +333,10 @@ export default function AdminPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-red-500">
-                            €{exp.period === 'yearly' ? (exp.amount / 12).toFixed(2) : exp.amount.toFixed(2)}/mês
-                            {exp.period === 'yearly' && <span className="text-[10px] text-gray-400 ml-1">(€{exp.amount}/ano)</span>}
+                            â‚¬{exp.period === 'yearly' ? (exp.amount / 12).toFixed(2) : exp.amount.toFixed(2)}/mÃªs
+                            {exp.period === 'yearly' && <span className="text-[10px] text-gray-400 ml-1">(â‚¬{exp.amount}/ano)</span>}
                           </span>
-                          <button onClick={() => removeExpense(exp.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button>
+                          <button onClick={() => removeExpense(exp.id)} className="text-gray-300 hover:text-red-500 text-xs">âœ•</button>
                         </div>
                       </div>
                     ))}
@@ -350,15 +350,15 @@ export default function AdminPage() {
                     </select>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-[10px] text-gray-500 mb-1">Descrição</label>
+                    <label className="block text-[10px] text-gray-500 mb-1">DescriÃ§Ã£o</label>
                     <input className="input text-xs" placeholder="ex: Railway hosting" value={expForm.description} onChange={(e) => setExpForm((f) => ({ ...f, description: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Valor (€)</label>
+                    <label className="block text-[10px] text-gray-500 mb-1">Valor (â‚¬)</label>
                     <input className="input text-xs" type="number" step="0.01" min="0" placeholder="0.00" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="block text-[10px] text-gray-500">Período</label>
+                    <label className="block text-[10px] text-gray-500">PerÃ­odo</label>
                     <div className="flex gap-1.5">
                       <select className="input text-xs flex-1" value={expForm.period} onChange={(e) => setExpForm((f) => ({ ...f, period: e.target.value }))}>
                         <option value="monthly">Mensal</option>
@@ -375,18 +375,18 @@ export default function AdminPage() {
                   </div>
                 </form>
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 mb-1">💡 Despesas típicas a registar</p>
+                  <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 mb-1">ðŸ’¡ Despesas tÃ­picas a registar</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[10px] text-blue-600 dark:text-blue-400">
-                    <span>🖥️ Railway ~€20/mês</span><span>🗄️ Supabase Pro €25/mês</span>
-                    <span>🤖 Anthropic API: variável</span><span>🤖 OpenAI API: variável</span>
-                    <span>🌐 Vercel Pro €20/mês</span><span>📱 Meta WA: grátis até 1000/mês</span>
+                    <span>ðŸ–¥ï¸ Railway ~â‚¬20/mÃªs</span><span>ðŸ—„ï¸ Supabase Pro â‚¬25/mÃªs</span>
+                    <span>ðŸ¤– Anthropic API: variÃ¡vel</span><span>ðŸ¤– OpenAI API: variÃ¡vel</span>
+                    <span>ðŸŒ Vercel Pro â‚¬20/mÃªs</span><span>ðŸ“± Meta WA: grÃ¡tis atÃ© 1000/mÃªs</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ─── Auditoria ─── */}
+          {/* â”€â”€â”€ Auditoria â”€â”€â”€ */}
           {activeTab === 'logs' && (
             <>
               <div className="flex items-center justify-between mb-3">
@@ -397,7 +397,7 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                      {['Data', 'Ação', 'Tipo', 'ID'].map((h) => (
+                      {['Data', 'AÃ§Ã£o', 'Tipo', 'ID'].map((h) => (
                         <th key={h} className="text-left py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
                       ))}
                     </tr>
@@ -413,17 +413,17 @@ export default function AdminPage() {
                             {d.toLocaleDateString('pt-PT')} {d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td className="py-2 px-4"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{label}</span></td>
-                          <td className="py-2 px-4 text-xs text-gray-500">{log.resourceType ?? '—'}</td>
-                          <td className="py-2 px-4 text-xs text-gray-400 font-mono">{log.resourceId?.slice(-8) ?? '—'}</td>
+                          <td className="py-2 px-4 text-xs text-gray-500">{log.resourceType ?? 'â€”'}</td>
+                          <td className="py-2 px-4 text-xs text-gray-400 font-mono">{log.resourceId?.slice(-8) ?? 'â€”'}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
-                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">← Anterior</button>
-                  <span className="text-xs text-gray-400">{skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
-                  <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">Próximo →</button>
+                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">â† Anterior</button>
+                  <span className="text-xs text-gray-400">{skip + 1}â€“{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
+                  <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">PrÃ³ximo â†’</button>
                 </div>
               </div>
             </>
@@ -445,139 +445,5 @@ export default function AdminPage() {
       <td className="py-2 px-4 text-xs text-gray-500">{log.resourceType ?? '—'}</td>
       <td className="py-2 px-4 text-xs text-gray-400 font-mono">{log.resourceId?.slice(-8) ?? '—'}</td>
     </tr>
-  );
-}
-
-export default function AdminPage() {
-  const router = useRouter();
-  const { tenant } = useAuth();
-  const { metrics, auditLogs, auditTotal, loading, error, fetchMetrics, fetchAuditLogs } = useAdmin();
-  const [skip, setSkip] = useState(0);
-  const PAGE_SIZE = 50;
-
-  useEffect(() => {
-    if (!tenant) { router.replace(ROUTES.home); return; }
-    fetchMetrics();
-    fetchAuditLogs(0, PAGE_SIZE);
-  }, []);
-
-  if (!tenant) return null;
-
-  const handlePrev = () => {
-    const newSkip = Math.max(0, skip - PAGE_SIZE);
-    setSkip(newSkip);
-    fetchAuditLogs(newSkip, PAGE_SIZE);
-  };
-
-  const handleNext = () => {
-    const newSkip = skip + PAGE_SIZE;
-    setSkip(newSkip);
-    fetchAuditLogs(newSkip, PAGE_SIZE);
-  };
-
-  return (
-    <div className="flex min-h-screen">
-      <Navigation />
-      <Head><title>Agentfy — Administração</title></Head>
-      <main className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-5xl mx-auto">
-
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900">Painel de Admin</h1>
-            <p className="text-gray-500 text-sm mt-1">Métricas e registos de auditoria da sua conta</p>
-          </div>
-
-          {error && (
-            <div className="mb-6 bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>
-          )}
-
-          {/* Metrics */}
-          {metrics ? (
-            <>
-              <h2 className="text-base font-semibold text-gray-700 mb-3">Agentes</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-                <MetricCard label="Total" value={metrics.agents.total} />
-                <MetricCard label="Ativos" value={metrics.agents.active} />
-                <MetricCard label="Inativos" value={metrics.agents.total - metrics.agents.active} />
-              </div>
-
-              <h2 className="text-base font-semibold text-gray-700 mb-3">Conversas</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-                <MetricCard label="Total" value={metrics.conversations.total} />
-                <MetricCard label="Hoje" value={metrics.conversations.today} />
-                <MetricCard label="Abertas" value={metrics.conversations.open} />
-                <MetricCard label="Mensagens" value={metrics.messages.total} />
-              </div>
-
-              <h2 className="text-base font-semibold text-gray-700 mb-3">Créditos</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-                <MetricCard label="Total" value={metrics.credits.total} />
-                <MetricCard label="Usados" value={metrics.credits.used} />
-                <MetricCard label="Disponíveis" value={metrics.credits.available} />
-                <MetricCard
-                  label="Utilização"
-                  value={`${metrics.credits.usedPercent}%`}
-                  sub={metrics.credits.usedPercent >= 90 ? 'Atenção: quase esgotado' : undefined}
-                />
-              </div>
-            </>
-          ) : loading ? (
-            <p className="text-gray-400 text-sm mb-8">A carregar métricas...</p>
-          ) : null}
-
-          {/* Audit Logs */}
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-gray-700">Registos de Auditoria</h2>
-            <span className="text-xs text-gray-400">{auditTotal} entradas no total</span>
-          </div>
-
-          {auditLogs.length === 0 && !loading ? (
-            <div className="card text-center py-10 text-gray-400 text-sm">
-              Nenhum registo de auditoria ainda
-            </div>
-          ) : (
-            <div className="card overflow-hidden p-0">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Data</th>
-                    <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Ação</th>
-                    <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Tipo</th>
-                    <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLogs.map((log) => (
-                    <LogRow key={log.id} log={log} />
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Pagination */}
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <button
-                  onClick={handlePrev}
-                  disabled={skip === 0 || loading}
-                  className="text-xs text-brand-600 disabled:text-gray-300 hover:underline"
-                >
-                  ← Anterior
-                </button>
-                <span className="text-xs text-gray-400">
-                  {skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}
-                </span>
-                <button
-                  onClick={handleNext}
-                  disabled={skip + PAGE_SIZE >= auditTotal || loading}
-                  className="text-xs text-brand-600 disabled:text-gray-300 hover:underline"
-                >
-                  Próximo →
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
   );
 }
