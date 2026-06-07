@@ -237,9 +237,28 @@ export default function AdminPage() {
     finally { setPricingSaving(false); }
   }
 
-  function pNum(path: string[], val: string) {
+  // Draft values: track raw string while typing so inputs don't snap back to 0
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+
+  function getDraftVal(path: string[], committed: number | undefined): string {
+    const k = path.join('.');
+    return draftValues[k] !== undefined ? draftValues[k] : String(committed ?? 0);
+  }
+
+  function handleNumBlur(path: string[], val: string) {
+    const k = path.join('.');
     const v = parseFloat(val);
-    if (isNaN(v)) return;
+    if (isNaN(v) || v < 0) commitNum(path, 0);
+    setDraftValues(d => { const next = { ...d }; delete next[k]; return next; });
+  }
+
+  function pNum(path: string[], val: string) {
+    setDraftValues(d => ({ ...d, [path.join('.')]: val }));
+    const v = parseFloat(val);
+    if (!isNaN(v) && v >= 0) commitNum(path, v);
+  }
+
+  function commitNum(path: string[], v: number) {
     setPricing((prev) => {
       if (!prev) return prev;
       const next = JSON.parse(JSON.stringify(prev)) as PricingConfig;
@@ -735,14 +754,17 @@ export default function AdminPage() {
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
                               </td>
                               <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input text-xs w-24"
-                                value={pricing.plans[plan]?.price ?? 0}
-                                onChange={(e) => pNum(['plans', plan, 'price'], e.target.value)} /></td>
+                                value={getDraftVal(['plans', plan, 'price'], pricing.plans[plan]?.price)}
+                                onChange={(e) => pNum(['plans', plan, 'price'], e.target.value)}
+                                onBlur={(e) => handleNumBlur(['plans', plan, 'price'], e.target.value)} /></td>
                               <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input text-xs w-28"
-                                value={pricing.plans[plan]?.credits ?? 0}
-                                onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)} /></td>
+                                value={getDraftVal(['plans', plan, 'credits'], pricing.plans[plan]?.credits)}
+                                onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)}
+                                onBlur={(e) => handleNumBlur(['plans', plan, 'credits'], e.target.value)} /></td>
                               <td className="py-2"><input type="number" min="1" step="1" className="input text-xs w-20"
-                                value={pricing.plans[plan]?.agents ?? 0}
-                                onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)} /></td>
+                                value={getDraftVal(['plans', plan, 'agents'], pricing.plans[plan]?.agents)}
+                                onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)}
+                                onBlur={(e) => handleNumBlur(['plans', plan, 'agents'], e.target.value)} /></td>
                             </tr>
                           ))}
                         </tbody>
@@ -804,16 +826,18 @@ export default function AdminPage() {
                                       <span className="text-xs text-gray-400">€</span>
                                       <input type="number" min="0" step="1" className="input text-xs w-20"
                                         disabled={mode !== 'addon'}
-                                        value={feat?.price ?? 0}
-                                        onChange={(e) => pNum(['features', featureKey, plan, 'price'], e.target.value)} />
+                                        value={getDraftVal(['features', featureKey, plan, 'price'], feat?.price)}
+                                        onChange={(e) => pNum(['features', featureKey, plan, 'price'], e.target.value)}
+                                        onBlur={(e) => handleNumBlur(['features', featureKey, plan, 'price'], e.target.value)} />
                                     </div>
                                   </td>
                                   {hasCredits && (
                                     <td className="py-1.5">
                                       <input type="number" min="0" step="1" className="input text-xs w-20"
                                         disabled={mode === 'disabled'}
-                                        value={feat?.creditsPerTx ?? 0}
-                                        onChange={(e) => pNum(['features', featureKey, plan, 'creditsPerTx'], e.target.value)} />
+                                        value={getDraftVal(['features', featureKey, plan, 'creditsPerTx'], feat?.creditsPerTx)}
+                                        onChange={(e) => pNum(['features', featureKey, plan, 'creditsPerTx'], e.target.value)}
+                                        onBlur={(e) => handleNumBlur(['features', featureKey, plan, 'creditsPerTx'], e.target.value)} />
                                     </td>
                                   )}
                                 </tr>

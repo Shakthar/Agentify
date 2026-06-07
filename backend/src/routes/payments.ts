@@ -144,6 +144,37 @@ router.patch('/orders/:id/status', authenticate, asyncHandler(async (req: Authen
   res.json(updated);
 }));
 
+// ─── GET /api/payments/orders/public/:orderId ─────────────────────────────────
+// Pública (sem auth): cliente acompanha o estado do seu pedido via link
+router.get('/orders/public/:orderId', asyncHandler(async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true, description: true, amount: true, status: true,
+      createdAt: true, paidAt: true,
+      agent: { select: { name: true } },
+    },
+  });
+
+  if (!order) {
+    res.status(404).json({ error: 'Pedido não encontrado' });
+    return;
+  }
+
+  // Não expõe dados sensíveis (buyerPhone, tenantId, etc.)
+  res.json({
+    id: order.id,
+    description: order.description,
+    amount: order.amount,
+    status: order.status,
+    createdAt: order.createdAt,
+    paidAt: order.paidAt,
+    agentName: order.agent?.name ?? null,
+  });
+}));
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function handlePaymentConfirmed(externalId: string): Promise<void> {

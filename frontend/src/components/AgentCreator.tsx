@@ -42,6 +42,8 @@ interface FormData {
     dataCollection: boolean;
     scheduling: boolean;
     fileUpload: boolean;
+    payments: boolean;
+    orders: boolean;
   };
 }
 
@@ -52,7 +54,7 @@ const DEFAULT_FORM: FormData = {
   model: 'auto',
   temperature: 0.7,
   maxTokens: 2000,
-  skills: { handoff: true, dataCollection: true, scheduling: false, fileUpload: false },
+  skills: { handoff: true, dataCollection: true, scheduling: false, fileUpload: false, payments: false, orders: false },
 };
 
 export default function AgentCreator() {
@@ -295,25 +297,35 @@ export default function AgentCreator() {
 
         {/* STEP 3: Skills */}
         {step === 3 && (
-          <div className="card space-y-4">
-            <h2 className="text-lg font-semibold">Skills</h2>
-            {([
-              { key: 'handoff',        label: 'Handoff com resumo IA',  desc: 'Escala para humano com resumo automático' },
-              { key: 'dataCollection', label: 'Recolha de dados',       desc: 'Formulário conversacional estruturado' },
-              { key: 'scheduling',     label: 'Agendamento',            desc: 'Integração Google Calendar / Calendly' },
-              { key: 'fileUpload',     label: 'Envio de ficheiros',     desc: 'Permite enviar PDFs e documentos' },
-            ] as { key: keyof FormData['skills']; label: string; desc: string }[]).map(({ key, label, desc }) => (
-              <label key={key} className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-colors ${
-                form.skills[key] ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'
-              }`}>
-                <input type="checkbox" className="accent-brand-600 w-4 h-4"
-                  checked={form.skills[key]} onChange={(e) => updateSkill(key, e.target.checked)} />
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-gray-500">{desc}</p>
-                </div>
-              </label>
-            ))}
+          <div className="card space-y-3">
+            <div className="mb-2">
+              <h2 className="text-lg font-semibold">Skills</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Capacidades adicionais para este agente. Algumas requerem plano pago.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {([
+                { key: 'handoff',        icon: '🔀', label: 'Handoff com resumo IA',    desc: 'Escala para humano com resumo automático da conversa' },
+                { key: 'dataCollection', icon: '📋', label: 'Recolha de dados',          desc: 'Formulário conversacional estruturado para captar info' },
+                { key: 'scheduling',     icon: '📅', label: 'Agendamento',               desc: 'Integração Google Calendar / Calendly para marcar reuniões' },
+                { key: 'fileUpload',     icon: '📁', label: 'Envio de ficheiros',        desc: 'Permite ao cliente enviar PDFs e documentos na conversa' },
+                { key: 'payments',       icon: '💳', label: 'Pagamentos (MB Way)',       desc: 'Cobrar pagamentos via MB Way diretamente na conversa' },
+                { key: 'orders',         icon: '🧾', label: 'Pedidos / Orders',          desc: 'Ativar painel de encomendas com fila KDS em tempo real' },
+              ] as { key: keyof FormData['skills']; icon: string; label: string; desc: string }[]).map(({ key, icon, label, desc }) => (
+                <label key={key} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                  form.skills[key]
+                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                }`}>
+                  <input type="checkbox" className="mt-0.5 accent-brand-600 w-4 h-4 shrink-0"
+                    checked={form.skills[key]} onChange={(e) => updateSkill(key, e.target.checked)} />
+                  <span className="text-lg shrink-0 leading-none mt-0.5">{icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight">{label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
         )}
 
