@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
+import Link from 'next/link';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../utils/constants';
@@ -46,6 +47,17 @@ export default function ProfilePage() {
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaMsg, setTwoFaMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Subscription / invoices
+  interface PlatformInvoice {
+    id: string; plan: string; amount: number; method: string; status: string;
+    reference: string | null; entity: string | null;
+    periodStart: string; periodEnd: string; paidAt: string | null; createdAt: string;
+  }
+  const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmMsg, setConfirmMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
     // Load full profile from API
@@ -62,6 +74,13 @@ export default function ProfilePage() {
       });
     });
     api.get('/api/auth/2fa/status').then(({ data }) => setTwoFaEnabled(data.enabled));
+
+    // Load subscription invoices
+    setInvLoading(true);
+    api.get('/api/billing/platform-invoices')
+      .then(({ data }) => setInvoices(data.invoices ?? []))
+      .catch(() => {/* silently ignore */})
+      .finally(() => setInvLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
 
@@ -136,6 +155,22 @@ export default function ProfilePage() {
       setTwoFaMsg({ type: 'ok', text: '2FA desativado.' });
     } catch { setTwoFaMsg({ type: 'err', text: 'Código inválido.' }); }
     finally { setTwoFaLoading(false); }
+  };
+
+  // ─── Test-confirm payment ──────────────────────────────────────────────────
+  const testConfirm = async (invoiceId: string) => {
+    setConfirmingId(invoiceId); setConfirmMsg(null);
+    try {
+      await api.post(`/api/billing/test-confirm/${invoiceId}`);
+      setConfirmMsg({ type: 'ok', text: 'Pagamento confirmado! Subscrição activada.' });
+      // Reload invoices + tenant
+      const { data } = await api.get('/api/billing/platform-invoices');
+      setInvoices(data.invoices ?? []);
+      await loadMe();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao confirmar';
+      setConfirmMsg({ type: 'err', text: msg });
+    } finally { setConfirmingId(null); }
   };
 
   return (
@@ -292,6 +327,134 @@ export default function ProfilePage() {
                   <button type="submit" className="btn-secondary text-sm" disabled={twoFaLoading}>{twoFaLoading ? '...' : 'Desativar 2FA'}</button>
                 </form>
               </div>
+            )}
+          </div>
+
+          {/* ─── Subscrição / Platform billing ────────────────────────── */}
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">💳 Subscrição da plataforma</h2>
+              <div className="flex items-center gap-2">
+                {tenant.subscriptionStatus === 'active' && (
+                  <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full font-medium">✓ Ativa</span>
+                )}
+                {tenant.subscriptionStatus === 'suspended' && (
+                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-full font-medium">⛔ Suspensa</span>
+                )}
+                {tenant.subscriptionStatus === 'pending_payment' && (
+                  <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">⏳ Aguarda pagamento</span>
+                )}
+                {tenant.subscriptionStatus === 'trial' && (
+                  <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full font-medium">🆓 Trial</span>
+                )}
+              </div>
+            </div>
+
+            {/* Current subscription details */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide">Plano</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mt-0.5 capitalize">{tenant.plan}</p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide">Método</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+                  {tenant.subscriptionMethod === 'stripe' && '💳 Cartão (Stripe)'}
+                  {tenant.subscriptionMethod === 'ifthenpay_mbway' && '📱 MB Way'}
+                  {tenant.subscriptionMethod === 'ifthenpay_multibanco' && '🏧 Multibanco'}
+                  {(tenant.subscriptionMethod === 'manual' || !tenant.subscriptionMethod) && '🔧 Manual'}
+                </p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide">Próxima renovação</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+                  {tenant.subscriptionExpiresAt
+                    ? new Date(tenant.subscriptionExpiresAt).toLocaleDateString('pt-PT')
+                    : '—'}
+                </p>
+                {tenant.subscriptionExpiresAt && (() => {
+                  const days = Math.ceil((new Date(tenant.subscriptionExpiresAt).getTime() - Date.now()) / 86400000);
+                  return days > 0
+                    ? <p className="text-[10px] text-gray-400">{days} dias restantes</p>
+                    : <p className="text-[10px] text-red-500">Expirado há {Math.abs(days)} dias</p>;
+                })()}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Link href={ROUTES.plans ?? '/dashboard/plans'} className="btn-primary text-sm">🔄 Gerir plano</Link>
+            </div>
+
+            {/* Test-mode confirm message */}
+            {confirmMsg && (
+              <p className={`text-sm px-3 py-2 rounded-lg ${confirmMsg.type === 'ok' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
+                {confirmMsg.text}
+              </p>
+            )}
+
+            {/* Invoice history */}
+            {invLoading ? (
+              <p className="text-sm text-gray-400">A carregar faturas…</p>
+            ) : invoices.length > 0 ? (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Histórico de faturas</h3>
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-xs min-w-[500px]">
+                    <thead className="bg-gray-50 dark:bg-gray-800/50">
+                      <tr>
+                        {['Data', 'Plano', 'Valor', 'Método', 'Estado', ''].map(h => (
+                          <th key={h} className="text-left py-2 px-3 text-gray-500 font-medium">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoices.slice(0, 10).map(inv => (
+                        <tr key={inv.id} className="border-t border-gray-100 dark:border-gray-700/50">
+                          <td className="py-2 px-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {new Date(inv.createdAt).toLocaleDateString('pt-PT')}
+                          </td>
+                          <td className="py-2 px-3 text-gray-700 dark:text-gray-300 capitalize">{inv.plan}</td>
+                          <td className="py-2 px-3 font-medium text-gray-800 dark:text-gray-200">€{inv.amount.toFixed(2)}</td>
+                          <td className="py-2 px-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {inv.method === 'stripe' && '💳 Stripe'}
+                            {inv.method === 'ifthenpay_mbway' && '📱 MB Way'}
+                            {inv.method === 'ifthenpay_multibanco' && '🏧 Multibanco'}
+                            {inv.method === 'manual' && '🔧 Manual'}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                              inv.status === 'paid'    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                              inv.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                              inv.status === 'failed' || inv.status === 'expired' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {inv.status === 'paid' ? '✓ Pago' :
+                               inv.status === 'pending' ? '⏳ Pendente' :
+                               inv.status === 'failed' ? '✗ Falhou' :
+                               inv.status === 'expired' ? 'Expirado' :
+                               inv.status === 'cancelled' ? 'Cancelado' : inv.status}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3">
+                            {/* Superadmin test-confirm button */}
+                            {tenant.isAdmin && inv.status === 'pending' && (
+                              <button
+                                onClick={() => testConfirm(inv.id)}
+                                disabled={confirmingId === inv.id}
+                                className="text-[10px] bg-brand-600 hover:bg-brand-700 text-white px-2 py-1 rounded-lg disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {confirmingId === inv.id ? '…' : '🧪 Confirmar'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">Sem faturas ainda. <Link href={ROUTES.plans ?? '/dashboard/plans'} className="text-brand-600 hover:underline">Escolhe um plano →</Link></p>
             )}
           </div>
         </div>

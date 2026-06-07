@@ -30,6 +30,11 @@ model Tenant {
   // Billing
   monthlyRecurringRevenue Float @default(0)
   paymentStatus         String @default("inactive") // active, overdue, inactive
+
+  // Subscription (platform billing)
+  subscriptionMethod    String    @default("manual")  // stripe | ifthenpay_mbway | ifthenpay_multibanco | manual
+  subscriptionStatus    String    @default("active")  // active | suspended | pending_payment | trial
+  subscriptionExpiresAt DateTime?                     // end of current paid period
   
   // Two-Factor Authentication (TOTP)
   twoFactorSecret   String?
@@ -62,6 +67,7 @@ model Tenant {
   knowledgeBases        KnowledgeBase[]
   agentDocs             AgentDoc[]
   orders                Order[]
+  platformInvoices      PlatformInvoice[]
 }
 
 // ===== PLATFORM EXPENSES (superadmin) =====
@@ -370,6 +376,29 @@ model Order {
   @@index([tenantId])
   @@index([agentId])
   @@index([externalId])
+  @@index([status])
+}
+
+// ===== PLATFORM INVOICES (subscrições da plataforma) =====
+model PlatformInvoice {
+  id          String    @id @default(cuid())
+  tenantId    String
+  plan        String                           // plano subscrito
+  amount      Float                            // valor em euros
+  method      String                           // stripe | ifthenpay_mbway | ifthenpay_multibanco | manual
+  status      String    @default("pending")    // pending | paid | failed | expired | cancelled
+  reference   String?                          // MB Way: telefone; Multibanco: referência; Stripe: sessionId
+  entity      String?                          // Multibanco: entidade (ex: 11249)
+  externalId  String?                          // ID externo no gateway
+  periodStart DateTime
+  periodEnd   DateTime
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
   @@index([status])
 }
 

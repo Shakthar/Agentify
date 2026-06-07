@@ -19,6 +19,10 @@ export interface Tenant {
   brandColor?: string;
   logoUrl?: string;
   domain?: string;
+  // Subscription
+  subscriptionMethod?: string;   // stripe | ifthenpay_mbway | ifthenpay_multibanco | manual
+  subscriptionStatus?: string;   // active | suspended | pending_payment | trial
+  subscriptionExpiresAt?: string; // ISO date
 }
 
 export interface Agent {

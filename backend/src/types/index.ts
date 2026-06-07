@@ -8,6 +8,9 @@ export interface AuthenticatedRequest extends Request {
     creditsTotal: number;
     creditsUsed: number;
     isAdmin: boolean;
+    subscriptionMethod: string;
+    subscriptionStatus: string;
+    subscriptionExpiresAt: Date | null;
   };
 }
 

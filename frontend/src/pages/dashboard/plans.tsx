@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../utils/constants';
 import { Plan, PLAN_LABELS, PLAN_COLORS } from '../../types';
+import api from '../../utils/api';
 
 const PLANS_DATA = [
   { id: 'free',       price: 0,   label: 'Free',       agents: 3,   credits: 3000,  conversations: 100 },
@@ -69,6 +71,53 @@ export default function PlansPage() {
   const router = useRouter();
   const { tenant } = useAuth();
 
+  // ─── Subscribe modal state ──────────────────────────────────────────────────
+  type Step = 'method' | 'phone' | 'instructions';
+  type MethodId = 'stripe' | 'ifthenpay_mbway' | 'ifthenpay_multibanco';
+  interface PayInstructions {
+    invoiceId: string; method: string; amount: number; plan: string; mock: boolean;
+    checkoutUrl?: string;
+    mbwayPhone?: string; mbwayReference?: string;
+    multibancoEntity?: string; multibancoReference?: string; multibancoExpiry?: string;
+    notes?: string;
+  }
+  const [modal, setModal] = useState<{ open: boolean; plan: string; price: number }>({ open: false, plan: '', price: 0 });
+  const [step, setStep] = useState<Step>('method');
+  const [chosenMethod, setChosenMethod] = useState<MethodId | null>(null);
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [instructions, setInstructions] = useState<PayInstructions | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  function openModal(planId: string, price: number) {
+    setModal({ open: true, plan: planId, price });
+    setStep('method'); setChosenMethod(null); setPhone(''); setInstructions(null); setModalError(null);
+  }
+  function closeModal() { setModal(m => ({ ...m, open: false })); }
+
+  async function handleMethodChosen(method: MethodId) {
+    setChosenMethod(method);
+    if (method === 'ifthenpay_mbway') { setStep('phone'); return; }
+    await submitSubscribe(method, undefined);
+  }
+
+  async function handlePhoneSubmit() {
+    if (!phone.match(/^\+?[0-9]{9,15}$/)) { setModalError('Número inválido'); return; }
+    await submitSubscribe('ifthenpay_mbway', phone);
+  }
+
+  async function submitSubscribe(method: MethodId, mbPhone?: string) {
+    setLoading(true); setModalError(null);
+    try {
+      const res = await api.post('/billing/platform-subscribe', { plan: modal.plan, method, phone: mbPhone });
+      setInstructions(res.data);
+      setStep('instructions');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao processar';
+      setModalError(msg);
+    } finally { setLoading(false); }
+  }
+
   if (!tenant) return null;
 
   return (
@@ -133,15 +182,15 @@ export default function PlansPage() {
                         <span className="text-xs text-brand-600 font-medium">✓ Plano atual</span>
                       ) : (
                         <button
+                          onClick={() => openModal(plan.id, plan.price)}
                           className={`w-full text-xs py-2 px-3 rounded-lg font-medium transition-colors ${
                             PLANS_DATA.findIndex(p => p.id === tenant.plan) < PLANS_DATA.findIndex(p => p.id === plan.id)
                               ? 'bg-brand-600 hover:bg-brand-700 text-white'
                               : 'bg-gray-100 hover:bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
                           }`}
-                          disabled
                         >
                           {PLANS_DATA.findIndex(p => p.id === tenant.plan) < PLANS_DATA.findIndex(p => p.id === plan.id)
-                            ? 'Upgrade'
+                            ? 'Upgrade →'
                             : 'Downgrade'}
                         </button>
                       )}
@@ -181,6 +230,156 @@ export default function PlansPage() {
           </p>
         </div>
       </main>
-    </div>
+      {/* ─── Subscribe Modal ─── */}
+      {modal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                  {step === 'instructions' ? '📋 Instruções de Pagamento' : `Subscrever plano ${PLAN_LABELS[modal.plan as Plan]}`}
+                </h3>
+                {modal.price > 0 && step !== 'instructions' && (
+                  <p className="text-sm text-gray-500 mt-0.5">€{modal.price}/mês · renovação automática</p>
+                )}
+              </div>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="p-5">
+              {/* Step 1 — choose method */}
+              {step === 'method' && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Como queres pagar?</p>
+                  {[
+                    { id: 'ifthenpay_mbway' as const, icon: '📱', label: 'MB Way', sub: 'Portugal · 0.7% + €0.07', badge: 'Mais barato' },
+                    { id: 'ifthenpay_multibanco' as const, icon: '🏧', label: 'Multibanco / ATM', sub: 'Portugal · 1.5% + €0.20' },
+                    { id: 'stripe' as const, icon: '💳', label: 'Cartão de Crédito / Débito', sub: 'Internacional · 1.4% + €0.25' },
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => handleMethodChosen(m.id)}
+                      disabled={loading}
+                      className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-all text-left"
+                    >
+                      <span className="text-2xl">{m.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{m.label}</span>
+                          {m.badge && <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">{m.badge}</span>}
+                        </div>
+                        <span className="text-xs text-gray-500">{m.sub}</span>
+                      </div>
+                      <span className="text-gray-300">›</span>
+                    </button>
+                  ))}
+                  {modalError && <p className="text-sm text-red-500 mt-2">{modalError}</p>}
+                </div>
+              )}
+
+              {/* Step 2 — phone for MB Way */}
+              {step === 'phone' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Introduz o teu número MB Way para receber o pedido de pagamento.
+                  </p>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="+351 9XXXXXXXX"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    autoFocus
+                  />
+                  {modalError && <p className="text-sm text-red-500">{modalError}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={() => setStep('method')} className="flex-1 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">← Voltar</button>
+                    <button
+                      onClick={handlePhoneSubmit}
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50"
+                    >
+                      {loading ? 'A processar…' : 'Confirmar →'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3 — payment instructions */}
+              {step === 'instructions' && instructions && (
+                <div className="space-y-4">
+                  {instructions.mock && (
+                    <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                      <span>🧪</span>
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        <strong>Modo Teste.</strong> Sem credenciais reais configuradas. O admin pode confirmar o pagamento em qualquer momento.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Multibanco */}
+                  {instructions.method === 'ifthenpay_multibanco' && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 space-y-3">
+                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">🏧 Referência Multibanco</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { label: 'Entidade', value: instructions.multibancoEntity },
+                          { label: 'Referência', value: instructions.multibancoReference },
+                          { label: 'Montante', value: `€${instructions.amount.toFixed(2)}` },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="text-center">
+                            <p className="text-[10px] text-blue-500 uppercase tracking-wide">{label}</p>
+                            <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mt-0.5">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {instructions.multibancoExpiry && <p className="text-xs text-blue-500 text-center">Válido até {instructions.multibancoExpiry}</p>}
+                    </div>
+                  )}
+
+                  {/* MB Way */}
+                  {instructions.method === 'ifthenpay_mbway' && (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 text-center">
+                      <p className="text-sm font-semibold text-green-800 dark:text-green-200">📱 MB Way</p>
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        Pedido enviado para <strong>{instructions.mbwayPhone}</strong>
+                      </p>
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-2">€{instructions.amount.toFixed(2)}</p>
+                      <p className="text-xs text-green-500 mt-1">Confirma o pagamento na app MB Way</p>
+                    </div>
+                  )}
+
+                  {/* Stripe */}
+                  {instructions.method === 'stripe' && (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Clica abaixo para pagar com cartão:</p>
+                      {instructions.checkoutUrl ? (
+                        <a href={instructions.checkoutUrl} target="_blank" rel="noopener noreferrer"
+                          className="block py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium">
+                          Pagar €{instructions.amount.toFixed(2)} com Stripe →
+                        </a>
+                      ) : (
+                        <p className="text-xs text-gray-400">Checkout não disponível (modo teste)</p>
+                      )}
+                    </div>
+                  )}
+
+                  {instructions.notes && (
+                    <p className="text-xs text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-3 font-mono">{instructions.notes}</p>
+                  )}
+
+                  <button
+                    onClick={closeModal}
+                    className="w-full py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}    </div>
   );
 }
