@@ -264,7 +264,11 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
       + '\nCobrança MB Way: quando o cliente confirmar o pedido completo e fornecer o número de telmóvel, usa [MBWAY:NUMERO|VALOR|DESCRICAO].'
       + ' NUMERO = 351XXXXXXXXX; VALOR = total em euros de TODOS os itens; DESCRICAO = lista completa (ex: 1x Pizza Margherita \u20ac8.00, 1x Sumo de Laranja \u20ac2.00).'
       + ' Exemplo correto: "Perfeito! 1x Pizza Margherita + 1x Sumo = \u20ac10.00. [MBWAY:351912345678|10.00|1x Pizza Margherita \u20ac8.00, 1x Sumo de Laranja \u20ac2.00]"'
-      + ' Nunca uses este marcador sem ter o número de telmóvel. Se não tiveres, pede-o primeiro.';
+      + ' Nunca uses este marcador sem ter o número de telmóvel. Se não tiveres, pede-o primeiro.'
+      + '\n\nAPÓS ENVIAR O MARCADOR [MBWAY:...]: informa o cliente que o pedido de pagamento foi enviado para o MB Way dele.'
+      + ' Diz que vai receber uma notificação na app MB Way e que basta aceitar para o pedido ficar confirmado automaticamente.'
+      + ' NÃO peças ao cliente para te confirmar que pagou — o sistema faz isso sozinho.'
+      + ' Exemplo pós-MBWAY: "Enviei o pedido de pagamento para o teu MB Way! \ud83d\udcf1 Aceita a notificação na app MB Way e o teu pedido fica automaticamente confirmado. \ud83c\udf89"';
   }
 
   // Injeta historial de pedidos anteriores do mesmo visitante (cliente recorrente)

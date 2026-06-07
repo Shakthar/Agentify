@@ -2,8 +2,10 @@
  * Serviço de pagamentos MB Way via Easypay (https://api.prod.easypay.pt)
  * Quando EASYPAY_ACCOUNT_ID e EASYPAY_API_KEY não estão configurados,
  * funciona em modo MOCK — cria a order na DB e retorna um ID fictício.
+ * Em modo MOCK, o pagamento é auto-confirmado após 5s (simula aprovação MB Way).
  */
 import prisma from '../lib/prisma.js';
+import { sendWhatsAppText } from '../lib/whatsapp.js';
 
 export interface MbwayChargeParams {
   tenantId: string;
@@ -133,7 +135,60 @@ export async function createMbwayCharge(params: MbwayChargeParams): Promise<Mbwa
     console.log(`[Payments] Débito de ${extraCreditCost} créditos (skill MB Way) para tenant ${tenantId}`);
   }
 
+  // Em modo MOCK: auto-confirmar após 5s (simula cliente a aceitar no MB Way)
+  if (isMock) {
+    mockAutoConfirm(order.id, agentId).catch(err =>
+      console.error('[Payments] mockAutoConfirm error:', err),
+    );
+  }
+
   return { orderId: order.id, externalId, mock: isMock };
+}
+
+/**
+ * Em modo MOCK, agenda auto-confirmação do pedido após 5s.
+ * Simula a aprovação MB Way pelo cliente + envia notificações WA.
+ */
+async function mockAutoConfirm(orderId: string, agentId: string): Promise<void> {
+  await new Promise(r => setTimeout(r, 5000));
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, status: 'pending' },
+    select: { id: true, buyerPhone: true, notifyPhone: true, amount: true, description: true, agentId: true, tenantId: true, externalId: true },
+  });
+  if (!order) return; // já confirmado ou cancelado
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: 'paid', paidAt: new Date() },
+  });
+  console.log(`[Payments] MOCK auto-confirmado: orderId=${orderId}`);
+
+  // Notificações WA (igual ao fluxo de produção via webhook)
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId },
+    select: { whatsappNumber: true, name: true },
+  });
+  if (!agent?.whatsappNumber) return;
+
+  const token = process.env.WHATSAPP_TOKEN;
+  const amt = order.amount.toFixed(2).replace('.', ',');
+
+  await sendWhatsAppText(
+    agent.whatsappNumber,
+    order.buyerPhone,
+    `✅ *Pagamento confirmado!* (modo teste)\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amt}\n\nO teu pedido está confirmado e a ser preparado! 🎉`,
+    token,
+  ).catch(err => console.warn('[Payments] MOCK notify cliente falhou:', err));
+
+  if (order.notifyPhone) {
+    await sendWhatsAppText(
+      agent.whatsappNumber,
+      order.notifyPhone,
+      `🛒 *Novo pedido pago!* (modo teste)\n\n📋 ${order.description}\n💶 €${amt}\n📱 Cliente: +${order.buyerPhone}\n🆔 ${order.id.slice(-8)}`,
+      token,
+    ).catch(err => console.warn('[Payments] MOCK notify dono falhou:', err));
+  }
 }
 
 /** Confirma pagamento de uma order (chamado pelo webhook Easypay ou endpoint de teste) */

@@ -26,9 +26,10 @@ interface Order {
 }
 
 const STATUS_COLUMNS = [
-  { key: 'paid',       label: '🔔 Novo',          badge: 'bg-orange-500 text-white' },
-  { key: 'processing', label: '⚙ Em Preparação', badge: 'bg-blue-500 text-white'   },
-  { key: 'done',       label: '✅ Pronto',         badge: 'bg-green-500 text-white'  },
+  { key: 'pending',    label: '⏳ A Pagar',        badge: 'bg-yellow-500 text-white'  },
+  { key: 'paid',       label: '🔔 Novo',          badge: 'bg-orange-500 text-white'  },
+  { key: 'processing', label: '⚙ Em Preparação', badge: 'bg-blue-500 text-white'    },
+  { key: 'done',       label: '✅ Pronto',         badge: 'bg-green-500 text-white'   },
 ] as const;
 
 const NEXT_STATUS: Partial<Record<string, string>> = { paid: 'processing', processing: 'done' };
@@ -207,14 +208,15 @@ export default function OrdersLivePage() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const [paidRes, processingRes, doneRes] = await Promise.all([
+      const [pendingRes, paidRes, processingRes, doneRes] = await Promise.all([
+        api.get('/api/payments/orders?status=pending&take=20'),
         api.get('/api/payments/orders?status=paid&take=50'),
         api.get('/api/payments/orders?status=processing&take=50'),
         api.get('/api/payments/orders?status=done&take=20'),
       ]);
 
       const paidOrders = paidRes.data.orders as Order[];
-      const all: Order[] = [...paidOrders, ...processingRes.data.orders, ...doneRes.data.orders];
+      const all: Order[] = [...pendingRes.data.orders, ...paidOrders, ...processingRes.data.orders, ...doneRes.data.orders];
       all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       // Detect new paid orders and play sound
