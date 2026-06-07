@@ -6,6 +6,7 @@
  */
 import prisma from '../lib/prisma.js';
 import { sendWhatsAppText } from '../lib/whatsapp.js';
+import { getPortalUrl } from '../lib/portal.js';
 
 export interface MbwayChargeParams {
   tenantId: string;
@@ -155,7 +156,7 @@ async function mockAutoConfirm(orderId: string, agentId: string): Promise<void> 
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, status: 'pending' },
-    select: { id: true, buyerPhone: true, amount: true, description: true, agentId: true },
+    select: { id: true, buyerPhone: true, amount: true, description: true, agentId: true, tenantId: true },
   });
   if (!order) return; // já confirmado ou cancelado
 
@@ -173,8 +174,8 @@ async function mockAutoConfirm(orderId: string, agentId: string): Promise<void> 
   if (!agent?.whatsappNumber) return;
 
   const amt = order.amount.toFixed(2).replace('.', ',');
-  const frontendUrl = process.env.FRONTEND_URL ?? '';
-  const statusLink = `${frontendUrl}/order-status/${orderId}`;
+  const portalUrl = await getPortalUrl(order.tenantId);
+  const statusLink = `${portalUrl}/order-status/${orderId}`;
   await sendWhatsAppText(
     agent.whatsappNumber,
     order.buyerPhone,

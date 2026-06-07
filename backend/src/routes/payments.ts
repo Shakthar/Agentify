@@ -12,6 +12,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { webhookLimiter, publicApiLimiter } from '../middleware/rateLimit.js';
 import { confirmPayment, confirmPaymentById } from '../services/payments.service.js';
 import { sendWhatsAppText } from '../lib/whatsapp.js';
+import { getPortalUrl } from '../lib/portal.js';
 import prisma from '../lib/prisma.js';
 
 const router = Router();
@@ -272,8 +273,8 @@ async function notifyAfterPayment(order: {
   const amountFmt = order.amount.toFixed(2).replace('.', ',');
 
   // Notifica apenas o CLIENTE — o dono acompanha pelo KDS / painel de pedidos
-  const frontendUrl = process.env.FRONTEND_URL ?? '';
-  const statusLink = `${frontendUrl}/order-status/${order.id}`;
+  const portalUrl = await getPortalUrl(order.tenantId);
+  const statusLink = `${portalUrl}/order-status/${order.id}`;
   const clientMsg = `\u2705 *Pagamento confirmado!*\n\n\ud83d\udccb Pedido: ${order.description}\n\ud83d\udcb6 Valor: \u20ac${amountFmt}\n\nAcompanha o estado do teu pedido aqui:\n${statusLink}\n\nObrigado! \ud83c\udf89`;
   await sendWhatsAppText(phoneId, order.buyerPhone, clientMsg, token);
   console.log(`[Payments] Confirma\u00e7\u00e3o enviada ao cliente ${order.buyerPhone}`);
