@@ -13,6 +13,15 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
 
   try {
     const payload = verifyAccessToken(token);
+
+    // SECURITY: Rejeitar tokens pending_2fa como tokens de sessão completos.
+    // signTwoFactorToken usa o mesmo JWT_SECRET; sem esta verificação, o token
+    // temporário emitido a meio do login 2FA seria aceite como sessão válida,
+    // bypassando o segundo factor completamente.
+    if ((payload as unknown as Record<string, unknown>)['type'] === 'pending_2fa') {
+      res.status(401).json({ error: '2FA incompleto — complete a autenticação' }); return;
+    }
+
     const tenant = await prisma.tenant.findUnique({
       where: { id: payload.tenantId, deletedAt: null },
       select: {

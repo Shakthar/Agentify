@@ -1,8 +1,9 @@
 import { Router, Response } from 'express';
+import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { ForbiddenError } from '../lib/errors.js';
+import { BadRequestError, ForbiddenError } from '../lib/errors.js';
 import * as superadminService from '../services/superadmin.service.js';
 import { getConfig, saveConfig } from '../lib/platformConfig.js';
 
@@ -88,8 +89,38 @@ router.get('/config', asyncHandler(async (_req: AuthenticatedRequest, res: Respo
 }));
 
 // PATCH /api/superadmin/config
+// SECURITY: validar o body antes de fazer deepMerge no estado em memória.
+// Sem validação, um admin comprometido pode definir credits=999999999 no plano
+// free e afectar todos os tenants existentes imediatamente (via syncToPlanLimits).
+const featurePlanSchema = z.object({
+  mode: z.enum(['disabled', 'addon', 'included']),
+  price: z.number().min(0).max(10_000).optional(),
+  creditsPerTx: z.number().int().min(0).max(100_000).optional(),
+}).strict();
+
+const configPatchSchema = z.object({
+  plans: z.record(
+    z.object({
+      price:   z.number().min(0).max(100_000),
+      credits: z.number().int().min(0).max(10_000_000),
+      agents:  z.number().int().min(0).max(9999),
+    }).strict()
+  ).optional(),
+  features: z.object({
+    scheduling:     z.record(featurePlanSchema).optional(),
+    fileUpload:     z.record(featurePlanSchema).optional(),
+    humorDetection: z.record(featurePlanSchema).optional(),
+    payments:       z.record(featurePlanSchema).optional(),
+    whitelabel:     z.record(featurePlanSchema).optional(),
+  }).optional(),
+}).strict();
+
 router.patch('/config', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const updated = await saveConfig(req.body);
+  const parsed = configPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new BadRequestError('Configuração inválida', parsed.error.flatten());
+  }
+  const updated = await saveConfig(parsed.data as Parameters<typeof saveConfig>[0]);
   res.json(updated);
 }));
 

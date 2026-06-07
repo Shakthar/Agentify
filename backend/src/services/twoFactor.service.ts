@@ -78,10 +78,18 @@ export async function verifyTwoFactorCode(tenantId: string, code: string): Promi
   }
 
   // SECURITY: Anti-replay persistente em DB.
-  // Guarda "window:code" no tenant — sobrevive a restarts e funciona em multi-instância.
-  // Janela TOTP = 30s; códigos mudam a cada janela, por isso um campo basta.
-  const window = Math.floor(Date.now() / 30000);
-  const codeKey = `${window}:${code}`;
+  // Chave = o próprio código de 6 dígitos (sem janela de tempo do servidor).
+  //
+  // PORQUÊ não usar `"${window}:${code}"` (solução anterior):
+  //   otplib aceita códigos de janelas adjacentes (window=1 → ±30s).
+  //   Um código usado na janela T e armazenado como "T:code" pode ser re-usado
+  //   na janela T+1 com chave "T+1:code" diferente → replay bem-sucedido.
+  //
+  // Usando apenas o código: qualquer re-uso do mesmo valor é bloqueado,
+  // independentemente de quando ocorre dentro da janela de validade (~90s).
+  // Risco de falso positivo (mesmo 6 dígitos em janela futura) = 1/1.000.000 por
+  // utilizador por login — negligenciável, e o utilizador só espera 30s.
+  const codeKey = code; // 6 dígitos — único por tenant dentro da janela de validade
 
   if (tenant.twoFactorLastCode === codeKey) {
     throw new UnauthorizedError('Código 2FA já utilizado. Aguarda a próxima janela de 30 segundos.');

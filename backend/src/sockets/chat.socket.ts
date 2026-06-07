@@ -49,9 +49,11 @@ export function registerChatSocket(io: SocketIOServer) {
         return;
       }
 
-      // Se a conversa tem um visitorId não-genérico, verificar que o cliente apresenta o mesmo
-      // (visitorIds do formato "visitor_TIMESTAMP" são gerados quando o cliente não fornece nenhum)
-      if (visitorId && convo.visitorId !== visitorId) {
+      // SECURITY: Verificar visitorId SEMPRE que a conversa tem um registado.
+      // O check anterior `if (visitorId && ...)` permitia que qualquer socket
+      // entrasse numa conversa sem fornecer visitorId (condição avaliava para
+      // false com undefined) — qualquer pessoa com o conversationId acedia ao stream.
+      if (convo.visitorId && convo.visitorId !== visitorId) {
         socket.emit('error', { message: 'Acesso não autorizado a esta conversa' });
         return;
       }
