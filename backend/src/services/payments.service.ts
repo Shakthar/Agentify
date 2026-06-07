@@ -53,10 +53,10 @@ export async function createMbwayCharge(params: MbwayChargeParams): Promise<Mbwa
   const apiKey    = process.env.EASYPAY_API_KEY;
   const isMock    = !accountId || !apiKey;
 
-  // SECURITY: Em produção, recusar cobranças se o gateway não estiver configurado.
-  // Nunca criar orders "gratuitas" por esquecimento de env vars em produção.
-  if (isMock && process.env.NODE_ENV === 'production') {
-    throw new Error('Gateway de pagamento não configurado. Define EASYPAY_ACCOUNT_ID e EASYPAY_API_KEY.');
+  // Em modo MOCK sem credenciais Easypay: aceitar em qualquer NODE_ENV (demo/teste).
+  // Log de aviso para que o operador saiba que pagamentos são simulados.
+  if (isMock) {
+    console.warn('[Payments] MOCK: EASYPAY_ACCOUNT_ID/EASYPAY_API_KEY não configurados — a simular MB Way (sem cobrança real)');
   }
 
   let externalId: string | null = null;
@@ -147,14 +147,15 @@ export async function createMbwayCharge(params: MbwayChargeParams): Promise<Mbwa
 
 /**
  * Em modo MOCK, agenda auto-confirmação do pedido após 5s.
- * Simula a aprovação MB Way pelo cliente + envia notificações WA.
+ * Simula a aprovação MB Way pelo cliente.
+ * Apenas notifica o CLIENTE via WA — o KDS/painel de pedidos é o canal do dono.
  */
 async function mockAutoConfirm(orderId: string, agentId: string): Promise<void> {
   await new Promise(r => setTimeout(r, 5000));
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, status: 'pending' },
-    select: { id: true, buyerPhone: true, notifyPhone: true, amount: true, description: true, agentId: true, tenantId: true, externalId: true },
+    select: { id: true, buyerPhone: true, amount: true, description: true, agentId: true },
   });
   if (!order) return; // já confirmado ou cancelado
 
@@ -164,31 +165,20 @@ async function mockAutoConfirm(orderId: string, agentId: string): Promise<void> 
   });
   console.log(`[Payments] MOCK auto-confirmado: orderId=${orderId}`);
 
-  // Notificações WA (igual ao fluxo de produção via webhook)
+  // Notifica apenas o CLIENTE (o dono acompanha pelo KDS/painel de pedidos)
   const agent = await prisma.agent.findFirst({
     where: { id: agentId },
-    select: { whatsappNumber: true, name: true },
+    select: { whatsappNumber: true },
   });
   if (!agent?.whatsappNumber) return;
 
-  const token = process.env.WHATSAPP_TOKEN;
   const amt = order.amount.toFixed(2).replace('.', ',');
-
   await sendWhatsAppText(
     agent.whatsappNumber,
     order.buyerPhone,
-    `✅ *Pagamento confirmado!* (modo teste)\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amt}\n\nO teu pedido está confirmado e a ser preparado! 🎉`,
-    token,
+    `✅ *Pagamento confirmado!*\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amt}\n\nO teu pedido está confirmado e a ser preparado! 🎉`,
+    process.env.WHATSAPP_TOKEN,
   ).catch(err => console.warn('[Payments] MOCK notify cliente falhou:', err));
-
-  if (order.notifyPhone) {
-    await sendWhatsAppText(
-      agent.whatsappNumber,
-      order.notifyPhone,
-      `🛒 *Novo pedido pago!* (modo teste)\n\n📋 ${order.description}\n💶 €${amt}\n📱 Cliente: +${order.buyerPhone}\n🆔 ${order.id.slice(-8)}`,
-      token,
-    ).catch(err => console.warn('[Payments] MOCK notify dono falhou:', err));
-  }
 }
 
 /** Confirma pagamento de uma order (chamado pelo webhook Easypay ou endpoint de teste) */

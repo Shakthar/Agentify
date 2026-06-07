@@ -389,8 +389,8 @@ export default function AgentDetailPage() {
                         <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">Painel KDS em tempo real. Requer Pagamentos MB Way ativos.</p>
                         {mbwayAvail && (
                           <div className="flex flex-wrap gap-3 mt-1">
-                            <button onClick={() => router.push('/dashboard/orders/live')} className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Abrir KDS →</button>
-                            <button onClick={() => navigator.clipboard.writeText(`${typeof window !== 'undefined' ? window.location.origin : ''}/orders/${agent.id}`).catch(() => {})} className="text-[11px] text-gray-500 dark:text-gray-400 hover:underline">🔗 Link público</button>
+                            <button onClick={() => setActiveTab('orders')} className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Abrir aba Pedidos →</button>
+                            <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[11px] text-gray-500 dark:text-gray-400 hover:underline">🔑 KDS autenticado</a>
                           </div>
                         )}
                       </div>
@@ -533,15 +533,23 @@ export default function AgentDetailPage() {
           {/* ─── Pedidos MB Way ─── */}
           {activeTab === 'orders' && agent && (
             <div className="space-y-4">
-              <div className="card flex items-center justify-between gap-3 flex-wrap py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">🧾 Painel público de pedidos</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Partilha este link com o staff (cozinha, balcão) para visualizar pedidos em tempo real sem login.</p>
+              <div className="card py-3 space-y-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">🛏️ Paineis KDS</p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">🔑 KDS com login (ti/equipa)</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Painel autenticado com gestão completa (mover pedidos, filtrar agentes).</p>
+                    <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline font-medium">Abrir KDS →</a>
+                  </div>
+                  <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">📺 KDS público (cozinha / staff)</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Sem login. Partilha com a cozinha ou balcão.</p>
+                    <CopyBox
+                      value={typeof window !== 'undefined' ? `${window.location.origin}/orders/${agent.id}` : `/orders/${agent.id}`}
+                      label="Link público KDS"
+                    />
+                  </div>
                 </div>
-                <CopyBox
-                  value={typeof window !== 'undefined' ? `${window.location.origin}/orders/${agent.id}` : `/orders/${agent.id}`}
-                  label="Link público KDS"
-                />
               </div>
               <Orders agentId={agent.id} plan={tenant.plan ?? 'free'} />
             </div>

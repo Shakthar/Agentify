@@ -220,14 +220,14 @@ async function notifyAfterPayment(order: {
   agentId: string;
   tenantId: string;
 }): Promise<void> {
-  // Buscar o phone_number_id e token do agente para enviar WA
+  // Buscar o phone_number_id do agente para enviar WA
   const agent = await prisma.agent.findFirst({
     where: { id: order.agentId },
     select: { whatsappNumber: true, whatsappToken: true, name: true, tenant: { select: { encryptionKey: true } } },
   });
 
   if (!agent?.whatsappNumber) {
-    console.warn(`[Payments] Agente ${order.agentId} sem whatsappNumber — notificações não enviadas`);
+    console.warn(`[Payments] Agente ${order.agentId} sem whatsappNumber — confirmação WA não enviada`);
     return;
   }
 
@@ -235,17 +235,10 @@ async function notifyAfterPayment(order: {
   const phoneId = agent.whatsappNumber;
   const amountFmt = order.amount.toFixed(2).replace('.', ',');
 
-  // 1. Notificar o cliente (comprador)
-  const clientMsg = `✅ *Pagamento confirmado!*\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amountFmt}\n\nObrigado! O seu pedido está confirmado e a ser processado. 🎉`;
+  // Notifica apenas o CLIENTE — o dono acompanha pelo KDS / painel de pedidos
+  const clientMsg = `✅ *Pagamento confirmado!*\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amountFmt}\n\nO seu pedido está confirmado e a ser processado. 🎉`;
   await sendWhatsAppText(phoneId, order.buyerPhone, clientMsg, token);
   console.log(`[Payments] Confirmação enviada ao cliente ${order.buyerPhone}`);
-
-  // 2. Notificar o dono do negócio (se configurado)
-  if (order.notifyPhone) {
-    const ownerMsg = `🛒 *Novo pedido pago!*\n\n📋 ${order.description}\n💶 €${amountFmt}\n📱 Cliente: +${order.buyerPhone}\n🆔 Pedido: ${order.id.slice(-8)}`;
-    await sendWhatsAppText(phoneId, order.notifyPhone, ownerMsg, token);
-    console.log(`[Payments] Notificação enviada ao dono ${order.notifyPhone}`);
-  }
 }
 
 export default router;
