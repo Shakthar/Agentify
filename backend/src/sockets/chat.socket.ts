@@ -69,7 +69,10 @@ export function registerChatSocket(io: SocketIOServer) {
 
     // Visitante envia mensagem
     socket.on('message', async ({ conversationId, content }: { conversationId: string; content: string }) => {
-      if (!conversationId || !content || typeof content !== 'string') return;
+      if (!conversationId || typeof conversationId !== 'string') return;
+      // Validate cuid format before any DB lookup to reject malformed IDs early
+      if (!/^c[a-z0-9]{20,32}$/.test(conversationId)) return;
+      if (!content || typeof content !== 'string') return;
       if (content.trim().length === 0 || content.length > 4000) return;
 
       // Verifica se o socket está na sala certa

@@ -50,8 +50,13 @@ router.post('/webhook', webhookLimiter, asyncHandler(async (req: Request & { raw
   if (body.type !== 'payment:capture' && body.type !== 'capture:success') return;
 
   const externalId = body.data?.id;
-  if (!externalId) {
+  if (!externalId || typeof externalId !== 'string') {
     console.warn('[Payments] Webhook sem data.id:', JSON.stringify(body).slice(0, 200));
+    return;
+  }
+  // SECURITY: Limit externalId length before DB lookup to prevent oversized string attacks
+  if (externalId.length > 200) {
+    console.warn('[Payments] Webhook data.id demasiado longo, ignorado');
     return;
   }
 
@@ -81,6 +86,13 @@ router.post('/test-paid/:id', authenticate, asyncHandler(async (req: Authenticat
 // Lista orders do tenant autenticado
 router.get('/orders', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { status, agentId, skip = '0', take = '20' } = req.query as Record<string, string>;
+
+  // SECURITY: Validate status against allowed values to prevent unexpected filter injection
+  const ALLOWED_STATUSES = ['pending', 'paid', 'processing', 'done', 'failed', 'expired'];
+  if (status && !ALLOWED_STATUSES.includes(status)) {
+    res.status(400).json({ error: `status inválido. Valores aceites: ${ALLOWED_STATUSES.join(', ')}` });
+    return;
+  }
 
   const orders = await prisma.order.findMany({
     where: {

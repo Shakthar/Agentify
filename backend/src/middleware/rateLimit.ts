@@ -76,3 +76,14 @@ export const webhookLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Webhook rate limit exceeded' },
 });
+
+// Rate limiter para endpoints públicos sem autenticação (ex: KDS de pedidos, agente whitelabel).
+// Mais agressivo que o global para endpoints que expõem dados sem login.
+// Um painel KDS a fazer refresh de 10 em 10s usa 6 req/min; limite 120/15min é suficiente.
+export const publicApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests to public API, please slow down' },
+});

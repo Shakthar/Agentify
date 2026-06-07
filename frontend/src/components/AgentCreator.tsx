@@ -42,6 +42,7 @@ interface FormData {
     dataCollection: boolean;
     scheduling: boolean;
     fileUpload: boolean;
+    humorDetection: boolean;
     payments: boolean;
     orders: boolean;
   };
@@ -54,7 +55,7 @@ const DEFAULT_FORM: FormData = {
   model: 'auto',
   temperature: 0.7,
   maxTokens: 2000,
-  skills: { handoff: true, dataCollection: true, scheduling: false, fileUpload: false, payments: false, orders: false },
+  skills: { handoff: true, dataCollection: true, scheduling: false, fileUpload: false, humorDetection: false, payments: false, orders: false },
 };
 
 export default function AgentCreator() {
@@ -296,38 +297,80 @@ export default function AgentCreator() {
         )}
 
         {/* STEP 3: Skills */}
-        {step === 3 && (
-          <div className="card space-y-3">
-            <div className="mb-2">
-              <h2 className="text-lg font-semibold">Skills</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Capacidades adicionais para este agente. Algumas requerem plano pago.</p>
+        {step === 3 && (() => {
+          const planOrder = ['free','starter','pro','business','enterprise'];
+          const planIdx = planOrder.indexOf(plan);
+          const SKILLS_DEF = [
+            { key: 'handoff'        as keyof FormData['skills'], icon: '🔀', label: 'Handoff com resumo IA',  desc: 'Escala para humano com resumo automático da conversa.', minPlan: 'free',    addonPrice: null as string | null },
+            { key: 'dataCollection' as keyof FormData['skills'], icon: '📋', label: 'Recolha de dados',        desc: 'Formulário conversacional estruturado para captar info.', minPlan: 'free',    addonPrice: null },
+            { key: 'scheduling'     as keyof FormData['skills'], icon: '📅', label: 'Agendamento',             desc: 'Agenda reuniões via Google Calendar / Calendly.', minPlan: 'starter', addonPrice: '€7/mês' },
+            { key: 'fileUpload'     as keyof FormData['skills'], icon: '📁', label: 'Envio de ficheiros',      desc: 'O agente envia PDFs, catálogos e documentos na conversa.', minPlan: 'starter', addonPrice: '€5/mês' },
+            { key: 'humorDetection' as keyof FormData['skills'], icon: '😊', label: 'Deteção de humor',        desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'pro', addonPrice: '€9/mês' },
+            { key: 'payments'       as keyof FormData['skills'], icon: '💳', label: 'Pagamentos (MB Way)',    desc: 'Cobrar via MB Way diretamente na conversa. Custo por transação.', minPlan: 'starter', addonPrice: '+€25/mês' },
+            { key: 'orders'         as keyof FormData['skills'], icon: '🧾', label: 'Pedidos / KDS',          desc: 'Painel de encomendas em tempo real (Kitchen Display System).', minPlan: 'starter', addonPrice: null },
+          ];
+          return (
+            <div className="card space-y-3">
+              <div className="mb-1">
+                <h2 className="text-lg font-semibold">Skills</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Ativa as capacidades para este agente. Skills marcadas como <span className="text-green-700 font-medium">Grátis</span> estão sempre disponíveis; as restantes requerem plano ou addon.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {SKILLS_DEF.map(({ key, icon, label, desc, minPlan, addonPrice }) => {
+                  const minIdx = planOrder.indexOf(minPlan);
+                  const locked = planIdx < minIdx;
+                  const active = form.skills[key];
+                  return (
+                    <div key={key} className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${
+                      locked
+                        ? 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
+                        : active
+                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}>
+                      <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight">{label}</span>
+                            {minPlan === 'free' && (
+                              <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">Grátis</span>
+                            )}
+                            {locked && addonPrice && (
+                              <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {addonPrice}</span>
+                            )}
+                            {locked && !addonPrice && (
+                              <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
+                            )}
+                            {!locked && minPlan !== 'free' && (
+                              <span className="text-[10px] bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={locked}
+                            onClick={() => !locked && updateSkill(key, !active)}
+                            aria-label={(active ? 'Desativar ' : 'Ativar ') + label}
+                            className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                              locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
+                              : active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-150 ${active && !locked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-snug">{desc}</p>
+                        {locked && addonPrice && (
+                          <p className="text-[11px] text-orange-500 dark:text-orange-400 mt-1">Podes ativar como addon após criar o agente.</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid grid-cols-1 gap-2">
-              {([
-                { key: 'handoff',        icon: '🔀', label: 'Handoff com resumo IA',    desc: 'Escala para humano com resumo automático da conversa' },
-                { key: 'dataCollection', icon: '📋', label: 'Recolha de dados',          desc: 'Formulário conversacional estruturado para captar info' },
-                { key: 'scheduling',     icon: '📅', label: 'Agendamento',               desc: 'Integração Google Calendar / Calendly para marcar reuniões' },
-                { key: 'fileUpload',     icon: '📁', label: 'Envio de ficheiros',        desc: 'Permite ao cliente enviar PDFs e documentos na conversa' },
-                { key: 'payments',       icon: '💳', label: 'Pagamentos (MB Way)',       desc: 'Cobrar pagamentos via MB Way diretamente na conversa' },
-                { key: 'orders',         icon: '🧾', label: 'Pedidos / Orders',          desc: 'Ativar painel de encomendas com fila KDS em tempo real' },
-              ] as { key: keyof FormData['skills']; icon: string; label: string; desc: string }[]).map(({ key, icon, label, desc }) => (
-                <label key={key} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                  form.skills[key]
-                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                }`}>
-                  <input type="checkbox" className="mt-0.5 accent-brand-600 w-4 h-4 shrink-0"
-                    checked={form.skills[key]} onChange={(e) => updateSkill(key, e.target.checked)} />
-                  <span className="text-lg shrink-0 leading-none mt-0.5">{icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight">{label}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* STEP 4: Confirmar */}
         {step === 4 && (

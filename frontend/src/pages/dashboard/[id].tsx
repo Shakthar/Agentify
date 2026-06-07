@@ -292,49 +292,60 @@ export default function AgentDetailPage() {
                       const locked = planIdx < minIdx;
                       const active = !!((agent as unknown as Record<string,unknown>)[skill.field]);
                       return (
-                        <div key={skill.key} className={`flex items-start gap-4 p-3 rounded-xl border transition-colors ${
+                        <div key={skill.key} className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${
                           locked ? 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
                           : active ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
                           : 'border-gray-200 dark:border-gray-700'
                         }`}>
-                          <span className="text-2xl mt-0.5">{skill.icon}</span>
+                          <span className="text-2xl shrink-0 mt-0.5">{skill.icon}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{skill.label}</span>
-                              {locked && skill.addonPrice && (
-                                <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
-                                  Addon {skill.addonPrice}
-                                </span>
-                              )}
-                              {locked && !skill.addonPrice && (
-                                <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">
-                                  Requer {skill.minPlan.charAt(0).toUpperCase() + skill.minPlan.slice(1)}+
-                                </span>
-                              )}
-                              {active && !locked && (
-                                <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">Ativa</span>
-                              )}
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{skill.label}</span>
+                                {skill.minPlan === 'free' && (
+                                  <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">Grátis</span>
+                                )}
+                                {locked && skill.addonPrice && (
+                                  <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
+                                    Addon {skill.addonPrice}
+                                  </span>
+                                )}
+                                {locked && !skill.addonPrice && (
+                                  <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">
+                                    {skill.minPlan.charAt(0).toUpperCase() + skill.minPlan.slice(1)}+
+                                  </span>
+                                )}
+                                {!locked && skill.minPlan !== 'free' && (
+                                  <span className="text-[10px] bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded-full">
+                                    {skill.minPlan.charAt(0).toUpperCase() + skill.minPlan.slice(1)}+
+                                  </span>
+                                )}
+                                {active && !locked && (
+                                  <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">Ativa</span>
+                                )}
+                              </div>
+                              <button
+                                disabled={locked || skillsSaving}
+                                onClick={() => handleToggleSkill(skill.field, active)}
+                                aria-label={(active ? 'Desativar ' : 'Ativar ') + skill.label}
+                                className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                                  locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
+                                  : active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+                                }`}
+                              >
+                                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-150 ${active && !locked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                              </button>
                             </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{skill.desc}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{skill.desc}</p>
                             {locked && skill.addonPrice && (
                               <button
                                 onClick={() => router.push('/dashboard/plans')}
-                                className="mt-2 text-[11px] text-orange-600 dark:text-orange-400 underline hover:no-underline"
+                                className="mt-1.5 text-[11px] text-orange-600 dark:text-orange-400 underline hover:no-underline"
                               >
-                                Ativar por {skill.addonPrice} →
+                                Ativar addon {skill.addonPrice} →
                               </button>
                             )}
                           </div>
-                          <button
-                            disabled={locked || skillsSaving}
-                            onClick={() => handleToggleSkill(skill.field, active)}
-                            className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-                              locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
-                              : active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
-                            }`}
-                          >
-                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${active && !locked ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                          </button>
                         </div>
                       );
                     })}
@@ -376,25 +387,38 @@ export default function AgentDetailPage() {
                       const wlActive = agent.whitelabelEnabled;
                       const wlUrl = `agentify.shaklabs.tech/w/${agent.id}`;
                       return (
-                        <div className={`flex items-start gap-4 p-3 rounded-xl border transition-colors ${
+                        <div className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${
                           !wlAvailable ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
                           : wlActive ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
                           : 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
                         }`}>
-                          <span className="text-2xl mt-0.5">🎨</span>
+                          <span className="text-2xl shrink-0 mt-0.5">🎨</span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Portal White-label</span>
-                              {wlActive && <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">Ativa</span>}
-                              {!wlAvailable && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
-                              {wlAvailable && !wlIncluded && wlAddonPrice && (
-                                <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
-                                  Addon {wlAddonPrice}/agente
-                                </span>
-                              )}
-                              {wlIncluded && !wlActive && <span className="text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Portal White-label</span>
+                                {wlActive && <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">Ativa</span>}
+                                {!wlAvailable && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
+                                {wlAvailable && !wlIncluded && wlAddonPrice && (
+                                  <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
+                                    Addon {wlAddonPrice}/agente
+                                  </span>
+                                )}
+                                {wlIncluded && !wlActive && <span className="text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
+                              </div>
+                              <button
+                                disabled={!wlAvailable || skillsSaving}
+                                onClick={() => handleToggleSkill('whitelabelEnabled', wlActive)}
+                                aria-label={wlActive ? 'Desativar White-label' : 'Ativar White-label'}
+                                className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                                  !wlAvailable ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
+                                  : wlActive ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+                                }`}
+                              >
+                                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-150 ${wlActive && wlAvailable ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                              </button>
                             </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
                               Página pública deste agente com a tua marca, sem branding Agentfy.
                             </p>
                             {wlActive && (
@@ -413,16 +437,6 @@ export default function AgentDetailPage() {
                               </button>
                             )}
                           </div>
-                          <button
-                            disabled={!wlAvailable || skillsSaving}
-                            onClick={() => handleToggleSkill('whitelabelEnabled', wlActive)}
-                            className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-                              !wlAvailable ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
-                              : wlActive ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
-                            }`}
-                          >
-                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${wlActive && wlAvailable ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                          </button>
                         </div>
                       );
                     })()}
@@ -544,7 +558,19 @@ export default function AgentDetailPage() {
 
           {/* ─── Pedidos MB Way ─── */}
           {activeTab === 'orders' && agent && (
-            <Orders agentId={agent.id} plan={tenant.plan ?? 'free'} />
+            <div className="space-y-4">
+              <div className="card flex items-center justify-between gap-3 flex-wrap py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">🧾 Painel público de pedidos</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Partilha este link com o staff (cozinha, balcão) para visualizar pedidos em tempo real sem login.</p>
+                </div>
+                <CopyBox
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/orders/${agent.id}` : `/orders/${agent.id}`}
+                  label="Link público KDS"
+                />
+              </div>
+              <Orders agentId={agent.id} plan={tenant.plan ?? 'free'} />
+            </div>
           )}
 
           {/* ─── Web Embed ─── */}
