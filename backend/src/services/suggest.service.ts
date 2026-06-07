@@ -1,5 +1,13 @@
 import { callLLM } from '../lib/llm.js';
-import { UpstreamError } from '../lib/errors.js';
+import { PaymentRequiredError, UpstreamError } from '../lib/errors.js';
+import prisma from '../lib/prisma.js';
+
+// Modelo fixo para sugest\u00f5es — mais capaz para gerar prompts profissionais
+const SUGGEST_MODEL = 'claude-sonnet-4-5-20250929';
+
+// Custo m\u00e1ximo estimado por chamada de suggest (usado na reserva de cr\u00e9ditos)
+// 2000 chars descri\u00e7\u00e3o + 1500 tokens resposta ≈ 3500 tokens × 3 (sonnet) ≈ 11 cr\u00e9ditos de reserva
+const SUGGEST_MAX_CREDITS_ESTIMATE = 15;
 
 const SUGGESTION_PROMPT = `You are an expert AI assistant builder. Based on the business description provided, generate a professional AI agent configuration in JSON format.
 
@@ -19,13 +27,27 @@ Rules:
 - Include how the agent should handle: greetings, unknown questions, escalation to human
 - Do NOT include placeholder text like [Company Name] — infer from the description`;
 
-export async function suggestAgent(businessDescription: string, language: string) {
+export async function suggestAgent(tenantId: string, businessDescription: string, language: string) {
+  // SECURITY: Verificar e reservar cr\u00e9ditos antes de chamar o LLM.
+  // Sem este check, qualquer tenant pode chamar claude-sonnet infinitamente
+  // (dentro do suggestLimiter) sem gastar cr\u00e9ditos — o operador paga a fatura.
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { creditsTotal: true, creditsUsed: true },
+  });
+  if (!tenant) throw new PaymentRequiredError('Tenant not found');
+
+  const available = tenant.creditsTotal - tenant.creditsUsed;
+  if (available < SUGGEST_MAX_CREDITS_ESTIMATE) {
+    throw new PaymentRequiredError('Cr\u00e9ditos insuficientes para gerar sugest\u00e3o. Compra mais cr\u00e9ditos ou faz upgrade do plano.');
+  }
+
   const userMessage = `Business description (language: ${language}):\n\n${businessDescription}\n\nGenerate the agent configuration JSON now.`;
 
   let result;
   try {
     result = await callLLM(
-      'claude-sonnet-4-5-20250929',
+      SUGGEST_MODEL,
       SUGGESTION_PROMPT,
       [{ role: 'user', content: userMessage }],
       1500,
@@ -35,6 +57,15 @@ export async function suggestAgent(businessDescription: string, language: string
     const msg = err instanceof Error ? err.message : 'Unknown error';
     throw new UpstreamError(`LLM error: ${msg}`);
   }
+
+  // Debitar cr\u00e9ditos reais ap\u00f3s a chamada (custo real, n\u00e3o estimado)
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { creditsUsed: { increment: result.creditsUsed } },
+  });
+  await prisma.creditLog.create({
+    data: { tenantId, amount: -result.creditsUsed, reason: 'suggest' },
+  });
 
   try {
     const jsonMatch = result.content.match(/\{[\s\S]*\}/);

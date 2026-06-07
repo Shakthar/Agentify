@@ -49,6 +49,23 @@ export const signupLimiter = rateLimit({
   message: { error: 'Too many registrations from this IP, please try again tomorrow' },
 });
 
+// Rate limiter para endpoint de suggest: limitado POR TENANT (não por IP).
+// O suggest chama claude-sonnet (modelo caro) sem debitar créditos do tenant;
+// sem este limiter, um utilizador cria conta e drena o orçamento Anthropic do operador.
+// keyGenerator usa tenantId quando disponível (autenticado), fallback para IP.
+export const suggestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 10,
+  skipSuccessfulRequests: false,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const authReq = req as import('express').Request & { tenant?: { id: string } };
+    return authReq.tenant?.id ?? req.ip ?? 'unknown';
+  },
+  message: { error: 'Limite de sugestões atingido (10/hora). Tente mais tarde.' },
+});
+
 // Rate limiter para webhooks externos (Easypay, Meta, etc.)
 // Limita rajadas de webhooks forjados enquanto permite volume legítimo de produção.
 // Meta envia ~1 mensagem por utilizador por segundo em pico; 200/min por IP é generoso.

@@ -160,6 +160,28 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   const planLimits = PLAN_LIMITS[tenant.plan as Plan] ?? PLAN_LIMITS.free;
   const paymentSkillCost = planLimits.paymentSkillCost; // null = bloqueado, 0+ = custo em créditos
 
+  // SECURITY: Reservar créditos atomicamente ANTES de chamar o LLM.
+  // O padrão "check (t=0) → call LLM (t=1..5s) → increment (t=5s)" tem race condition:
+  // dois pedidos concorrentes passam ambos o check com saldo positivo, chamam ambos
+  // o LLM, e ambos incrementam → saldo final negativo (overdraft ilimitado).
+  //
+  // Solução: pre-reservar o pior caso (maxTokens × custo/token) com UPDATE atómico
+  // que só executa se "creditsUsed + reserva <= creditsTotal". Após o LLM,
+  // devolver os créditos não usados (refund = reserva − custo_real).
+  const costPerKTokens = 3; // default conservador; o custo real pode ser menor
+  const maxReserve = Math.ceil(((conversation.agent.maxTokens + 2000) / 1000) * costPerKTokens);
+
+  const reserveResult = await prisma.$executeRaw`
+    UPDATE "Tenant"
+    SET "creditsUsed" = "creditsUsed" + ${maxReserve}
+    WHERE id = ${tenantId}
+      AND "creditsTotal" - "creditsUsed" >= ${maxReserve}
+  `;
+
+  if (reserveResult === 0) {
+    throw new PaymentRequiredError('No credits available. Please purchase more.');
+  }
+
   const dataKey = unwrapDataKey(tenant.encryptionKey);
 
   // Histórico para o LLM (decifrado)
@@ -312,7 +334,13 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
 
   const sentiment = detectSentiment(content);
 
-  // Atualiza estatísticas + créditos numa só transação lógica
+  // Atualiza estatísticas + créditos numa só transação lógica.
+  // SECURITY: Os créditos já foram pré-reservados (maxReserve) antes do LLM.
+  // Agora calculamos o refund: créditos reservados em excesso devem ser devolvidos.
+  // O saldo final = (creditsUsed + maxReserve) - (maxReserve - creditsUsed_real)
+  //              = creditsUsed + creditsUsed_real  ✓
+  const creditRefund = maxReserve - llmResponse.creditsUsed;
+
   await Promise.all([
     prisma.conversation.update({
       where: { id: conversation.id },
@@ -323,10 +351,16 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
         sentiment,
       },
     }),
-    prisma.tenant.update({
-      where: { id: tenantId },
-      data: { creditsUsed: { increment: llmResponse.creditsUsed } },
-    }),
+    // Devolver créditos reservados em excesso (refund ≥ 0 quase sempre)
+    creditRefund > 0
+      ? prisma.tenant.update({
+          where: { id: tenantId },
+          data: { creditsUsed: { decrement: creditRefund } },
+        })
+      : prisma.tenant.update({
+          where: { id: tenantId },
+          data: { creditsUsed: { increment: -creditRefund } }, // extra cobrado (raro)
+        }),
     prisma.agent.update({
       where: { id: conversation.agentId },
       data: { totalMessages: { increment: 2 } },
