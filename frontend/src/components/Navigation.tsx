@@ -14,7 +14,6 @@ const navItems = [
   { href: ROUTES.whitelabelDashboard, label: 'White-label', icon: '🎨' },
   { href: ROUTES.admin, label: 'Admin', icon: '🛡️' },
   { href: ROUTES.profile, label: 'Perfil', icon: '👤' },
-  { href: ROUTES.settings, label: 'Definições', icon: '⚙️' },
 ];
 
 export default function Navigation() {
