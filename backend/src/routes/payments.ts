@@ -163,7 +163,8 @@ router.patch('/orders/:id/status', authenticate, asyncHandler(async (req: Authen
 
   // Quando o pedido é marcado como enviado, notificar o cliente por WA
   if (newStatus === 'sent') {
-    notifySent(updated).catch(err => console.warn('[KDS] notifySent falhou:', err));
+    const { orderType } = req.body as { status: string; orderType?: 'delivery' | 'pickup' };
+    notifySent(updated, orderType ?? 'delivery').catch(err => console.warn('[KDS] notifySent falhou:', err));
   }
 
   res.json(updated);
@@ -223,7 +224,7 @@ async function notifySent(order: {
   amount: number;
   description: string;
   agentId: string;
-}): Promise<void> {
+}, orderType: 'delivery' | 'pickup' = 'delivery'): Promise<void> {
   const agent = await prisma.agent.findFirst({
     where: { id: order.agentId },
     select: { whatsappNumber: true },
@@ -231,17 +232,19 @@ async function notifySent(order: {
   if (!agent?.whatsappNumber) return;
 
   const token = process.env.WHATSAPP_TOKEN;
-  const frontendUrl = process.env.FRONTEND_URL ?? '';
-  const link = `${frontendUrl}/order-status/${order.id}`;
   const amountFmt = order.amount.toFixed(2).replace('.', ',');
+
+  const message = orderType === 'pickup'
+    ? `\ud83c\udfea *O teu pedido est\u00e1 pronto para retirada!*\n\n\ud83d\udccb ${order.description}\n\ud83d\udcb6 \u20ac${amountFmt}\n\nPodes vir levantar quando quiseres! \ud83d\ude0a`
+    : `\ud83d\ude97 *O teu pedido est\u00e1 a caminho!*\n\n\ud83d\udccb ${order.description}\n\ud83d\udcb6 \u20ac${amountFmt}\n\nO teu pedido est\u00e1 a ser entregue. Aguarda em breve! \ud83c\udf89`;
 
   await sendWhatsAppText(
     agent.whatsappNumber,
     order.buyerPhone,
-    `\ud83d\ude97 *O teu pedido est\u00e1 a caminho!*\n\n\ud83d\udccb ${order.description}\n\ud83d\udcb6 \u20ac${amountFmt}\n\nAcompanha o estado aqui:\n${link}`,
+    message,
     token,
   ).catch(err => console.warn('[KDS] notifySent WA falhou:', err));
-  console.log(`[KDS] Notifica\u00e7\u00e3o enviado enviada para ${order.buyerPhone}`);
+  console.log(`[KDS] Notifica\u00e7\u00e3o enviada para ${order.buyerPhone} (${orderType})`);
 }
 
 async function notifyAfterPayment(order: {
