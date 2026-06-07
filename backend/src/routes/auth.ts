@@ -31,8 +31,18 @@ const profileSchema = z.object({
   addressCountry: z.string().max(100).optional(),
   addressZip:   z.string().max(20).optional(),
   brandColor:   z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  logoUrl:      z.string().url().max(500).optional().or(z.literal('')),
-  domain:       z.string().max(200).optional().or(z.literal('')),
+  logoUrl:      z.string().max(500).refine(
+    (v) => !v || (v.startsWith('https://') && !v.toLowerCase().startsWith('javascript:')),
+    { message: 'logoUrl deve ser HTTPS' }
+  ).optional().or(z.literal('')),
+  // SECURITY: domain não pode ser o próprio domínio da plataforma
+  domain: z.string().max(200).regex(
+    /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
+    { message: 'Domínio inválido' }
+  ).refine(
+    (v) => !['agentify.shaklabs.tech', 'agentfy.shaklabs.tech', 'agentify-production-8d3a.up.railway.app'].includes(v.toLowerCase()),
+    { message: 'Não podes usar um domínio da plataforma' }
+  ).optional().or(z.literal('')),
 });
 
 const changePasswordSchema = z.object({

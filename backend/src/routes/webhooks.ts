@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { authenticate } from '../middleware/auth.js';
+import { ForbiddenError } from '../lib/errors.js';
+import { AuthenticatedRequest } from '../types/index.js';
 import prisma from '../lib/prisma.js';
 import * as conversationsService from '../services/conversations.service.js';
 import { decrypt } from '../lib/encryption.js';
@@ -11,9 +14,9 @@ import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
   const appSecret = process.env.META_APP_SECRET;
   if (!appSecret) {
-    // Sem segredo configurado: avisar mas PERMITIR (não bloquear)
-    console.warn('[WhatsApp] META_APP_SECRET não configurado — a verificar sem assinatura (inseguro)');
-    return true;
+    // FIX: sem segredo configurado, REJEITAR — nunca permitir sem verificação
+    console.error('[WhatsApp] META_APP_SECRET não configurado — a rejeitar webhook (configure a variável de ambiente)');
+    return false;
   }
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
   if (!signature || !req.rawBody) {
@@ -21,16 +24,22 @@ function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
     return false;
   }
   const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
-  const match = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  // timingSafeEqual requer buffers do mesmo tamanho
+  if (sigBuf.length !== expBuf.length) { console.warn('[WhatsApp] Assinatura com tamanho errado'); return false; }
+  const match = crypto.timingSafeEqual(sigBuf, expBuf);
   if (!match) console.warn('[WhatsApp] Assinatura inválida — possível payload adulterado');
   return match;
 }
 
 const router = Router();
 
-// ─── GET /api/webhooks/whatsapp/debug ─────────────────────────────────────
+// ─── GET /api/webhooks/whatsapp/debug (SUPERADMIN ONLY) ─────────────────────────────────────
 // Diagnóstico: mostra o estado da configuração do WhatsApp + todos os agentes
-router.get('/whatsapp/debug', asyncHandler(async (_req: Request, res: Response) => {
+// SECURITY: requer autenticação + isAdmin — nunca expor publicamente
+router.get('/whatsapp/debug', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.tenant?.isAdmin) throw new ForbiddenError('Superadmin only');
   const allAgents = await prisma.agent.findMany({
     where: { whatsappEnabled: true },
     select: { id: true, name: true, whatsappNumber: true, whatsappEnabled: true, isActive: true },
@@ -38,8 +47,8 @@ router.get('/whatsapp/debug', asyncHandler(async (_req: Request, res: Response) 
   res.json({
     config: {
       WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN ? `${process.env.WHATSAPP_TOKEN.slice(0, 12)}…` : null,
-      META_APP_SECRET: process.env.META_APP_SECRET ? `${process.env.META_APP_SECRET.slice(0, 6)}…` : null,
-      WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ?? null,
+      META_APP_SECRET: process.env.META_APP_SECRET ? '***configured***' : null,
+      WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ? '***configured***' : null,
       WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION ?? 'v20.0',
     },
     whatsappAgents: allAgents,
@@ -47,9 +56,11 @@ router.get('/whatsapp/debug', asyncHandler(async (_req: Request, res: Response) 
   });
 }));
 
-// ─── POST /api/webhooks/whatsapp/simulate ─────────────────────────────────────
+// ─── POST /api/webhooks/whatsapp/simulate (SUPERADMIN ONLY) ─────────────────────────────────────
 // Testa o fluxo completo sem necessitar de mensagem real do WhatsApp
-router.post('/whatsapp/simulate', asyncHandler(async (req: Request, res: Response) => {
+// SECURITY: requer autenticação + isAdmin — nunca expor publicamente (causa credit drain)
+router.post('/whatsapp/simulate', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.tenant?.isAdmin) throw new ForbiddenError('Superadmin only');
   const { phoneNumberId, text = 'Olá!' } = req.body as { phoneNumberId?: string; text?: string };
   if (!phoneNumberId) {
     res.status(400).json({ error: 'phoneNumberId é obrigatório' });

@@ -39,10 +39,15 @@ router.post('/expenses', asyncHandler(async (req: AuthenticatedRequest, res: Res
     res.status(400).json({ error: 'category, description e amount são obrigatórios' });
     return;
   }
+  const parsedAmount = parseFloat(amount);
+  if (!isFinite(parsedAmount) || parsedAmount <= 0 || parsedAmount > 1_000_000) {
+    res.status(400).json({ error: 'amount deve ser um número positivo válido (máx 1 000 000)' });
+    return;
+  }
   const expense = await superadminService.createExpense({
     category: String(category),
     description: String(description),
-    amount: parseFloat(amount),
+    amount: parsedAmount,
     recurring: Boolean(recurring),
     period: String(period ?? 'monthly'),
   });

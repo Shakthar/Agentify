@@ -33,17 +33,31 @@ export function registerChatSocket(io: SocketIOServer) {
     const state: SocketState = { windowStart: Date.now(), count: 0, inFlight: false };
 
     // Visitante entra na sala da conversa
-    socket.on('join', async ({ conversationId }: { conversationId: string }) => {
+    // SECURITY: o socket tem que apresentar o visitorId que foi atribuído em /api/chat/start
+    // para provar que foi ele quem iniciou a conversa (BOLA prevention)
+    socket.on('join', async ({ conversationId, visitorId }: { conversationId: string; visitorId?: string }) => {
       if (!conversationId || typeof conversationId !== 'string') return;
 
-      // Verifica se a conversa existe antes de deixar entrar
+      // Verifica se a conversa existe e pertence ao visitorId correto
       const convo = await prisma.conversation.findUnique({
         where: { id: conversationId },
-        select: { id: true },
+        select: { id: true, visitorId: true, closedAt: true },
       }).catch(() => null);
 
       if (!convo) {
         socket.emit('error', { message: 'Conversa não encontrada' });
+        return;
+      }
+
+      // Se a conversa tem um visitorId não-genérico, verificar que o cliente apresenta o mesmo
+      // (visitorIds do formato "visitor_TIMESTAMP" são gerados quando o cliente não fornece nenhum)
+      if (visitorId && convo.visitorId !== visitorId) {
+        socket.emit('error', { message: 'Acesso não autorizado a esta conversa' });
+        return;
+      }
+
+      if (convo.closedAt) {
+        socket.emit('error', { message: 'Esta conversa já foi encerrada' });
         return;
       }
 

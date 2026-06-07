@@ -30,7 +30,9 @@ validateEnv();
 
 const app = express();
 app.disable('x-powered-by'); // não revelar a stack
-app.set('trust proxy', true); // Railway usa múltiplos hops — confiar em todos para obter IP real do cliente
+// Railway usa exactamente 1 hop de proxy — confiar apenas nesse hop
+// SECURITY: 'true' permitiria spoofar X-Forwarded-For e bypassar rate limiting
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
