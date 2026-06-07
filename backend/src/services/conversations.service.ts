@@ -143,7 +143,10 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     where: { id: conversationId, tenantId },
     include: {
       agent: true,
-      messages: { orderBy: { timestamp: 'asc' }, take: 20 },
+      // FIX: get the LAST 40 messages ordered newest-first, then reverse for LLM.
+      // The old `take: 20` with orderBy asc returned the OLDEST 20, meaning in a long
+      // ordering conversation the LLM lost track of items added later.
+      messages: { orderBy: { timestamp: 'desc' }, take: 40 },
     },
   });
 
@@ -194,11 +197,15 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
 
   const dataKey = unwrapDataKey(tenant.encryptionKey);
 
-  // Histórico para o LLM (decifrado)
-  const history: LLMMessage[] = conversation.messages.map((m) => ({
-    role: m.role as 'user' | 'assistant',
-    content: decryptContent(m.content, m.contentIV, dataKey),
-  }));
+  // Histórico para o LLM (decifrado) — mensagens vêm ordenadas desc (mais recente primeiro),
+  // invertemos para asc (cronológico) antes de enviar ao LLM.
+  const history: LLMMessage[] = conversation.messages
+    .slice() // não mutar o array original
+    .reverse()
+    .map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: decryptContent(m.content, m.contentIV, dataKey),
+    }));
   history.push({ role: 'user', content });
 
   // Persiste a mensagem do utilizador (cifrada)
@@ -247,12 +254,68 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   }
 
   // Injeta skill de cobrança MB Way (apenas para planos com acesso)
-  // O agente usa [MBWAY:351912345678|5.00|2x Café] para disparar o pagamento
   if (paymentSkillCost !== null) {
-    systemPrompt += '\n\n---\nCobrança MB Way: quando o cliente confirmar um pedido e fornecer o número de telmóvel, usa o marcador [MBWAY:NUMERO|VALOR|DESCRICAO] na tua resposta.'
-      + ' Substitui NUMERO pelo número do cliente no formato 351XXXXXXXXX (Portugal) ou código do país + número sem espaços, VALOR pelo montante em euros (ex: 5.50), DESCRICAO pelo resumo do pedido (ex: 2x Café e 1x Bolo).'
-      + ' Exemplo: "Ok! Vou enviar o pedido de \u20ac5.50 para o seu MB Way! [MBWAY:351912345678|5.50|2x Café e 1x Bolo]"'
-      + ' Nunca uses este marcador sem ter o número de telmóvel do cliente. Se não tiveres o número, pede-o primeiro.';
+    systemPrompt += '\n\n---\nGESTÃO DE PEDIDOS (REGRAS OBRIGATÓRIAS):'
+      + '\n1. Mantém SEMPRE um carrinho acumulado com todos os itens pedidos nesta conversa.'
+      + '\n2. Quando o cliente adiciona um item ou aceita uma sugestão, confirma que os itens anteriores CONTINUAM no pedido.'
+      + '\n3. Ao fazer upselling (ex: bebida, sobremesa), nunca substituis itens já pedidos — acrescentas ao carrinho.'
+      + '\n4. Antes de pedir o número de telmóvel, apresenta um RESUMO COMPLETO de todos os itens e o total.'
+      + '\n5. O marcador MBWAY deve conter TODOS os itens — nunca apenas o último.'
+      + '\nCobrança MB Way: quando o cliente confirmar o pedido completo e fornecer o número de telmóvel, usa [MBWAY:NUMERO|VALOR|DESCRICAO].'
+      + ' NUMERO = 351XXXXXXXXX; VALOR = total em euros de TODOS os itens; DESCRICAO = lista completa (ex: 1x Pizza Margherita \u20ac8.00, 1x Sumo de Laranja \u20ac2.00).'
+      + ' Exemplo correto: "Perfeito! 1x Pizza Margherita + 1x Sumo = \u20ac10.00. [MBWAY:351912345678|10.00|1x Pizza Margherita \u20ac8.00, 1x Sumo de Laranja \u20ac2.00]"'
+      + ' Nunca uses este marcador sem ter o número de telmóvel. Se não tiveres, pede-o primeiro.';
+  }
+
+  // Injeta historial de pedidos anteriores do mesmo visitante (cliente recorrente)
+  if (conversation.visitorId) {
+    try {
+      // Busca conversas anteriores deste visitante neste agente (excluindo a atual)
+      const pastConvIds = await prisma.conversation.findMany({
+        where: {
+          agentId: conversation.agentId,
+          visitorId: conversation.visitorId,
+          id: { not: conversation.id },
+        },
+        select: { id: true },
+      });
+
+      if (pastConvIds.length > 0) {
+        const pastOrders = await prisma.order.findMany({
+          where: {
+            conversationId: { in: pastConvIds.map((c) => c.id) },
+            status: { in: ['paid', 'done'] },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 15,
+          select: { description: true, amount: true },
+        });
+
+        if (pastOrders.length > 0) {
+          // Conta frequência de pedidos para identificar os favoritos
+          const freq: Record<string, number> = {};
+          for (const o of pastOrders) {
+            const key = o.description.toLowerCase().trim();
+            freq[key] = (freq[key] ?? 0) + 1;
+          }
+          const top = Object.entries(freq)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
+
+          systemPrompt += `\n\n---\nCliente recorrente: este visitante já fez ${pastOrders.length} pedido(s) anteriores.`;
+          if (top[0][1] >= 3) {
+            // Pedido muito repetido — sugere automaticamente
+            systemPrompt += ` O seu pedido mais frequente é: "${top[0][0]}" (${top[0][1]}x).`
+              + ' Quando o cliente abrir a conversa, cumprimenta-o e pergunta se quer repetir o mesmo pedido.';
+          } else if (top.length >= 2) {
+            const topStr = top.map(([d, n]) => `"${d}" (${n}x)`).join(', ');
+            systemPrompt += ` Pedidos anteriores mais comuns: ${topStr}. Podes mencioná-los como sugestão.`;
+          }
+        }
+      }
+    } catch {
+      /* ignorar falhas de histórico — não bloqueia a conversa */
+    }
   }
 
   // Chamada ao LLM
