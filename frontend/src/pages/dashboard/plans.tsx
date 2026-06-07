@@ -44,8 +44,8 @@ const FEATURES: FeatureRow[] = [
   { label: 'Pedidos / Orders', icon: '🧾', values: [false, true, true, true, true] },
   { label: 'Relatórios avançados', icon: '📊', values: [false, false, true, true, true] },
   { label: 'API access',      icon: '🔌', values: [false, false, true, true, true] },
-  { label: 'White-label / Portal próprio', icon: '🎨', values: ['—', '+€15/mês ➕', '+€9/mês ➕', 'Incluído', 'Incluído'],
-    note: 'Remove branding e activa portal público personalizado' },
+  { label: 'White-label / Portal próprio', icon: '🎨', values: ['—', '+€5/mês/agente ➕', '+€3/mês/agente ➕', 'Incluído', 'Incluído'],
+    note: 'Página pública por agente, sem branding Agentfy. Cobrado por agente ativo.' },
   { label: 'Suporte',         icon: '🛟', values: ['Comunidade', 'Email', 'Prioritário', 'Dedicado', 'SLA 24h'] },
 ];
 
@@ -158,7 +158,7 @@ export default function PlansPage() {
                 { icon: '📅', name: 'Agendamento', price: '€7/mês', plans: 'Free' },
                 { icon: '📁', name: 'Upload de ficheiros', price: '€5/mês', plans: 'Free' },
                 { icon: '😊', name: 'Deteção de humor', price: '€9/mês', plans: 'Free & Starter' },
-                { icon: '🎨', name: 'White-label', price: '€15/mês (Starter) · €9/mês (Pro)', plans: 'Starter & Pro' },
+                { icon: '🎨', name: 'White-label', price: '€5/agente/mês (Starter) · €3/agente/mês (Pro)', plans: 'Starter & Pro' },
               ].map((a) => (
                 <div key={a.name} className="flex items-start gap-2 bg-white dark:bg-gray-800 rounded-lg p-3 border border-orange-100 dark:border-orange-900">
                   <span className="text-xl">{a.icon}</span>

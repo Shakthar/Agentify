@@ -14,7 +14,8 @@ export const ROUTES = {
   admin: '/dashboard/admin',
   settings: '/dashboard/settings',
   profile: '/dashboard/profile',
-  portal: (tenantId: string) => `/w/${tenantId}`,
+  whitelabel: (agentId: string) => `/w/${agentId}`,
+  portal: (agentId: string) => `/w/${agentId}`, // alias kept for compat
 } as const;
 
 export const CREDIT_ALERT_THRESHOLDS = [70, 80, 90] as const;

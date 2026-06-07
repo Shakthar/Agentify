@@ -353,33 +353,61 @@ export default function AgentDetailPage() {
                       </div>
                     </div>
 
-                    {/* Whitelabel portal */}
+                    {/* Whitelabel portal — toggle per agent */}
                     {(() => {
                       const wlIncluded = planIdx >= planOrder.indexOf('business');
-                      const wlAddon = !wlIncluded ? (plan === 'starter' ? '€15/mês' : plan === 'pro' ? '€9/mês' : null) : null;
+                      const wlAddonPrice = plan === 'starter' ? '€5/mês' : plan === 'pro' ? '€3/mês' : null;
+                      const wlAvailable = wlIncluded || wlAddonPrice !== null;
+                      const wlActive = agent.whitelabelEnabled;
+                      const wlUrl = `agentify.shaklabs.tech/w/${agent.id}`;
                       return (
-                        <div className={`flex items-start gap-4 p-3 rounded-xl border ${
-                          wlIncluded ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
-                          : wlAddon ? 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
-                          : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                        <div className={`flex items-start gap-4 p-3 rounded-xl border transition-colors ${
+                          !wlAvailable ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                          : wlActive ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
+                          : 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
                         }`}>
                           <span className="text-2xl mt-0.5">🎨</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Portal White-label</span>
-                              {wlIncluded && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
-                              {wlAddon && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {wlAddon}</span>}
-                              {!wlIncluded && !wlAddon && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
+                              {wlActive && <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">Ativa</span>}
+                              {!wlAvailable && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
+                              {wlAvailable && !wlIncluded && wlAddonPrice && (
+                                <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
+                                  Addon {wlAddonPrice}/agente
+                                </span>
+                              )}
+                              {wlIncluded && !wlActive && <span className="text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              Portal público com a tua marca, sem branding Agentfy. URL: agentify.shaklabs.tech/w/{tenant.id}
+                              Página pública deste agente com a tua marca, sem branding Agentfy.
                             </p>
-                            {wlAddon && (
-                              <button onClick={() => router.push('/dashboard/plans')} className="mt-2 text-[11px] text-orange-600 dark:text-orange-400 underline hover:no-underline">
-                                Ativar por {wlAddon} →
+                            {wlActive && (
+                              <a
+                                href={`https://${wlUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-1 inline-block text-[11px] text-brand-600 dark:text-brand-400 underline hover:no-underline font-mono"
+                              >
+                                {wlUrl} ↗
+                              </a>
+                            )}
+                            {wlAvailable && !wlIncluded && (
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-2 text-[11px] text-orange-600 dark:text-orange-400 underline hover:no-underline block">
+                                Ativar addon por {wlAddonPrice}/agente/mês →
                               </button>
                             )}
                           </div>
+                          <button
+                            disabled={!wlAvailable || skillsSaving}
+                            onClick={() => handleToggleSkill('whitelabelEnabled', wlActive)}
+                            className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                              !wlAvailable ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
+                              : wlActive ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${wlActive && wlAvailable ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </button>
                         </div>
                       );
                     })()}

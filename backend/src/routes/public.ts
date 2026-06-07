@@ -6,39 +6,39 @@ import prisma from '../lib/prisma.js';
 const router = Router();
 
 /**
- * GET /api/public/portal/:tenantId
- * Retorna dados públicos de um tenant para a página whitelabel.
+ * GET /api/public/agent/:agentId
+ * Retorna dados públicos de um agente para a página whitelabel /w/[agentId].
  * Não requer autenticação.
  */
-router.get('/portal/:tenantId', asyncHandler(async (req: Request, res: Response) => {
-  const { tenantId } = req.params;
+router.get('/agent/:agentId', asyncHandler(async (req: Request, res: Response) => {
+  const { agentId } = req.params;
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { id: tenantId, deletedAt: null },
-    select: {
-      id: true,
-      companyName: true,
-      name: true,
-      domain: true,
-    },
-  });
-
-  if (!tenant) throw new NotFoundError('Portal not found');
-
-  const agents = await prisma.agent.findMany({
-    where: { tenantId, isActive: true, webChatEnabled: true },
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, isActive: true, webChatEnabled: true, whitelabelEnabled: true },
     select: {
       id: true,
       name: true,
       description: true,
+      tenant: {
+        select: {
+          id: true,
+          companyName: true,
+          name: true,
+          domain: true,
+        },
+      },
     },
-    orderBy: { createdAt: 'asc' },
   });
 
+  if (!agent) throw new NotFoundError('Whitelabel page not found');
+
   res.json({
-    companyName: tenant.companyName ?? tenant.name,
-    domain: tenant.domain,
-    agents,
+    agentId: agent.id,
+    agentName: agent.name,
+    agentDescription: agent.description,
+    companyName: agent.tenant.companyName ?? agent.tenant.name,
+    tenantId: agent.tenant.id,
+    domain: agent.tenant.domain,
   });
 }));
 

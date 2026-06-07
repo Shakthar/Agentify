@@ -91,6 +91,7 @@ model Agent {
   whatsappWebhookUrl    String?
   notifyPhone           String?    // Número WA do dono do negócio para notificações de pedidos (ex: 351912345678)
   webChatEnabled        Boolean    @default(true)
+  whitelabelEnabled     Boolean    @default(false) // Página /w/[agentId] pública sem branding Agentfy (addon pago)
   emailEnabled          Boolean    @default(false)
   
   // Skills

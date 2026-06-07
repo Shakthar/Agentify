@@ -20,6 +20,7 @@ export interface Agent {
   maxTokens: number;
   isActive: boolean;
   webChatEnabled: boolean;
+  whitelabelEnabled: boolean;
   whatsappEnabled: boolean;
   whatsappNumber?: string;
   notifyPhone?: string;
