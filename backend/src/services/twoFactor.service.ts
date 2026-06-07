@@ -62,7 +62,10 @@ export async function disableTwoFactor(tenantId: string, code: string): Promise<
   });
 }
 
-/** Verifica o código TOTP durante o login (segundo fator). */
+/** Verifica o código TOTP durante o login (segundo fator). Previne replay na mesma janela. */
+// Anti-replay: cache em memória por janela TOTP (30s). Suficiente para instância única (Railway).
+const _usedCodes = new Map<string, number>(); // key=`tenantId:window:code`, value=timestamp
+
 export async function verifyTwoFactorCode(tenantId: string, code: string): Promise<void> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant?.twoFactorSecret) {
@@ -72,6 +75,20 @@ export async function verifyTwoFactorCode(tenantId: string, code: string): Promi
   const result = await verifyOTP({ token: code, secret: tenant.twoFactorSecret });
   if (!result.valid) {
     throw new UnauthorizedError('Código 2FA inválido ou expirado');
+  }
+
+  // Anti-replay: rejeita o mesmo código na mesma janela de 30s
+  const window = Math.floor(Date.now() / 30000);
+  const cacheKey = `${tenantId}:${window}:${code}`;
+  if (_usedCodes.has(cacheKey)) {
+    throw new UnauthorizedError('Código 2FA já utilizado. Aguarda a próxima janela de 30 segundos.');
+  }
+  _usedCodes.set(cacheKey, Date.now());
+
+  // Limpa entradas com mais de 2 minutos (evita crescimento ilimitado da Map)
+  const cutoff = Date.now() - 120_000;
+  for (const [k, ts] of _usedCodes) {
+    if (ts < cutoff) _usedCodes.delete(k);
   }
 }
 

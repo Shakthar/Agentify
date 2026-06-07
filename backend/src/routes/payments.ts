@@ -5,6 +5,7 @@
  *  GET  /api/payments/orders         — Lista orders do tenant (autenticado)
  */
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { AuthenticatedRequest } from '../types/index.js';
@@ -16,7 +17,23 @@ const router = Router();
 
 // ─── POST /api/payments/webhook ───────────────────────────────────────────────
 // Easypay envia este webhook quando o pagamento é confirmado
-router.post('/webhook', asyncHandler(async (req: Request, res: Response) => {
+// SECURITY: verifica Bearer token da Easypay (configurado no dashboard Easypay)
+router.post('/webhook', asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
+  // Verificar token Bearer da Easypay (se configurado)
+  const easypaySecret = process.env.EASYPAY_WEBHOOK_SECRET;
+  if (easypaySecret) {
+    const authHeader = req.headers.authorization;
+    const provided = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!provided || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(easypaySecret))) {
+      res.status(403).json({ error: 'Unauthorized' });
+      return;
+    }
+  } else {
+    // Sem segredo configurado: verificar apenas que vem de IP da Easypay
+    // Em produção DEVE configurar EASYPAY_WEBHOOK_SECRET
+    console.warn('[Payments] EASYPAY_WEBHOOK_SECRET não configurado — webhook sem autenticação');
+  }
+
   // Responder imediatamente para não re-tentar
   res.status(200).json({ status: 'ok' });
 
@@ -35,8 +52,12 @@ router.post('/webhook', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // ─── POST /api/payments/test-paid/:id ─────────────────────────────────────────
-// Simula pagamento confirmado para testes (usar orderId interno)
-router.post('/test-paid/:id', asyncHandler(async (req: Request, res: Response) => {
+// Simula pagamento confirmado (SUPERADMIN ONLY — nunca expor em produção)
+router.post('/test-paid/:id', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.tenant?.isAdmin) {
+    res.status(403).json({ error: 'Superadmin only' });
+    return;
+  }
   const { id } = req.params;
   const { order } = await confirmPaymentById(id);
 

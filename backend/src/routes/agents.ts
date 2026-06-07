@@ -27,10 +27,17 @@ const createAgentSchema = z.object({
   whatsappNumber: z.string().max(40).optional(),
   whatsappToken: z.string().min(20).max(500).optional(),
   webChatEnabled: z.boolean().optional().default(true),
+  whitelabelEnabled: z.boolean().optional(),
   emailEnabled: z.boolean().optional().default(false),
   offHoursMessage: z.string().max(500).optional(),
   offHourStart: z.string().optional(),
   offHourEnd: z.string().optional(),
+  // Skill toggles directos (usados pelo Skills tab)
+  skillHandoff:        z.boolean().optional(),
+  skillDataCollection: z.boolean().optional(),
+  skillScheduling:     z.boolean().optional(),
+  skillFileUpload:     z.boolean().optional(),
+  skillHumorDetection: z.boolean().optional(),
 });
 
 const updateAgentSchema = createAgentSchema.partial();

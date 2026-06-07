@@ -71,7 +71,7 @@ router.post('/login', authLimiter, asyncHandler(async (req: Request, res: Respon
 }));
 
 // POST /api/auth/refresh
-router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
+router.post('/refresh', authLimiter, asyncHandler(async (req: Request, res: Response) => {
   const result = await authService.refresh(req.body.refreshToken);
   res.json(result);
 }));

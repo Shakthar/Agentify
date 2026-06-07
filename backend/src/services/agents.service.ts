@@ -23,12 +23,19 @@ interface CreateAgentInput {
   skills?: AgentSkills;
   whatsappEnabled?: boolean;
   whatsappNumber?: string;
-  whatsappToken?: string;   // token em claro — será encriptado antes de persistir
+  whatsappToken?: string;
   webChatEnabled?: boolean;
+  whitelabelEnabled?: boolean;
   emailEnabled?: boolean;
   offHoursMessage?: string;
   offHourStart?: string;
   offHourEnd?: string;
+  // Skill toggles directos (Skills tab)
+  skillHandoff?: boolean;
+  skillDataCollection?: boolean;
+  skillScheduling?: boolean;
+  skillFileUpload?: boolean;
+  skillHumorDetection?: boolean;
 }
 
 type UpdateAgentInput = Partial<CreateAgentInput>;
@@ -162,6 +169,30 @@ export async function updateAgent(
 
   if (input.model) {
     assertModelAllowed(tenant.plan, input.model);
+  }
+
+  // SECURITY: plan gate para skills e whitelabel no backend
+  // (o frontend já bloqueia, mas um atacante podia chamar a API directamente)
+  const PLAN_ORDER = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  const planIdx = PLAN_ORDER.indexOf(tenant.plan);
+
+  if ((input.skillScheduling || input.skillFileUpload) && planIdx < PLAN_ORDER.indexOf('starter')) {
+    throw new ForbiddenError('Skill requires Starter plan or higher');
+  }
+  if (input.skillHumorDetection && planIdx < PLAN_ORDER.indexOf('pro')) {
+    throw new ForbiddenError('Skill requires Pro plan or higher');
+  }
+  if (input.skills?.scheduling && planIdx < PLAN_ORDER.indexOf('starter')) {
+    throw new ForbiddenError('Skill requires Starter plan or higher');
+  }
+  if (input.skills?.fileUpload && planIdx < PLAN_ORDER.indexOf('starter')) {
+    throw new ForbiddenError('Skill requires Starter plan or higher');
+  }
+  if (input.skills?.humorDetection && planIdx < PLAN_ORDER.indexOf('pro')) {
+    throw new ForbiddenError('Skill requires Pro plan or higher');
+  }
+  if (input.whitelabelEnabled && planIdx < PLAN_ORDER.indexOf('starter')) {
+    throw new ForbiddenError('Whitelabel requires Starter plan or higher');
   }
 
   const { skills, whatsappToken, ...updateData } = input;
