@@ -42,6 +42,15 @@ router.post('/platform-subscribe', asyncHandler(async (req: AuthenticatedRequest
     res.status(400).json({ error: 'plan e method são obrigatórios' });
     return;
   }
+  // SECURITY: Validar plano contra lista fechada.
+  // Sem esta validação, um nome de plano arbitrário passa por `applyFreeUpgrade`
+  // (price = 0 para planos inexistentes) e seta tenant.plan a um valor inválido,
+  // causando TypeErrors em ALLOWED_MODELS[plan] e corrompendo a conta.
+  const validPlans = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  if (!validPlans.includes(plan)) {
+    res.status(400).json({ error: `Plano inválido. Valores aceites: ${validPlans.join(', ')}` });
+    return;
+  }
   const allowed: PaymentMethod[] = ['stripe', 'ifthenpay_mbway', 'ifthenpay_multibanco', 'manual'];
   if (!allowed.includes(method)) {
     res.status(400).json({ error: 'method inválido' });

@@ -115,7 +115,13 @@ router.get('/whatsapp', (req: Request, res: Response) => {
 
   if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
     console.log('[WhatsApp] Webhook verificado com sucesso');
-    res.status(200).send(challenge);
+    // SECURITY: hub.challenge é controlado pelo chamador. Express define Content-Type:
+    // text/html quando a string começa com '<', permitindo XSS reflectido se alguém
+    // aceder ao URL com um payload malicioso. Forçar text/plain + sanitizar para só
+    // permitir caracteres numéricos (o challenge real do Meta é sempre um número inteiro).
+    const safeChallenge = String(challenge ?? '').replace(/[^0-9]/g, '').slice(0, 32);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.status(200).send(safeChallenge);
   } else {
     res.status(403).send('Forbidden');
   }

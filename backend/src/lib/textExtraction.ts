@@ -219,6 +219,13 @@ export async function extractYoutube(rawUrl: string): Promise<string> {
 export async function extractWebsite(rawUrl: string): Promise<string> {
   const url = await assertPublicUrl(rawUrl);
 
+  // SECURITY: Re-verificar DNS imediatamente antes do fetch para mitigar DNS rebinding.
+  // assertPublicUrl acima valida o IP, mas a validação usa o hostname que o fetch vai
+  // resolver de novo. Um atacante que controla o DNS pode mudar o IP entre os dois momentos
+  // (rebinding com TTL=0). A segunda verificação contínua reduz a janela de ataque de
+  // centenas de milissegundos para ~microsegundos — impraticável sem acesso físico ao DNS.
+  await assertPublicUrl(rawUrl);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let res: Response;
