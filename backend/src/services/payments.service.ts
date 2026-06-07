@@ -173,10 +173,12 @@ async function mockAutoConfirm(orderId: string, agentId: string): Promise<void> 
   if (!agent?.whatsappNumber) return;
 
   const amt = order.amount.toFixed(2).replace('.', ',');
+  const frontendUrl = process.env.FRONTEND_URL ?? '';
+  const statusLink = `${frontendUrl}/order-status/${orderId}`;
   await sendWhatsAppText(
     agent.whatsappNumber,
     order.buyerPhone,
-    `✅ *Pagamento confirmado!*\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amt}\n\nO teu pedido está confirmado e a ser preparado! 🎉`,
+    `✅ *Pagamento confirmado!*\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amt}\n\nAcompanha o estado do teu pedido aqui:\n${statusLink}\n\nObrigado! 🎉`,
     process.env.WHATSAPP_TOKEN,
   ).catch(err => console.warn('[Payments] MOCK notify cliente falhou:', err));
 }

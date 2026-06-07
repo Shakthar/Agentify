@@ -88,7 +88,7 @@ router.get('/orders', authenticate, asyncHandler(async (req: AuthenticatedReques
   const { status, agentId, skip = '0', take = '20' } = req.query as Record<string, string>;
 
   // SECURITY: Validate status against allowed values to prevent unexpected filter injection
-  const ALLOWED_STATUSES = ['pending', 'paid', 'processing', 'done', 'failed', 'expired'];
+  const ALLOWED_STATUSES = ['pending', 'paid', 'processing', 'done', 'sent', 'failed', 'expired'];
   if (status && !ALLOWED_STATUSES.includes(status)) {
     res.status(400).json({ error: `status inválido. Valores aceites: ${ALLOWED_STATUSES.join(', ')}` });
     return;
@@ -123,10 +123,11 @@ router.get('/orders', authenticate, asyncHandler(async (req: AuthenticatedReques
 }));
 
 // ─── PATCH /api/payments/orders/:id/status ────────────────────────────────────
-// Move o estado do pedido na fila KDS: paid → processing → done
+// Move o estado do pedido na fila KDS: paid → processing → done → sent
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   paid:       ['processing'],
-  processing: ['done', 'paid'], // permite regredir
+  processing: ['done', 'paid'],    // permite regredir
+  done:       ['sent'],            // enviado para entrega
 };
 
 router.patch('/orders/:id/status', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -159,6 +160,11 @@ router.patch('/orders/:id/status', authenticate, asyncHandler(async (req: Authen
     data: { status: newStatus },
     select: { id: true, status: true, agentId: true, description: true, amount: true, buyerPhone: true, createdAt: true, paidAt: true },
   });
+
+  // Quando o pedido é marcado como enviado, notificar o cliente por WA
+  if (newStatus === 'sent') {
+    notifySent(updated).catch(err => console.warn('[KDS] notifySent falhou:', err));
+  }
 
   res.json(updated);
 }));
@@ -211,6 +217,33 @@ async function handlePaymentConfirmed(externalId: string): Promise<void> {
   await notifyAfterPayment(order);
 }
 
+async function notifySent(order: {
+  id: string;
+  buyerPhone: string;
+  amount: number;
+  description: string;
+  agentId: string;
+}): Promise<void> {
+  const agent = await prisma.agent.findFirst({
+    where: { id: order.agentId },
+    select: { whatsappNumber: true },
+  });
+  if (!agent?.whatsappNumber) return;
+
+  const token = process.env.WHATSAPP_TOKEN;
+  const frontendUrl = process.env.FRONTEND_URL ?? '';
+  const link = `${frontendUrl}/order-status/${order.id}`;
+  const amountFmt = order.amount.toFixed(2).replace('.', ',');
+
+  await sendWhatsAppText(
+    agent.whatsappNumber,
+    order.buyerPhone,
+    `\ud83d\ude97 *O teu pedido est\u00e1 a caminho!*\n\n\ud83d\udccb ${order.description}\n\ud83d\udcb6 \u20ac${amountFmt}\n\nAcompanha o estado aqui:\n${link}`,
+    token,
+  ).catch(err => console.warn('[KDS] notifySent WA falhou:', err));
+  console.log(`[KDS] Notifica\u00e7\u00e3o enviado enviada para ${order.buyerPhone}`);
+}
+
 async function notifyAfterPayment(order: {
   id: string;
   buyerPhone: string;
@@ -236,9 +269,11 @@ async function notifyAfterPayment(order: {
   const amountFmt = order.amount.toFixed(2).replace('.', ',');
 
   // Notifica apenas o CLIENTE — o dono acompanha pelo KDS / painel de pedidos
-  const clientMsg = `✅ *Pagamento confirmado!*\n\n📋 Pedido: ${order.description}\n💶 Valor: €${amountFmt}\n\nO seu pedido está confirmado e a ser processado. 🎉`;
+  const frontendUrl = process.env.FRONTEND_URL ?? '';
+  const statusLink = `${frontendUrl}/order-status/${order.id}`;
+  const clientMsg = `\u2705 *Pagamento confirmado!*\n\n\ud83d\udccb Pedido: ${order.description}\n\ud83d\udcb6 Valor: \u20ac${amountFmt}\n\nAcompanha o estado do teu pedido aqui:\n${statusLink}\n\nObrigado! \ud83c\udf89`;
   await sendWhatsAppText(phoneId, order.buyerPhone, clientMsg, token);
-  console.log(`[Payments] Confirmação enviada ao cliente ${order.buyerPhone}`);
+  console.log(`[Payments] Confirma\u00e7\u00e3o enviada ao cliente ${order.buyerPhone}`);
 }
 
 export default router;

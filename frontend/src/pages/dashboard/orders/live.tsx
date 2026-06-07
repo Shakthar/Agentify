@@ -20,7 +20,7 @@ interface Order {
   buyerPhone: string;
   amount: number;
   description: string;
-  status: 'pending' | 'paid' | 'processing' | 'done' | 'failed' | 'expired';
+  status: 'pending' | 'paid' | 'processing' | 'done' | 'sent' | 'failed' | 'expired';
   createdAt: string;
   paidAt: string | null;
 }
@@ -30,10 +30,11 @@ const STATUS_COLUMNS = [
   { key: 'paid',       label: '🔔 Novo',          badge: 'bg-orange-500 text-white'  },
   { key: 'processing', label: '⚙ Em Preparação', badge: 'bg-blue-500 text-white'    },
   { key: 'done',       label: '✅ Pronto',         badge: 'bg-green-500 text-white'   },
+  { key: 'sent',       label: '🚗 Enviado',       badge: 'bg-purple-500 text-white'  },
 ] as const;
 
-const NEXT_STATUS: Partial<Record<string, string>> = { paid: 'processing', processing: 'done' };
-const NEXT_LABEL:  Partial<Record<string, string>> = { paid: 'Iniciar preparo →', processing: 'Marcar pronto ✓' };
+const NEXT_STATUS: Partial<Record<string, string>> = { paid: 'processing', processing: 'done', done: 'sent' };
+const NEXT_LABEL:  Partial<Record<string, string>> = { paid: 'Iniciar preparo →', processing: 'Marcar pronto ✓', done: 'Marcar enviado 🚗' };
 
 // ─── Web Audio beep (no external files) ──────────────────────────────────────
 function playBeep(freq = 880, duration = 0.3, delay = 0) {
@@ -208,15 +209,16 @@ export default function OrdersLivePage() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const [pendingRes, paidRes, processingRes, doneRes] = await Promise.all([
+      const [pendingRes, paidRes, processingRes, doneRes, sentRes] = await Promise.all([
         api.get('/api/payments/orders?status=pending&take=20'),
         api.get('/api/payments/orders?status=paid&take=50'),
         api.get('/api/payments/orders?status=processing&take=50'),
         api.get('/api/payments/orders?status=done&take=20'),
+        api.get('/api/payments/orders?status=sent&take=20'),
       ]);
 
       const paidOrders = paidRes.data.orders as Order[];
-      const all: Order[] = [...pendingRes.data.orders, ...paidOrders, ...processingRes.data.orders, ...doneRes.data.orders];
+      const all: Order[] = [...pendingRes.data.orders, ...paidOrders, ...processingRes.data.orders, ...doneRes.data.orders, ...sentRes.data.orders];
       all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       // Detect new paid orders and play sound
@@ -315,10 +317,10 @@ export default function OrdersLivePage() {
       )}
 
       {!loading && (
-        <div className={`grid grid-cols-3 gap-0 ${fullscreen ? 'h-[calc(100vh-53px)]' : 'min-h-[calc(100vh-53px)]'}`}>
+        <div className={`grid grid-cols-5 gap-0 ${fullscreen ? 'h-[calc(100vh-53px)]' : 'min-h-[calc(100vh-53px)]'}`}>
           {STATUS_COLUMNS.map(col => {
             const colOrders = filteredOrders.filter(o => o.status === col.key);
-            const isDone = col.key === 'done';
+            const isDone = col.key === 'done' || col.key === 'sent';
 
             return (
               <div key={col.key} className="flex flex-col border-r border-gray-700 last:border-r-0">
@@ -348,7 +350,9 @@ export default function OrdersLivePage() {
                         key={order.id}
                         className={`rounded-xl border-2 p-3 space-y-2 transition-all shadow-sm ${
                           isDone
-                            ? 'border-green-700 bg-gray-800/60 opacity-80'
+                            ? col.key === 'sent'
+                              ? 'border-purple-700 bg-gray-800/60 opacity-80'
+                              : 'border-green-700 bg-gray-800/60 opacity-80'
                             : `${colors!.border} bg-gray-800 ${colors!.pulse ? 'shadow-lg' : ''}`
                         }`}
                       >
@@ -356,8 +360,9 @@ export default function OrdersLivePage() {
                         <div className="flex items-start justify-between gap-2">
                           <span className={`text-xl font-extrabold ${
                             col.key === 'paid'       ? 'text-orange-400' :
-                            col.key === 'processing' ? 'text-blue-400'   : 'text-green-400'
-                          }`}>€{order.amount.toFixed(2)}</span>
+                            col.key === 'processing' ? 'text-blue-400'   :
+                            col.key === 'sent'       ? 'text-purple-400' : 'text-green-400'
+                          }`}>\u20ac{order.amount.toFixed(2)}</span>
 
                           {/* SLA indicator (not on done column) */}
                           {!isDone && colors && (
@@ -370,7 +375,6 @@ export default function OrdersLivePage() {
                           )}
                           {isDone && <span className="text-xs text-gray-500">{timeAgo(refTime)}</span>}
                         </div>
-
                         {/* Description */}
                         <p className="text-sm font-medium text-gray-200 leading-tight">{order.description}</p>
 
@@ -389,9 +393,9 @@ export default function OrdersLivePage() {
                             onClick={() => advanceStatus(order)}
                             disabled={isAdv}
                             className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                              col.key === 'paid'
-                                ? 'bg-orange-500 hover:bg-orange-400 text-white'
-                                : 'bg-blue-500 hover:bg-blue-400 text-white'
+                              col.key === 'paid'       ? 'bg-orange-500 hover:bg-orange-400 text-white' :
+                              col.key === 'done'       ? 'bg-purple-600 hover:bg-purple-500 text-white' :
+                                                        'bg-blue-500 hover:bg-blue-400 text-white'
                             }`}
                           >
                             {isAdv ? '⏳ A atualizar...' : nextLabel}

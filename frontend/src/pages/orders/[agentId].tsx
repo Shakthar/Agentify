@@ -14,7 +14,7 @@ interface PublicOrder {
   id: string;
   description: string;
   amount: number;
-  status: 'paid' | 'processing' | 'done';
+  status: 'paid' | 'processing' | 'done' | 'sent';
   createdAt: string;
   paidAt: string | null;
 }
@@ -31,8 +31,7 @@ interface AgentInfo {
 const STATUS_COLS = [
   { key: 'paid',       label: '🔔 Novos',         bg: 'bg-orange-950/80', border: 'border-orange-500', badge: 'bg-orange-500 text-white' },
   { key: 'processing', label: '⚙ Em Preparação',  bg: 'bg-blue-950/80',   border: 'border-blue-500',   badge: 'bg-blue-500 text-white'   },
-  { key: 'done',       label: '✅ Prontos',         bg: 'bg-green-950/80',  border: 'border-green-600',  badge: 'bg-green-600 text-white'  },
-] as const;
+  { key: 'done',       label: '✅ Prontos',         bg: 'bg-green-950/80',  border: 'border-green-600',  badge: 'bg-green-600 text-white'  },  { key: 'sent',       label: '\ud83d\ude97 Enviados',       bg: 'bg-purple-950/80', border: 'border-purple-600', badge: 'bg-purple-600 text-white' },] as const;
 
 function elapsedMin(iso: string): number {
   return (Date.now() - new Date(iso).getTime()) / 60000;
