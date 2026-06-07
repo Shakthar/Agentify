@@ -260,10 +260,15 @@ export default function AgentDetailPage() {
               { key: 'skillHumorDetection', label: 'Deteção de humor',         icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'pro', field: 'skillHumorDetection', addonPrice: '€9/mês' },
             ];
 
-            const MB_WAY_COST: Record<string, string | null> = {
-              free: null, starter: '25 crd/transação', pro: '15 crd/transação', business: 'Incluído', enterprise: 'Incluído',
+            const MB_WAY_INFO: Record<string, { monthly: string | null; credits: string | null }> = {
+              free:       { monthly: null,       credits: null },
+              starter:    { monthly: '+€25/mês',  credits: '50 crd/transação' },
+              pro:        { monthly: '+€15/mês',  credits: '35 crd/transação' },
+              business:   { monthly: '+€5/mês',   credits: '20 crd/transação' },
+              enterprise: { monthly: 'Incluído',  credits: '10 crd/transação' },
             };
-            const mbwayCost = MB_WAY_COST[plan] ?? null;
+            const mbwayInfo = MB_WAY_INFO[plan] ?? MB_WAY_INFO.free;
+            const mbwayCost = mbwayInfo.monthly;
 
             const handleToggleSkill = async (field: string, current: boolean) => {
               setSkillsSaving(true); setSkillsMsg('');
@@ -344,11 +349,21 @@ export default function AgentDetailPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Cobrança MB Way</span>
                           {mbwayCost === null && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
-                          {mbwayCost && mbwayCost !== 'Incluído' && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">{mbwayCost} (pay-per-use)</span>}
-                          {mbwayCost === 'Incluído' && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
+                          {mbwayCost && mbwayCost !== 'Incluído' && (
+                            <>
+                              <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">{mbwayCost}</span>
+                              {mbwayInfo.credits && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">{mbwayInfo.credits}</span>}
+                            </>
+                          )}
+                          {mbwayCost === 'Incluído' && (
+                            <>
+                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Incluído</span>
+                              {mbwayInfo.credits && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">{mbwayInfo.credits}</span>}
+                            </>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          Inicia cobranças MB Way diretamente na conversa. Créditos debitados por transação — só pagas o que usas.
+                          Cobra via MB Way (e PIX em breve) diretamente na conversa. Mensalidade + créditos por transação.
                         </p>
                       </div>
                     </div>
