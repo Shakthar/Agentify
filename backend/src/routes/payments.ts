@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { webhookLimiter } from '../middleware/rateLimit.js';
+import { webhookLimiter, publicApiLimiter } from '../middleware/rateLimit.js';
 import { confirmPayment, confirmPaymentById } from '../services/payments.service.js';
 import { sendWhatsAppText } from '../lib/whatsapp.js';
 import prisma from '../lib/prisma.js';
@@ -165,8 +165,14 @@ router.patch('/orders/:id/status', authenticate, asyncHandler(async (req: Authen
 
 // ─── GET /api/payments/orders/public/:orderId ─────────────────────────────────
 // Pública (sem auth): cliente acompanha o estado do seu pedido via link
-router.get('/orders/public/:orderId', asyncHandler(async (req: Request, res: Response) => {
+router.get('/orders/public/:orderId', publicApiLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { orderId } = req.params;
+
+  // Validate cuid format to prevent order enumeration
+  if (!orderId || !/^c[a-z0-9]{20,32}$/.test(orderId)) {
+    res.status(404).json({ error: 'Pedido não encontrado' });
+    return;
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },

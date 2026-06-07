@@ -73,6 +73,16 @@ export async function createConversation(tenantId: string, input: CreateConversa
     throw new BadRequestError('agentId is required');
   }
 
+  // SECURITY: Enforce channelType allowlist — prevents arbitrary strings from
+  // being stored in the DB and potentially being reflected unsanitized downstream.
+  const ALLOWED_CHANNEL_TYPES = ['web', 'whatsapp', 'email', 'api'];
+  const channelType = input.channelType && ALLOWED_CHANNEL_TYPES.includes(input.channelType)
+    ? input.channelType
+    : 'web';
+
+  // SECURITY: Cap externalId to prevent oversized strings being stored in DB
+  const externalId = input.externalId ? input.externalId.slice(0, 200) : undefined;
+
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, tenantId, isActive: true },
   });
@@ -84,14 +94,14 @@ export async function createConversation(tenantId: string, input: CreateConversa
     data: {
       tenantId,
       agentId: input.agentId,
-      channelType: input.channelType ?? 'web',
+      channelType,
       visitorId: input.visitorId,
-      externalId: input.externalId,
+      externalId,
       modelUsed: agent.model,
     },
   });
 
-  writeAuditLog(tenantId, 'conversation_created', 'conversation', conversation.id, { agentId: input.agentId, channel: input.channelType });
+  writeAuditLog(tenantId, 'conversation_created', 'conversation', conversation.id, { agentId: input.agentId, channel: channelType });
   return conversation;
 }
 

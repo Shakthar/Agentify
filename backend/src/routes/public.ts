@@ -11,8 +11,13 @@ const router = Router();
  * Retorna dados públicos de um agente para a página whitelabel /w/[agentId].
  * Não requer autenticação.
  */
-router.get('/agent/:agentId', asyncHandler(async (req: Request, res: Response) => {
+router.get('/agent/:agentId', publicApiLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { agentId } = req.params;
+
+  // Validate cuid format to prevent enumeration probing
+  if (!agentId || !/^c[a-z0-9]{20,32}$/.test(agentId)) {
+    throw new BadRequestError('Invalid agent id');
+  }
 
   const agent = await prisma.agent.findFirst({
     where: { id: agentId, isActive: true, webChatEnabled: true, whitelabelEnabled: true },
