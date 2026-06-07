@@ -8,6 +8,17 @@ export interface Tenant {
   creditsUsed: number;
   createdAt: string;
   isAdmin?: boolean;
+  // Profile / billing
+  phone?: string;
+  vatNumber?: string;
+  addressLine1?: string;
+  addressCity?: string;
+  addressCountry?: string;
+  addressZip?: string;
+  // White-label
+  brandColor?: string;
+  logoUrl?: string;
+  domain?: string;
 }
 
 export interface Agent {
@@ -146,6 +157,7 @@ export interface CreateAgentInput {
   whatsappNumber?: string;
   notifyPhone?: string;
   webChatEnabled?: boolean;
+  whitelabelEnabled?: boolean;
   emailEnabled?: boolean;
   offHoursMessage?: string;
   offHourStart?: string;

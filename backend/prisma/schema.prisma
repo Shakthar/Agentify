@@ -46,6 +46,10 @@ model Tenant {
   addressCountry    String?
   addressZip        String?
 
+  // White-label branding
+  brandColor        String?  // hex, ex: #3b57f0
+  logoUrl           String?  // URL pública do logotipo
+
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
   deletedAt             DateTime?

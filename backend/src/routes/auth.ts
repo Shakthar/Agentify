@@ -30,6 +30,9 @@ const profileSchema = z.object({
   addressCity:  z.string().max(100).optional(),
   addressCountry: z.string().max(100).optional(),
   addressZip:   z.string().max(20).optional(),
+  brandColor:   z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  logoUrl:      z.string().url().max(500).optional().or(z.literal('')),
+  domain:       z.string().max(200).optional().or(z.literal('')),
 });
 
 const changePasswordSchema = z.object({

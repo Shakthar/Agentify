@@ -10,6 +10,8 @@ interface AgentPublicData {
   agentDescription?: string;
   companyName: string;
   tenantId: string;
+  brandColor: string;
+  logoUrl: string | null;
 }
 
 export default function WhitelabelAgentPage() {
@@ -55,13 +57,21 @@ export default function WhitelabelAgentPage() {
       </Head>
       <div className="min-h-screen flex flex-col bg-gray-50">
         {/* Branded header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="bg-white border-b border-gray-200 px-6 py-4" style={{ borderBottomColor: data.brandColor }}>
           <div className="max-w-2xl mx-auto flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-              <span className="text-white text-sm font-bold">
-                {data.companyName.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {data.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={data.logoUrl} alt={data.companyName} className="h-8 object-contain" />
+            ) : (
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: data.brandColor }}
+              >
+                <span className="text-white text-sm font-bold">
+                  {data.companyName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div>
               <p className="text-xs text-gray-500 leading-tight">{data.companyName}</p>
               <h1 className="text-sm font-semibold text-gray-900 leading-tight">{data.agentName}</h1>

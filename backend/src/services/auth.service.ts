@@ -185,6 +185,7 @@ export async function getProfile(tenantId: string) {
       stripeCustomerId: true, monthlyRecurringRevenue: true,
       phone: true, vatNumber: true,
       addressLine1: true, addressCity: true, addressCountry: true, addressZip: true,
+      brandColor: true, logoUrl: true, domain: true,
       createdAt: true, isAdmin: true,
     },
   });
@@ -199,6 +200,9 @@ export async function updateProfile(tenantId: string, data: {
   addressCity?: string;
   addressCountry?: string;
   addressZip?: string;
+  brandColor?: string;
+  logoUrl?: string;
+  domain?: string;
 }) {
   const updated = await prisma.tenant.update({
     where: { id: tenantId },
@@ -208,6 +212,7 @@ export async function updateProfile(tenantId: string, data: {
       plan: true, creditsTotal: true, creditsUsed: true,
       phone: true, vatNumber: true,
       addressLine1: true, addressCity: true, addressCountry: true, addressZip: true,
+      brandColor: true, logoUrl: true, domain: true,
       createdAt: true, isAdmin: true,
     },
   });

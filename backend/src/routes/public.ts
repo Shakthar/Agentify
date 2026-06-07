@@ -25,6 +25,8 @@ router.get('/agent/:agentId', asyncHandler(async (req: Request, res: Response) =
           companyName: true,
           name: true,
           domain: true,
+          brandColor: true,
+          logoUrl: true,
         },
       },
     },
@@ -39,6 +41,8 @@ router.get('/agent/:agentId', asyncHandler(async (req: Request, res: Response) =
     companyName: agent.tenant.companyName ?? agent.tenant.name,
     tenantId: agent.tenant.id,
     domain: agent.tenant.domain,
+    brandColor: agent.tenant.brandColor ?? '#3b57f0',
+    logoUrl: agent.tenant.logoUrl ?? null,
   });
 }));
 
