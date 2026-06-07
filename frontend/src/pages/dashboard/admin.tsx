@@ -8,6 +8,18 @@ import { ROUTES } from '../../utils/constants';
 import { AuditLogEntry } from '../../types';
 import api from '../../utils/api';
 
+// ─── PricingConfig (mirrors backend) ─────────────────────────────────────────
+interface PricingConfig {
+  plans: { free: PC; starter: PC; pro: PC; business: PC; enterprise: PC };
+  skillAddons: { scheduling: number; fileUpload: number; humorDetection: number };
+  payments: {
+    monthlyFee:  { free: null; starter: number; pro: number; business: number; enterprise: number | null };
+    creditsPerTx: { free: null; starter: number; pro: number; business: number; enterprise: number };
+  };
+  whitelabel: { starterPerAgent: number; proPerAgent: number };
+}
+interface PC { price: number; credits: number; agents: number }
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PlatformMetrics {
   tenants: { total: number; byPlan: Record<string, number> };
@@ -113,7 +125,7 @@ export default function AdminPage() {
   const { tenant } = useAuth();
   const { auditLogs, auditTotal, loading: auditLoading, fetchAuditLogs } = useAdmin();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'balance' | 'logs'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'balance' | 'pricing' | 'logs'>('dashboard');
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -122,6 +134,11 @@ export default function AdminPage() {
 
   const [expForm, setExpForm] = useState({ category: 'hosting', description: '', amount: '', recurring: true, period: 'monthly' });
   const [expSaving, setExpSaving] = useState(false);
+
+  // Pricing config state
+  const [pricing, setPricing] = useState<PricingConfig | null>(null);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingMsg, setPricingMsg] = useState('');
 
   const isAdmin = tenant?.isAdmin;
 
@@ -163,10 +180,41 @@ export default function AdminPage() {
   const handleAuditPrev = () => { const n = Math.max(0, skip - PAGE_SIZE); setSkip(n); fetchAuditLogs(n, PAGE_SIZE); };
   const handleAuditNext = () => { const n = skip + PAGE_SIZE; setSkip(n); fetchAuditLogs(n, PAGE_SIZE); };
 
+  async function loadPricing() {
+    try { const r = await api.get('/api/superadmin/config'); setPricing(r.data); } catch { /* ignore */ }
+  }
+
+  async function savePricing() {
+    if (!pricing) return;
+    setPricingSaving(true); setPricingMsg('');
+    try {
+      const r = await api.patch('/api/superadmin/config', pricing);
+      setPricing(r.data);
+      setPricingMsg('Guardado com sucesso!');
+      setTimeout(() => setPricingMsg(''), 3000);
+    } catch { setPricingMsg('Erro ao guardar.'); }
+    finally { setPricingSaving(false); }
+  }
+
+  function pNum(path: string[], val: string) {
+    const v = parseFloat(val);
+    if (isNaN(v)) return;
+    setPricing((prev) => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev)) as PricingConfig;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let obj: any = next;
+      for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+      obj[path[path.length - 1]] = v;
+      return next;
+    });
+  }
+
   const tabList = [
     { key: 'dashboard', label: '📊 Dashboard' },
     { key: 'tenants',   label: '🏢 Contas' },
     { key: 'balance',   label: '💰 Balanço' },
+    { key: 'pricing',   label: '🏷️ Preços' },
     { key: 'logs',      label: '📋 Auditoria' },
   ] as { key: typeof activeTab; label: string }[];
 
@@ -191,7 +239,11 @@ export default function AdminPage() {
 
           <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1">
             {tabList.map((t) => (
-              <button key={t.key} onClick={() => { setActiveTab(t.key); if (t.key === 'logs') fetchAuditLogs(0, PAGE_SIZE); }}
+              <button key={t.key} onClick={() => {
+                setActiveTab(t.key);
+                if (t.key === 'logs') fetchAuditLogs(0, PAGE_SIZE);
+                if (t.key === 'pricing' && !pricing) loadPricing();
+              }}
                 className={`px-4 pb-2 text-sm font-medium transition-colors ${
                   activeTab === t.key ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                 }`}>
@@ -470,6 +522,150 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ─── Preços ─── */}
+          {activeTab === 'pricing' && (
+            <div className="space-y-6">
+              {!pricing && <div className="text-center py-10 text-gray-400 text-sm">A carregar configuração...</div>}
+              {pricing && (
+                <>
+                  {pricingMsg && (
+                    <div className={`text-sm px-4 py-2 rounded-lg ${pricingMsg.includes('Erro') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                      {pricingMsg}
+                    </div>
+                  )}
+
+                  {/* Planos */}
+                  <div className="card">
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">📦 Planos — preço, créditos e agentes</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[500px]">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-700">
+                            <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Preço (€/mês)</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Créditos/mês</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Agentes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(['free','starter','pro','business','enterprise'] as const).map((plan) => (
+                            <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
+                              <td className="py-2 pr-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
+                              </td>
+                              <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input text-xs w-24"
+                                value={pricing.plans[plan].price}
+                                onChange={(e) => pNum(['plans', plan, 'price'], e.target.value)} /></td>
+                              <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input text-xs w-28"
+                                value={pricing.plans[plan].credits}
+                                onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)} /></td>
+                              <td className="py-2"><input type="number" min="1" step="1" className="input text-xs w-20"
+                                value={pricing.plans[plan].agents}
+                                onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Skill addons */}
+                  <div className="card">
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">⚡ Skills — preço addon (€/mês)</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {([
+                        ['scheduling',     '📅 Agendamento',     'Addon para plano Free'],
+                        ['fileUpload',      '📁 Upload ficheiros', 'Addon para plano Free'],
+                        ['humorDetection',  '😊 Deteção humor',   'Addon para Free + Starter'],
+                      ] as [keyof typeof pricing.skillAddons, string, string][]).map(([key, label, note]) => (
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+                          <p className="text-[10px] text-gray-400 mb-2">{note}</p>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">€</span>
+                            <input type="number" min="0" step="1" className="input text-xs w-20"
+                              value={pricing.skillAddons[key]}
+                              onChange={(e) => pNum(['skillAddons', key], e.target.value)} />
+                            <span className="text-xs text-gray-500">/mês</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payments skill */}
+                  <div className="card">
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">💳 Skill Pagamentos — mensalidade + créditos/transação</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[450px]">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-700">
+                            <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Mensalidade (€/mês)</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Créditos por transação</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(['starter','pro','business','enterprise'] as const).map((plan) => (
+                            <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
+                              <td className="py-2 pr-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
+                              </td>
+                              <td className="py-2 pr-3">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-gray-500">€</span>
+                                  <input type="number" min="0" step="1" className="input text-xs w-20"
+                                    value={pricing.payments.monthlyFee[plan] ?? 0}
+                                    onChange={(e) => pNum(['payments', 'monthlyFee', plan], e.target.value)} />
+                                  <span className="text-xs text-gray-400">{plan === 'enterprise' ? '(0 = incluído)' : ''}</span>
+                                </div>
+                              </td>
+                              <td className="py-2">
+                                <input type="number" min="0" step="1" className="input text-xs w-20"
+                                  value={pricing.payments.creditsPerTx[plan] ?? 0}
+                                  onChange={(e) => pNum(['payments', 'creditsPerTx', plan], e.target.value)} />
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-b border-gray-50 dark:border-gray-700/50">
+                            <td className="py-2 pr-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS.free}`}>Free</span></td>
+                            <td className="py-2 text-xs text-gray-400 italic" colSpan={2}>Bloqueado (sem acesso)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Whitelabel */}
+                  <div className="card">
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">🎨 White-label — addon por agente (€/agente/mês)</h3>
+                    <div className="grid grid-cols-2 gap-4 max-w-xs">
+                      {([['starterPerAgent','Starter'],['proPerAgent','Pro']] as [keyof typeof pricing.whitelabel, string][]).map(([key, label]) => (
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">€</span>
+                            <input type="number" min="0" step="1" className="input text-xs w-20"
+                              value={pricing.whitelabel[key]}
+                              onChange={(e) => pNum(['whitelabel', key], e.target.value)} />
+                            <span className="text-xs text-gray-500">/agente/mês</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-3">Business+ e Enterprise: incluído no plano (sem addon)</p>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button onClick={savePricing} disabled={pricingSaving} className="btn-primary">
+                      {pricingSaving ? 'A guardar...' : '💾 Guardar alterações'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

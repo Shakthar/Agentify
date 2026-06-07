@@ -103,6 +103,47 @@ router.get('/orders', authenticate, asyncHandler(async (req: AuthenticatedReques
   res.json({ orders, total });
 }));
 
+// ─── PATCH /api/payments/orders/:id/status ────────────────────────────────────
+// Move o estado do pedido na fila KDS: paid → processing → done
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  paid:       ['processing'],
+  processing: ['done', 'paid'], // permite regredir
+};
+
+router.patch('/orders/:id/status', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { status: newStatus } = req.body as { status: string };
+
+  if (!newStatus) {
+    res.status(400).json({ error: 'status é obrigatório' });
+    return;
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { id, tenantId: req.tenant!.id },
+    select: { id: true, status: true, agentId: true },
+  });
+
+  if (!order) {
+    res.status(404).json({ error: 'Pedido não encontrado' });
+    return;
+  }
+
+  const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
+  if (!allowed.includes(newStatus)) {
+    res.status(400).json({ error: `Transição inválida: ${order.status} → ${newStatus}` });
+    return;
+  }
+
+  const updated = await prisma.order.update({
+    where: { id },
+    data: { status: newStatus },
+    select: { id: true, status: true, agentId: true, description: true, amount: true, buyerPhone: true, createdAt: true, paidAt: true },
+  });
+
+  res.json(updated);
+}));
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function handlePaymentConfirmed(externalId: string): Promise<void> {

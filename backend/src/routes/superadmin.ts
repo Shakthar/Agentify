@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { ForbiddenError } from '../lib/errors.js';
 import * as superadminService from '../services/superadmin.service.js';
+import { getConfig, saveConfig } from '../lib/platformConfig.js';
 
 const router = Router();
 router.use(authenticate);
@@ -58,6 +59,19 @@ router.post('/expenses', asyncHandler(async (req: AuthenticatedRequest, res: Res
 router.delete('/expenses/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   await superadminService.deleteExpense(req.params.id);
   res.json({ ok: true });
+}));
+
+// ─── Pricing config ───────────────────────────────────────────────────────────
+
+// GET /api/superadmin/config
+router.get('/config', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
+  res.json(getConfig());
+}));
+
+// PATCH /api/superadmin/config
+router.patch('/config', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const updated = await saveConfig(req.body);
+  res.json(updated);
 }));
 
 export default router;

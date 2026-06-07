@@ -24,6 +24,7 @@ import publicRouter from './routes/public.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
 import { startIngestionWorker, stopIngestionWorker } from './workers/ingestion.worker.js';
 import { closeQueue } from './lib/queue.js';
+import { loadConfigFromDB } from './lib/platformConfig.js';
 
 // Falha rápido se a configuração de ambiente for insegura
 validateEnv();
@@ -121,10 +122,12 @@ app.use('/api/webhooks', webhooksRouter);
 app.use(errorHandler);
 
 // Start server
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 Socket.io ready for real-time chat`);
+  // Carrega config de preços dinâmica da DB
+  await loadConfigFromDB();
   // Inicia o worker de ingestão da base de conhecimento (se Redis disponível)
   startIngestionWorker();
 });

@@ -372,3 +372,10 @@ model Order {
   @@index([externalId])
   @@index([status])
 }
+
+// ===== PLATFORM CONFIG (pricing & feature flags — editable by superadmin) =====
+model PlatformConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
