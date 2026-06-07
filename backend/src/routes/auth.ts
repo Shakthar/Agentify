@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
-import { authLimiter, loginLimiter } from '../middleware/rateLimit.js';
+import { authLimiter, loginLimiter, signupLimiter } from '../middleware/rateLimit.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { BadRequestError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
@@ -51,7 +51,7 @@ const changePasswordSchema = z.object({
 });
 
 // POST /api/auth/signup
-router.post('/signup', authLimiter, asyncHandler(async (req: Request, res: Response) => {
+router.post('/signup', authLimiter, signupLimiter, asyncHandler(async (req: Request, res: Response) => {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new BadRequestError('Validation failed', parsed.error.flatten());

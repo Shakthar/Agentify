@@ -51,6 +51,12 @@ export async function createMbwayCharge(params: MbwayChargeParams): Promise<Mbwa
   const apiKey    = process.env.EASYPAY_API_KEY;
   const isMock    = !accountId || !apiKey;
 
+  // SECURITY: Em produção, recusar cobranças se o gateway não estiver configurado.
+  // Nunca criar orders "gratuitas" por esquecimento de env vars em produção.
+  if (isMock && process.env.NODE_ENV === 'production') {
+    throw new Error('Gateway de pagamento não configurado. Define EASYPAY_ACCOUNT_ID e EASYPAY_API_KEY.');
+  }
+
   let externalId: string | null = null;
 
   if (!isMock) {

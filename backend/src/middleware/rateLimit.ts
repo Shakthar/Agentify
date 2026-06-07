@@ -38,6 +38,17 @@ export const chatLimiter = rateLimit({
   message: { error: 'Too many messages, slow down' },
 });
 
+// Rate limiter específico para signup: 3 registos por IP por 24h
+// Mitiga criação em massa de contas para acumular créditos gratuitos.
+export const signupLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 horas
+  max: 5,
+  skipSuccessfulRequests: false,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many registrations from this IP, please try again tomorrow' },
+});
+
 // Rate limiter para webhooks externos (Easypay, Meta, etc.)
 // Limita rajadas de webhooks forjados enquanto permite volume legítimo de produção.
 // Meta envia ~1 mensagem por utilizador por segundo em pico; 200/min por IP é generoso.

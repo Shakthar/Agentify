@@ -251,8 +251,14 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
 
   let docAttachment: { id: string; name: string; url: string } | null = null;
   if (docId) {
-    const doc = await prisma.agentDoc.findUnique({ where: { id: docId }, select: { id: true, name: true, fileUrl: true } });
+    // SECURITY: verificar que o documento pertence ao agente desta conversa
+    // (evita IDOR — LLM pode ser manipulado a emitir IDs de docs de outros tenants)
+    const doc = await prisma.agentDoc.findFirst({
+      where: { id: docId, agentId: conversation.agentId },
+      select: { id: true, name: true, fileUrl: true },
+    });
     if (doc) docAttachment = { id: doc.id, name: doc.name, url: doc.fileUrl };
+    else if (docId) console.warn(`[Security] SEND_DOC bloqueado: docId=${docId} não pertence ao agente ${conversation.agentId}`);
   }
 
   // Processa cobrança MB Way se o agente a disparou e o plano permite

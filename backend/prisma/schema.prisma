@@ -37,8 +37,11 @@ model Tenant {
   subscriptionExpiresAt DateTime?                     // end of current paid period
   
   // Two-Factor Authentication (TOTP)
-  twoFactorSecret   String?
-  twoFactorEnabled  Boolean  @default(false)
+  twoFactorSecret       String?
+  twoFactorEnabled      Boolean  @default(false)
+  // Anti-replay: último código TOTP usado (formato "window:code").
+  // Persiste em DB para sobreviver a restarts do servidor e a deployments multi-instância.
+  twoFactorLastCode     String?
 
   // Platform admin
   isAdmin           Boolean  @default(false)
