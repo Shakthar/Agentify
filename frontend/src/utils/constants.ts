@@ -8,9 +8,13 @@ export const ROUTES = {
   agents: '/dashboard/agents',
   createAgent: '/dashboard/create',
   agentDetail: (id: string) => `/dashboard/${id}`,
+  credits: '/dashboard/credits',
+  plans: '/dashboard/plans',
   billing: '/dashboard/billing',
   admin: '/dashboard/admin',
   settings: '/dashboard/settings',
+  profile: '/dashboard/profile',
+  portal: (tenantId: string) => `/w/${tenantId}`,
 } as const;
 
 export const CREDIT_ALERT_THRESHOLDS = [70, 80, 90] as const;

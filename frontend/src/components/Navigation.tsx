@@ -9,8 +9,10 @@ import Logo from './Logo';
 const navItems = [
   { href: ROUTES.dashboard, label: 'Dashboard', icon: '◈' },
   { href: ROUTES.agents, label: 'Agentes', icon: '🤖' },
-  { href: ROUTES.billing, label: 'Créditos', icon: '💳' },
+  { href: ROUTES.credits, label: 'Créditos', icon: '💳' },
+  { href: ROUTES.plans, label: 'Planos', icon: '🚀' },
   { href: ROUTES.admin, label: 'Admin', icon: '🛡️' },
+  { href: ROUTES.profile, label: 'Perfil', icon: '👤' },
   { href: ROUTES.settings, label: 'Definições', icon: '⚙️' },
 ];
 

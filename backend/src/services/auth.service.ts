@@ -183,9 +183,55 @@ export async function getProfile(tenantId: string) {
       id: true, email: true, name: true, companyName: true,
       plan: true, creditsTotal: true, creditsUsed: true,
       stripeCustomerId: true, monthlyRecurringRevenue: true,
+      phone: true, vatNumber: true,
+      addressLine1: true, addressCity: true, addressCountry: true, addressZip: true,
       createdAt: true, isAdmin: true,
     },
   });
+}
+
+export async function updateProfile(tenantId: string, data: {
+  name?: string;
+  companyName?: string;
+  phone?: string;
+  vatNumber?: string;
+  addressLine1?: string;
+  addressCity?: string;
+  addressCountry?: string;
+  addressZip?: string;
+}) {
+  const updated = await prisma.tenant.update({
+    where: { id: tenantId },
+    data,
+    select: {
+      id: true, email: true, name: true, companyName: true,
+      plan: true, creditsTotal: true, creditsUsed: true,
+      phone: true, vatNumber: true,
+      addressLine1: true, addressCity: true, addressCountry: true, addressZip: true,
+      createdAt: true, isAdmin: true,
+    },
+  });
+  writeAuditLog(tenantId, 'profile_updated', 'tenant', tenantId);
+  return updated;
+}
+
+export async function changePassword(tenantId: string, currentPassword: string, newPassword: string) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) throw new UnauthorizedError('Tenant not found');
+
+  const valid = await comparePassword(currentPassword, tenant.passwordHash);
+  if (!valid) throw new BadRequestError('Palavra-passe atual incorreta');
+
+  const newHash = await hashPassword(newPassword);
+  await prisma.tenant.update({ where: { id: tenantId }, data: { passwordHash: newHash } });
+
+  // Revoke all refresh tokens to force re-login on all devices
+  await prisma.refreshToken.updateMany({
+    where: { tenantId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  writeAuditLog(tenantId, 'password_changed', 'tenant', tenantId);
 }
 
 export async function logout(tenantId: string, refreshTokenRaw: string | undefined) {

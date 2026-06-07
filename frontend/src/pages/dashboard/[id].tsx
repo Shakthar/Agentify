@@ -43,7 +43,9 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills'>('overview');
+  const [skillsSaving, setSkillsSaving] = useState(false);
+  const [skillsMsg, setSkillsMsg] = useState('');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
   const [error, setError] = useState<string | null>(null);
   // WhatsApp state
@@ -155,8 +157,7 @@ export default function AgentDetailPage() {
               { key: 'orders',     label: '🛒 Pedidos' },
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
-              { key: 'history',    label: '� Histórico' },
-              { key: 'edit',       label: '✏️ Editar' },
+              { key: 'history',    label: '� Histórico' },              { key: 'skills',     label: '⚡ Skills' },              { key: 'edit',       label: '✏️ Editar' },
             ] as { key: typeof activeTab; label: string }[]).map((t) => (
               <button
                 key={t.key}
@@ -244,6 +245,116 @@ export default function AgentDetailPage() {
           {activeTab === 'chat' && (
             <ChatWidget agentId={agent.id} tenantId={tenant.id} />
           )}
+
+          {/* ⚡ Skills */}
+          {activeTab === 'skills' && (() => {
+            const plan = tenant.plan as string ?? 'free';
+            const planOrder = ['free','starter','pro','business','enterprise'];
+            const planIdx = planOrder.indexOf(plan);
+
+            const SKILLS_DEF = [
+              { key: 'skillHandoff',        label: 'Handoff para humano',     icon: '🔀', desc: 'Transfere a conversa para um agente humano quando necessário.', minPlan: 'free', field: 'skillHandoff' },
+              { key: 'skillDataCollection', label: 'Recolha de dados',         icon: '📋', desc: 'Recolhe informação estruturada do utilizador (formulários conversacionais).', minPlan: 'free', field: 'skillDataCollection' },
+              { key: 'skillScheduling',     label: 'Agendamento',             icon: '📅', desc: 'Agenda consultas, reuniões ou serviços automaticamente.', minPlan: 'starter', field: 'skillScheduling' },
+              { key: 'skillFileUpload',     label: 'Envio de ficheiros',       icon: '📁', desc: 'Permite ao agente enviar documentos, catálogos e ficheiros ao utilizador.', minPlan: 'starter', field: 'skillFileUpload' },
+              { key: 'skillHumorDetection', label: 'Deteção de humor',         icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'pro', field: 'skillHumorDetection' },
+            ];
+
+            const MB_WAY_COST: Record<string, string | null> = {
+              free: null, starter: '25 crd/transação', pro: '15 crd/transação', business: 'Incluído', enterprise: 'Incluído',
+            };
+            const mbwayCost = MB_WAY_COST[plan] ?? null;
+
+            const handleToggleSkill = async (field: string, current: boolean) => {
+              setSkillsSaving(true); setSkillsMsg('');
+              try {
+                const updated = await updateAgent(agent.id, { [field]: !current });
+                setAgent(updated);
+                setSkillsMsg('Guardado!');
+                setTimeout(() => setSkillsMsg(''), 2000);
+              } catch { setSkillsMsg('Erro ao guardar.'); }
+              finally { setSkillsSaving(false); }
+            };
+
+            return (
+              <div className="space-y-4">
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">⚡ Skills do agente</h3>
+                  {skillsMsg && <p className="text-xs text-green-600 mb-3">{skillsMsg}</p>}
+                  <div className="space-y-3">
+                    {SKILLS_DEF.map((skill) => {
+                      const minIdx = planOrder.indexOf(skill.minPlan);
+                      const locked = planIdx < minIdx;
+                      const active = !!((agent as unknown as Record<string,unknown>)[skill.field]);
+                      return (
+                        <div key={skill.key} className={`flex items-start gap-4 p-3 rounded-xl border transition-colors ${
+                          locked ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                          : active ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
+                          : 'border-gray-200 dark:border-gray-700'
+                        }`}>
+                          <span className="text-2xl mt-0.5">{skill.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{skill.label}</span>
+                              {locked && (
+                                <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">
+                                  Requer {skill.minPlan.charAt(0).toUpperCase() + skill.minPlan.slice(1)}+
+                                </span>
+                              )}
+                              {active && !locked && (
+                                <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">Ativa</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{skill.desc}</p>
+                          </div>
+                          <button
+                            disabled={locked || skillsSaving}
+                            onClick={() => handleToggleSkill(skill.field, active)}
+                            className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                              locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
+                              : active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${active && !locked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {/* MB Way payment skill */}
+                    <div className={`flex items-start gap-4 p-3 rounded-xl border ${
+                      mbwayCost === null ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                      : 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10'
+                    }`}>
+                      <span className="text-2xl mt-0.5">💳</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Cobrança MB Way</span>
+                          {mbwayCost === null && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
+                          {mbwayCost && mbwayCost !== 'Incluído' && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">{mbwayCost}</span>}
+                          {mbwayCost === 'Incluído' && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          Inicia cobranças MB Way diretamente na conversa. O agente usa o marcador [MBWAY:...] para disparar pagamentos.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Upgrade prompt if any locked */}
+                {SKILLS_DEF.some(s => planOrder.indexOf(s.minPlan) > planIdx) && (
+                  <div className="card bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-900/20 dark:to-purple-900/20 border border-brand-200 dark:border-brand-800">
+                    <p className="text-sm font-medium text-brand-700 dark:text-brand-300">🚀 Desbloqueia mais skills</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
+                      Faz upgrade para aceder a Agendamento, Upload de ficheiros, Deteção de humor e mais.
+                    </p>
+                    <button onClick={() => router.push('/dashboard/plans')} className="btn-primary text-sm">Ver planos →</button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Edit */}
           {activeTab === 'edit' && (() => {

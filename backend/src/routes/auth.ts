@@ -21,6 +21,22 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const profileSchema = z.object({
+  name:         z.string().min(2).max(100).optional(),
+  companyName:  z.string().max(200).optional(),
+  phone:        z.string().max(30).optional(),
+  vatNumber:    z.string().max(30).optional(),
+  addressLine1: z.string().max(200).optional(),
+  addressCity:  z.string().max(100).optional(),
+  addressCountry: z.string().max(100).optional(),
+  addressZip:   z.string().max(20).optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/),
+});
+
 // POST /api/auth/signup
 router.post('/signup', authLimiter, asyncHandler(async (req: Request, res: Response) => {
   const parsed = signupSchema.safeParse(req.body);
@@ -51,6 +67,22 @@ router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
 router.get('/me', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const profile = await authService.getProfile(req.tenant!.id);
   res.json(profile);
+}));
+
+// PUT /api/auth/profile — update profile fields
+router.put('/profile', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success) throw new BadRequestError('Dados inválidos', parsed.error.flatten());
+  const updated = await authService.updateProfile(req.tenant!.id, parsed.data);
+  res.json(updated);
+}));
+
+// POST /api/auth/change-password
+router.post('/change-password', authenticate, authLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) throw new BadRequestError('Dados inválidos', parsed.error.flatten());
+  await authService.changePassword(req.tenant!.id, parsed.data.currentPassword, parsed.data.newPassword);
+  res.json({ message: 'Palavra-passe alterada. Sessão encerrada nos outros dispositivos.' });
 }));
 
 // POST /api/auth/logout

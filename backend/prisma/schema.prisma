@@ -38,6 +38,14 @@ model Tenant {
   // Platform admin
   isAdmin           Boolean  @default(false)
 
+  // Profile / Billing info
+  phone             String?
+  vatNumber         String?  // NIF / VAT para faturação
+  addressLine1      String?
+  addressCity       String?
+  addressCountry    String?
+  addressZip        String?
+
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
   deletedAt             DateTime?
