@@ -22,8 +22,30 @@ export interface MbwayChargeResult {
   mock: boolean;
 }
 
+// Limites de segurança para transacções MB Way
+const MIN_MBWAY_AMOUNT = 0.50;  // €0.50 mínimo (Easypay rejeita abaixo disto)
+const MAX_MBWAY_AMOUNT = 10000; // €10,000 máximo por transação
+
 export async function createMbwayCharge(params: MbwayChargeParams): Promise<MbwayChargeResult> {
   const { tenantId, agentId, conversationId, buyerPhone, amount, description, notifyPhone, extraCreditCost } = params;
+
+  // SECURITY: Validar limites de valor — rejeitar antes de chamar Easypay
+  if (!Number.isFinite(amount) || amount < MIN_MBWAY_AMOUNT || amount > MAX_MBWAY_AMOUNT) {
+    throw new Error(`Valor inválido: €${amount}. Deve estar entre €${MIN_MBWAY_AMOUNT} e €${MAX_MBWAY_AMOUNT}`);
+  }
+
+  // SECURITY: Verificar créditos disponíveis antes de prosseguir (evita créditos negativos)
+  if (extraCreditCost > 0) {
+    const tenantCredits = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { creditsTotal: true, creditsUsed: true },
+    });
+    if (!tenantCredits) throw new Error('Tenant não encontrado');
+    const available = tenantCredits.creditsTotal - tenantCredits.creditsUsed;
+    if (available < extraCreditCost) {
+      throw new Error(`Créditos insuficientes: disponíveis=${available}, necessários=${extraCreditCost}`);
+    }
+  }
 
   const accountId = process.env.EASYPAY_ACCOUNT_ID;
   const apiKey    = process.env.EASYPAY_API_KEY;

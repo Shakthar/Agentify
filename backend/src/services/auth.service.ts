@@ -138,39 +138,47 @@ export async function refresh(refreshTokenRaw: string | undefined) {
   }
 
   const tokenHash = hashToken(refreshTokenRaw);
-  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-  if (!stored) {
-    throw new UnauthorizedError('Refresh token expired or revoked');
-  }
+  // SECURITY: Operação atómica para evitar TOCTOU (time-of-check-time-of-use).
+  // Tentamos revogar APENAS se o token não estiver já revogado E não estiver expirado.
+  // Se count === 0 → ou já foi revogado (possível reuso) ou não existe.
+  const now = new Date();
+  const revokeResult = await prisma.refreshToken.updateMany({
+    where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
+    data:  { revokedAt: now },
+  });
 
-  // Detecção de reuso: um token já revogado a ser reutilizado indica roubo.
-  // Revoga TODOS os refresh tokens do tenant para forçar novo login em todos os dispositivos.
-  if (stored.revokedAt) {
-    await prisma.refreshToken.updateMany({
-      where: { tenantId: stored.tenantId, revokedAt: null },
-      data: { revokedAt: new Date() },
+  if (revokeResult.count === 0) {
+    // Token não foi revogado — verificar se existe mas já estava revogado (reuso detectado)
+    const stored = await prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { tenantId: true, revokedAt: true, expiresAt: true },
     });
-    writeAuditLog(stored.tenantId, 'refresh_token_reuse_detected', 'tenant', stored.tenantId);
-    throw new UnauthorizedError('Refresh token reuse detected — all sessions revoked');
-  }
 
-  if (stored.expiresAt < new Date()) {
+    if (stored?.revokedAt) {
+      // Token previamente válido a ser reusado → roubo de sessão provável
+      // Revogar TODAS as sessões do tenant como precaução
+      await prisma.refreshToken.updateMany({
+        where: { tenantId: stored.tenantId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      writeAuditLog(stored.tenantId, 'refresh_token_reuse_detected', 'tenant', stored.tenantId);
+    }
     throw new UnauthorizedError('Refresh token expired or revoked');
   }
+
+  // Token revogado com sucesso — agora buscar o tenantId associado
+  const stored = await prisma.refreshToken.findUnique({
+    where: { tokenHash },
+    select: { tenantId: true },
+  });
 
   const tenant = await prisma.tenant.findUnique({
-    where: { id: stored.tenantId, deletedAt: null },
+    where: { id: stored!.tenantId, deletedAt: null },
   });
   if (!tenant) {
     throw new UnauthorizedError('Tenant not found');
   }
-
-  // Rotação: revoga o token usado e emite um novo par
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
-  });
 
   const tokens = await issueTokens(tenant);
   return { token: tokens.accessToken, refreshToken: tokens.refreshToken };

@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import { webhookLimiter } from '../middleware/rateLimit.js';
 import { confirmPayment, confirmPaymentById } from '../services/payments.service.js';
 import { sendWhatsAppText } from '../lib/whatsapp.js';
 import prisma from '../lib/prisma.js';
@@ -18,20 +19,26 @@ const router = Router();
 // ─── POST /api/payments/webhook ───────────────────────────────────────────────
 // Easypay envia este webhook quando o pagamento é confirmado
 // SECURITY: verifica Bearer token da Easypay (configurado no dashboard Easypay)
-router.post('/webhook', asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
-  // Verificar token Bearer da Easypay (se configurado)
+router.post('/webhook', webhookLimiter, asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
   const easypaySecret = process.env.EASYPAY_WEBHOOK_SECRET;
+
   if (easypaySecret) {
+    // Produção: verificar Bearer token com comparação em tempo constante
     const authHeader = req.headers.authorization;
     const provided = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!provided || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(easypaySecret))) {
       res.status(403).json({ error: 'Unauthorized' });
       return;
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    // SECURITY: Em produção sem secret configurado → rejeitar sempre.
+    // Nunca processar webhooks não autenticados em produção.
+    console.error('[Payments] CRITICAL: EASYPAY_WEBHOOK_SECRET não configurado em produção — webhook rejeitado');
+    res.status(503).json({ error: 'Webhook not configured' });
+    return;
   } else {
-    // Sem segredo configurado: verificar apenas que vem de IP da Easypay
-    // Em produção DEVE configurar EASYPAY_WEBHOOK_SECRET
-    console.warn('[Payments] EASYPAY_WEBHOOK_SECRET não configurado — webhook sem autenticação');
+    // Desenvolvimento/teste: aceitar sem auth mas avisar
+    console.warn('[Payments] DEV: EASYPAY_WEBHOOK_SECRET não configurado — a aceitar webhook sem autenticação (apenas dev)');
   }
 
   // Responder imediatamente para não re-tentar

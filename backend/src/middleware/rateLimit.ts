@@ -12,10 +12,22 @@ export const globalLimiter = rateLimit({
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  skipSuccessfulRequests: true, // só conta tentativas falhadas
+  // SECURITY: skipSuccessfulRequests:true permitiria brute-force alternando entre contas;
+  // contar TODAS as tentativas (sucesso e falha) para limitar eficazmente.
+  skipSuccessfulRequests: false,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many auth attempts, please try again later' },
+});
+
+// Rate limiter mais agressivo para tentativas de login (5 por minuto por IP)
+export const loginLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 5,
+  skipSuccessfulRequests: false,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please wait a minute' },
 });
 
 export const chatLimiter = rateLimit({
@@ -24,4 +36,15 @@ export const chatLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many messages, slow down' },
+});
+
+// Rate limiter para webhooks externos (Easypay, Meta, etc.)
+// Limita rajadas de webhooks forjados enquanto permite volume legítimo de produção.
+// Meta envia ~1 mensagem por utilizador por segundo em pico; 200/min por IP é generoso.
+export const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Webhook rate limit exceeded' },
 });

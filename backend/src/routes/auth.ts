@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
-import { authLimiter } from '../middleware/rateLimit.js';
+import { authLimiter, loginLimiter } from '../middleware/rateLimit.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { BadRequestError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
@@ -61,7 +61,7 @@ router.post('/signup', authLimiter, asyncHandler(async (req: Request, res: Respo
 }));
 
 // POST /api/auth/login
-router.post('/login', authLimiter, asyncHandler(async (req: Request, res: Response) => {
+router.post('/login', authLimiter, loginLimiter, asyncHandler(async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new BadRequestError('Invalid email or password format');

@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { ForbiddenError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import { webhookLimiter } from '../middleware/rateLimit.js';
 import prisma from '../lib/prisma.js';
 import * as conversationsService from '../services/conversations.service.js';
 import { decrypt } from '../lib/encryption.js';
@@ -122,7 +123,7 @@ router.get('/whatsapp', (req: Request, res: Response) => {
 
 // ─── POST /api/webhooks/whatsapp ─────────────────────────────────────────────
 // Meta envia mensagens recebidas para este endpoint
-router.post('/whatsapp', asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
+router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
   // Verificar assinatura HMAC-SHA256 antes de processar qualquer payload
   if (!verifyMetaSignature(req)) {
     res.status(403).send('Forbidden');

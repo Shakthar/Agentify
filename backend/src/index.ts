@@ -53,11 +53,17 @@ const io = new SocketIOServer(httpServer, {
 });
 
 // Limite de ligações simultâneas por IP (anti-flood de conexões)
+// SECURITY: Com trust proxy:1, o Railway adiciona o IP real no final do X-Forwarded-For.
+// Usar o último IP adicionado pelo proxy (não o primeiro, que o cliente pode forjar).
 const MAX_SOCKETS_PER_IP = 10;
 const socketsPerIp = new Map<string, number>();
 io.use((socket, next) => {
-  const ip = (socket.handshake.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-    || socket.handshake.address;
+  const forwarded = socket.handshake.headers['x-forwarded-for'] as string | undefined;
+  // Pegar o último hop do X-Forwarded-For (adicionado pelo proxy de confiança, Railway)
+  // Se não houver, usar o endereço directo da socket (já é o IP real)
+  const ip = forwarded
+    ? forwarded.split(',').map(s => s.trim()).pop() ?? socket.handshake.address
+    : socket.handshake.address;
   const count = socketsPerIp.get(ip) ?? 0;
   if (count >= MAX_SOCKETS_PER_IP) {
     return next(new Error('Too many connections'));
