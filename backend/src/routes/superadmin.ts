@@ -27,6 +27,25 @@ router.get('/tenants', asyncHandler(async (_req: AuthenticatedRequest, res: Resp
   res.json({ tenants });
 }));
 
+// GET /api/superadmin/tenants/:id
+router.get('/tenants/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const detail = await superadminService.getTenantDetail(req.params.id);
+  if (!detail) { res.status(404).json({ error: 'Tenant não encontrado' }); return; }
+  res.json(detail);
+}));
+
+// PATCH /api/superadmin/tenants/:id/plan
+router.patch('/tenants/:id/plan', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { plan, creditsOverride } = req.body as { plan: string; creditsOverride?: number };
+  const validPlans = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  if (!plan || !validPlans.includes(plan)) {
+    res.status(400).json({ error: `plan inválido. Valores aceites: ${validPlans.join(', ')}` });
+    return;
+  }
+  const updated = await superadminService.changeTenantPlan(req.params.id, plan, creditsOverride);
+  res.json(updated);
+}));
+
 // GET /api/superadmin/expenses
 router.get('/expenses', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
   const expenses = await superadminService.getExpenses();

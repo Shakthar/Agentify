@@ -127,3 +127,57 @@ export async function deleteExpense(id: string) {
 export async function getExpenses() {
   return prisma.platformExpense.findMany({ orderBy: { createdAt: 'desc' } });
 }
+
+// ── Tenant detail (full) ──────────────────────────────────────────────────────
+export async function getTenantDetail(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      id: true, name: true, email: true, plan: true, companyName: true,
+      phone: true, vatNumber: true, addressCity: true, addressCountry: true,
+      creditsTotal: true, creditsUsed: true, isAdmin: true,
+      paymentStatus: true, monthlyRecurringRevenue: true,
+      createdAt: true, updatedAt: true,
+      brandColor: true, logoUrl: true, domain: true,
+      twoFactorEnabled: true,
+      agents: {
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, name: true, model: true, isActive: true, whitelabelEnabled: true,
+          skillHandoff: true, skillDataCollection: true, skillScheduling: true,
+          skillFileUpload: true, skillHumorDetection: true,
+          whatsappEnabled: true, webChatEnabled: true,
+          totalConversations: true, totalMessages: true, createdAt: true,
+          _count: { select: { conversations: true, orders: true } },
+        },
+      },
+      _count: { select: { conversations: true, orders: true } },
+    },
+  });
+  if (!tenant) return null;
+  return {
+    ...tenant,
+    planPrice: PLAN_PRICE[tenant.plan] ?? 0,
+    creditsAvailable: tenant.creditsTotal - tenant.creditsUsed,
+    creditsUsedPercent: tenant.creditsTotal > 0
+      ? Math.round((tenant.creditsUsed / tenant.creditsTotal) * 100) : 0,
+  };
+}
+
+// ── Change tenant plan ────────────────────────────────────────────────────────
+export async function changeTenantPlan(tenantId: string, plan: string, creditsOverride?: number) {
+  const PLAN_CREDITS: Record<string, number> = {
+    free: 3000, starter: 10000, pro: 30000, business: 60000, enterprise: 75000,
+  };
+  const newCredits = creditsOverride ?? PLAN_CREDITS[plan] ?? 3000;
+  return prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      plan,
+      creditsTotal: newCredits,
+      creditsUsed: 0,
+      creditsRefreshDate: new Date(),
+    },
+    select: { id: true, plan: true, creditsTotal: true },
+  });
+}

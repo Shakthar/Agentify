@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Navigation from '../../components/Navigation';
@@ -9,16 +9,42 @@ import { AuditLogEntry } from '../../types';
 import api from '../../utils/api';
 
 // ─── PricingConfig (mirrors backend) ─────────────────────────────────────────
+interface FeaturePlanConfig {
+  mode: 'disabled' | 'addon' | 'included';
+  price?: number;
+  creditsPerTx?: number;
+}
 interface PricingConfig {
-  plans: { free: PC; starter: PC; pro: PC; business: PC; enterprise: PC };
-  skillAddons: { scheduling: number; fileUpload: number; humorDetection: number };
-  payments: {
-    monthlyFee:  { free: null; starter: number; pro: number; business: number; enterprise: number | null };
-    creditsPerTx: { free: null; starter: number; pro: number; business: number; enterprise: number };
+  plans: Record<string, PC>;
+  features: {
+    scheduling:     Record<string, FeaturePlanConfig>;
+    fileUpload:     Record<string, FeaturePlanConfig>;
+    humorDetection: Record<string, FeaturePlanConfig>;
+    payments:       Record<string, FeaturePlanConfig>;
+    whitelabel:     Record<string, FeaturePlanConfig>;
   };
-  whitelabel: { starterPerAgent: number; proPerAgent: number };
 }
 interface PC { price: number; credits: number; agents: number }
+
+// ─── Tenant detail ────────────────────────────────────────────────────────────
+interface AgentDetail {
+  id: string; name: string; model: string; isActive: boolean; whitelabelEnabled: boolean;
+  skillHandoff: boolean; skillDataCollection: boolean; skillScheduling: boolean;
+  skillFileUpload: boolean; skillHumorDetection: boolean;
+  whatsappEnabled: boolean; webChatEnabled: boolean;
+  _count: { conversations: number; orders: number };
+  createdAt: string;
+}
+interface TenantDetail {
+  id: string; name: string; email: string; plan: string; companyName: string | null;
+  phone: string | null; vatNumber: string | null; addressCity: string | null; addressCountry: string | null;
+  creditsTotal: number; creditsUsed: number; creditsAvailable: number; creditsUsedPercent: number;
+  planPrice: number; isAdmin: boolean; paymentStatus: string; twoFactorEnabled: boolean;
+  brandColor: string | null; logoUrl: string | null; domain: string | null;
+  agents: AgentDetail[];
+  _count: { conversations: number; orders: number };
+  createdAt: string;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PlatformMetrics {
@@ -89,6 +115,16 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string |
   );
 }
 
+function SkillBadge({ label, active, highlight }: { label: string; active: boolean; highlight?: boolean }) {
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+      !active ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 line-through' :
+      highlight ? 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300' :
+      'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+    }`}>{label}</span>
+  );
+}
+
 function PlanBar({ byPlan }: { byPlan: Record<string, number> }) {
   const plans = ['free', 'starter', 'pro', 'business', 'enterprise'];
   const total = plans.reduce((s, p) => s + (byPlan[p] ?? 0), 0) || 1;
@@ -139,6 +175,11 @@ export default function AdminPage() {
   const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [pricingSaving, setPricingSaving] = useState(false);
   const [pricingMsg, setPricingMsg] = useState('');
+
+  // Tenant detail state
+  const [selectedTenant, setSelectedTenant] = useState<TenantDetail | null>(null);
+  const [tenantDetailLoading, setTenantDetailLoading] = useState(false);
+  const [planChanging, setPlanChanging] = useState(false);
 
   const isAdmin = tenant?.isAdmin;
 
@@ -208,6 +249,36 @@ export default function AdminPage() {
       obj[path[path.length - 1]] = v;
       return next;
     });
+  }
+
+  function pMode(feature: string, plan: string, val: string) {
+    setPricing((prev) => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev)) as PricingConfig;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (next.features as any)[feature][plan].mode = val;
+      return next;
+    });
+  }
+
+  async function openTenantDetail(id: string) {
+    if (selectedTenant?.id === id) { setSelectedTenant(null); return; }
+    setTenantDetailLoading(true);
+    try {
+      const r = await api.get(`/api/superadmin/tenants/${id}`);
+      setSelectedTenant(r.data);
+    } catch { /* ignore */ }
+    finally { setTenantDetailLoading(false); }
+  }
+
+  async function changePlan(tenantId: string, plan: string) {
+    setPlanChanging(true);
+    try {
+      await api.patch(`/api/superadmin/tenants/${tenantId}/plan`, { plan });
+      await openTenantDetail(tenantId);
+      await loadDashboard();
+    } catch { /* ignore */ }
+    finally { setPlanChanging(false); }
   }
 
   const tabList = [
@@ -325,48 +396,155 @@ export default function AdminPage() {
 
           {/* ─── Contas ─── */}
           {activeTab === 'tenants' && (
-            <div className="card overflow-x-auto p-0">
-              <table className="w-full text-sm min-w-[700px]">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                    {['Conta', 'Plano', 'Agentes', 'Conversas', 'Créditos', 'MRR', 'Criada'].map((h) => (
-                      <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tenants.map((t) => (
-                    <tr key={t.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="py-2 px-3">
-                        <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">{t.name}</p>
-                        <p className="text-[10px] text-gray-400">{t.email}{t.isAdmin && ' 🔑'}</p>
-                      </td>
-                      <td className="py-2 px-3">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan] ?? PLAN_COLORS.free}`}>
-                          {PLAN_LABELS_LOCAL[t.plan] ?? t.plan}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300">{t._count.agents}</td>
-                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300">{t._count.conversations}</td>
-                      <td className="py-2 px-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${t.creditsUsedPercent >= 90 ? 'bg-red-500' : t.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                              style={{ width: `${t.creditsUsedPercent}%` }} />
-                          </div>
-                          <span className="text-[10px] text-gray-400">{t.creditsUsedPercent}%</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">{t.creditsUsed.toLocaleString()} / {t.creditsTotal.toLocaleString()}</p>
-                      </td>
-                      <td className="py-2 px-3 text-xs font-medium text-green-600">€{t.planPrice}/mês</td>
-                      <td className="py-2 px-3 text-[10px] text-gray-400">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
+            <div className="space-y-2">
+              <div className="card overflow-x-auto p-0">
+                <table className="w-full text-sm min-w-[700px]">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                      {['Conta', 'Plano', 'Agentes', 'Conversas', 'Créditos', 'MRR', 'Criada', ''].map((h) => (
+                        <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {tenants.length === 0 && !loadingData && (
-                <p className="text-center py-10 text-sm text-gray-400">Nenhuma conta encontrada</p>
-              )}
+                  </thead>
+                  <tbody>
+                    {tenants.map((t) => (
+                      <Fragment key={t.id}>
+                        <tr key={t.id} className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors ${selectedTenant?.id === t.id ? 'bg-brand-50 dark:bg-brand-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                          onClick={() => openTenantDetail(t.id)}>
+                          <td className="py-2 px-3">
+                            <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">{t.name}</p>
+                            <p className="text-[10px] text-gray-400">{t.email}{t.isAdmin && ' 🔑'}</p>
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan] ?? PLAN_COLORS.free}`}>
+                              {PLAN_LABELS_LOCAL[t.plan] ?? t.plan}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300">{t._count.agents}</td>
+                          <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300">{t._count.conversations}</td>
+                          <td className="py-2 px-3">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${t.creditsUsedPercent >= 90 ? 'bg-red-500' : t.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                  style={{ width: `${t.creditsUsedPercent}%` }} />
+                              </div>
+                              <span className="text-[10px] text-gray-400">{t.creditsUsedPercent}%</span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-xs font-medium text-green-600">€{t.planPrice}/mês</td>
+                          <td className="py-2 px-3 text-[10px] text-gray-400">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
+                          <td className="py-2 px-3 text-xs text-brand-500">{selectedTenant?.id === t.id ? '▲' : '▼'}</td>
+                        </tr>
+
+                        {/* Inline detail row */}
+                        {selectedTenant?.id === t.id && (
+                          <tr key={`detail-${t.id}`}>
+                            <td colSpan={8} className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700 p-0">
+                              {tenantDetailLoading ? (
+                                <div className="py-6 text-center text-xs text-gray-400">A carregar...</div>
+                              ) : (
+                                <div className="p-4 space-y-4">
+                                  {/* Header info */}
+                                  <div className="flex flex-wrap gap-4 items-start">
+                                    <div className="flex-1 min-w-[200px]">
+                                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{selectedTenant.companyName || selectedTenant.name}</p>
+                                      <p className="text-[10px] text-gray-400">{selectedTenant.email}</p>
+                                      {selectedTenant.phone && <p className="text-[10px] text-gray-400">📱 {selectedTenant.phone}</p>}
+                                      {selectedTenant.vatNumber && <p className="text-[10px] text-gray-400">NIF: {selectedTenant.vatNumber}</p>}
+                                      {selectedTenant.domain && <p className="text-[10px] text-gray-400">🌐 {selectedTenant.domain}</p>}
+                                      <div className="flex gap-2 mt-1">
+                                        {selectedTenant.twoFactorEnabled && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">2FA ✓</span>}
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedTenant.paymentStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                          Billing: {selectedTenant.paymentStatus}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {/* Credits */}
+                                    <div className="min-w-[160px]">
+                                      <p className="text-[10px] text-gray-500 mb-1">Créditos</p>
+                                      <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden mb-1">
+                                        <div className={`h-full rounded-full ${selectedTenant.creditsUsedPercent >= 90 ? 'bg-red-500' : selectedTenant.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                          style={{ width: `${selectedTenant.creditsUsedPercent}%` }} />
+                                      </div>
+                                      <p className="text-[10px] text-gray-500">{selectedTenant.creditsUsed.toLocaleString()} / {selectedTenant.creditsTotal.toLocaleString()} ({selectedTenant.creditsUsedPercent}%)</p>
+                                      <p className="text-[10px] text-gray-400">Disponível: {selectedTenant.creditsAvailable.toLocaleString()}</p>
+                                    </div>
+                                    {/* Plan change */}
+                                    <div className="min-w-[160px]">
+                                      <p className="text-[10px] text-gray-500 mb-1">Alterar plano</p>
+                                      <div className="flex gap-1">
+                                        <select
+                                          defaultValue={selectedTenant.plan}
+                                          id={`plan-select-${selectedTenant.id}`}
+                                          className="input text-xs flex-1"
+                                        >
+                                          {['free','starter','pro','business','enterprise'].map(p => (
+                                            <option key={p} value={p}>{PLAN_LABELS_LOCAL[p]}</option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          disabled={planChanging}
+                                          onClick={() => {
+                                            const sel = document.getElementById(`plan-select-${selectedTenant.id}`) as HTMLSelectElement;
+                                            changePlan(selectedTenant.id, sel.value);
+                                          }}
+                                          className="btn-primary text-xs px-2 py-1"
+                                        >
+                                          {planChanging ? '...' : '✓'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Agents + skills */}
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                      Agentes ({selectedTenant.agents.length}) · Conversas: {selectedTenant._count.conversations} · Pedidos: {selectedTenant._count.orders}
+                                    </p>
+                                    {selectedTenant.agents.length === 0 && (
+                                      <p className="text-xs text-gray-400">Sem agentes criados.</p>
+                                    )}
+                                    <div className="space-y-2">
+                                      {selectedTenant.agents.map((agent) => (
+                                        <div key={agent.id} className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                              <span className={`w-1.5 h-1.5 rounded-full ${agent.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                              <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
+                                              <span className="text-[10px] text-gray-400">{agent.model.split('-').slice(0,2).join('-')}</span>
+                                            </div>
+                                            <div className="flex gap-1 text-[10px]">
+                                              <span className="text-gray-400">{agent._count.conversations} conv.</span>
+                                              {agent._count.orders > 0 && <span className="text-green-600">{agent._count.orders} pedidos</span>}
+                                            </div>
+                                          </div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {agent.webChatEnabled   && <SkillBadge label="Web"       active />}
+                                            {agent.whatsappEnabled  && <SkillBadge label="WA"        active />}
+                                            <SkillBadge label="Handoff"    active={agent.skillHandoff} />
+                                            <SkillBadge label="Dados"      active={agent.skillDataCollection} />
+                                            <SkillBadge label="Agenda"     active={agent.skillScheduling} />
+                                            <SkillBadge label="Upload"     active={agent.skillFileUpload} />
+                                            <SkillBadge label="Humor"      active={agent.skillHumorDetection} />
+                                            <SkillBadge label="Whitelabel" active={agent.whitelabelEnabled} highlight />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+                {tenants.length === 0 && !loadingData && (
+                  <p className="text-center py-10 text-sm text-gray-400">Nenhuma conta encontrada</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -537,7 +715,7 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {/* Planos */}
+                  {/* Planos base */}
                   <div className="card">
                     <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">📦 Planos — preço, créditos e agentes</h3>
                     <div className="overflow-x-auto">
@@ -547,7 +725,7 @@ export default function AdminPage() {
                             <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
                             <th className="text-left py-2 text-xs text-gray-500">Preço (€/mês)</th>
                             <th className="text-left py-2 text-xs text-gray-500">Créditos/mês</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Agentes</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Agentes máx.</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -557,13 +735,13 @@ export default function AdminPage() {
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
                               </td>
                               <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input text-xs w-24"
-                                value={pricing.plans[plan].price}
+                                value={pricing.plans[plan]?.price ?? 0}
                                 onChange={(e) => pNum(['plans', plan, 'price'], e.target.value)} /></td>
                               <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input text-xs w-28"
-                                value={pricing.plans[plan].credits}
+                                value={pricing.plans[plan]?.credits ?? 0}
                                 onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)} /></td>
                               <td className="py-2"><input type="number" min="1" step="1" className="input text-xs w-20"
-                                value={pricing.plans[plan].agents}
+                                value={pricing.plans[plan]?.agents ?? 0}
                                 onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)} /></td>
                             </tr>
                           ))}
@@ -572,92 +750,80 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Skill addons */}
-                  <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">⚡ Skills — preço addon (€/mês)</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      {([
-                        ['scheduling',     '📅 Agendamento',     'Addon para plano Free'],
-                        ['fileUpload',      '📁 Upload ficheiros', 'Addon para plano Free'],
-                        ['humorDetection',  '😊 Deteção humor',   'Addon para Free + Starter'],
-                      ] as [keyof typeof pricing.skillAddons, string, string][]).map(([key, label, note]) => (
-                        <div key={key}>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
-                          <p className="text-[10px] text-gray-400 mb-2">{note}</p>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">€</span>
-                            <input type="number" min="0" step="1" className="input text-xs w-20"
-                              value={pricing.skillAddons[key]}
-                              onChange={(e) => pNum(['skillAddons', key], e.target.value)} />
-                            <span className="text-xs text-gray-500">/mês</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Payments skill */}
-                  <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">💳 Skill Pagamentos — mensalidade + créditos/transação</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm min-w-[450px]">
-                        <thead>
-                          <tr className="border-b border-gray-100 dark:border-gray-700">
-                            <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Mensalidade (€/mês)</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Créditos por transação</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(['starter','pro','business','enterprise'] as const).map((plan) => (
-                            <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
-                              <td className="py-2 pr-3">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
-                              </td>
-                              <td className="py-2 pr-3">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-gray-500">€</span>
-                                  <input type="number" min="0" step="1" className="input text-xs w-20"
-                                    value={pricing.payments.monthlyFee[plan] ?? 0}
-                                    onChange={(e) => pNum(['payments', 'monthlyFee', plan], e.target.value)} />
-                                  <span className="text-xs text-gray-400">{plan === 'enterprise' ? '(0 = incluído)' : ''}</span>
-                                </div>
-                              </td>
-                              <td className="py-2">
-                                <input type="number" min="0" step="1" className="input text-xs w-20"
-                                  value={pricing.payments.creditsPerTx[plan] ?? 0}
-                                  onChange={(e) => pNum(['payments', 'creditsPerTx', plan], e.target.value)} />
-                              </td>
+                  {/* Features per plan */}
+                  {([
+                    ['scheduling',     '📅 Agendamento',        false],
+                    ['fileUpload',     '📁 Upload ficheiros',    false],
+                    ['humorDetection', '😊 Deteção de humor',   false],
+                    ['payments',       '💳 Pagamentos',          true ],
+                    ['whitelabel',     '🎨 White-label',         false],
+                  ] as [string, string, boolean][]).map(([featureKey, featureLabel, hasCredits]) => (
+                    <div key={featureKey} className="card">
+                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">{featureLabel}</h3>
+                      <p className="text-[10px] text-gray-400 mb-4">
+                        {featureKey === 'whitelabel' ? 'Preço = €/agente/mês' :
+                         featureKey === 'payments'   ? 'Preço = mensalidade €/mês · Créditos = por transação' :
+                         'Preço = addon €/mês (só relevante se mode=addon)'}
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm min-w-[500px]">
+                          <thead>
+                            <tr className="border-b border-gray-100 dark:border-gray-700">
+                              <th className="text-left py-1.5 text-xs text-gray-500 w-24">Plano</th>
+                              <th className="text-left py-1.5 text-xs text-gray-500 w-40">Modo</th>
+                              <th className="text-left py-1.5 text-xs text-gray-500">Preço (€)</th>
+                              {hasCredits && <th className="text-left py-1.5 text-xs text-gray-500">Crd/tx</th>}
                             </tr>
-                          ))}
-                          <tr className="border-b border-gray-50 dark:border-gray-700/50">
-                            <td className="py-2 pr-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS.free}`}>Free</span></td>
-                            <td className="py-2 text-xs text-gray-400 italic" colSpan={2}>Bloqueado (sem acesso)</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {(['free','starter','pro','business','enterprise'] as const).map((plan) => {
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              const feat = (pricing.features as any)[featureKey]?.[plan] as FeaturePlanConfig | undefined;
+                              const mode = feat?.mode ?? 'disabled';
+                              return (
+                                <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
+                                  <td className="py-1.5 pr-3">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
+                                  </td>
+                                  <td className="py-1.5 pr-3">
+                                    <select
+                                      value={mode}
+                                      onChange={(e) => pMode(featureKey, plan, e.target.value)}
+                                      className={`input text-xs w-36 ${
+                                        mode === 'disabled' ? 'text-gray-400' :
+                                        mode === 'included' ? 'text-green-600' : 'text-orange-600'
+                                      }`}
+                                    >
+                                      <option value="disabled">🚫 Desativado</option>
+                                      <option value="addon">➕ Addon (cobra)</option>
+                                      <option value="included">✅ Incluído</option>
+                                    </select>
+                                  </td>
+                                  <td className="py-1.5 pr-3">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs text-gray-400">€</span>
+                                      <input type="number" min="0" step="1" className="input text-xs w-20"
+                                        disabled={mode !== 'addon'}
+                                        value={feat?.price ?? 0}
+                                        onChange={(e) => pNum(['features', featureKey, plan, 'price'], e.target.value)} />
+                                    </div>
+                                  </td>
+                                  {hasCredits && (
+                                    <td className="py-1.5">
+                                      <input type="number" min="0" step="1" className="input text-xs w-20"
+                                        disabled={mode === 'disabled'}
+                                        value={feat?.creditsPerTx ?? 0}
+                                        onChange={(e) => pNum(['features', featureKey, plan, 'creditsPerTx'], e.target.value)} />
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Whitelabel */}
-                  <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">🎨 White-label — addon por agente (€/agente/mês)</h3>
-                    <div className="grid grid-cols-2 gap-4 max-w-xs">
-                      {([['starterPerAgent','Starter'],['proPerAgent','Pro']] as [keyof typeof pricing.whitelabel, string][]).map(([key, label]) => (
-                        <div key={key}>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">€</span>
-                            <input type="number" min="0" step="1" className="input text-xs w-20"
-                              value={pricing.whitelabel[key]}
-                              onChange={(e) => pNum(['whitelabel', key], e.target.value)} />
-                            <span className="text-xs text-gray-500">/agente/mês</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-3">Business+ e Enterprise: incluído no plano (sem addon)</p>
-                  </div>
+                  ))}
 
                   <div className="flex justify-end">
                     <button onClick={savePricing} disabled={pricingSaving} className="btn-primary">
