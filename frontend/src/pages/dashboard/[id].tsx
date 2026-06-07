@@ -253,11 +253,11 @@ export default function AgentDetailPage() {
             const planIdx = planOrder.indexOf(plan);
 
             const SKILLS_DEF = [
-              { key: 'skillHandoff',        label: 'Handoff para humano',     icon: '🔀', desc: 'Transfere a conversa para um agente humano quando necessário.', minPlan: 'free', field: 'skillHandoff' },
-              { key: 'skillDataCollection', label: 'Recolha de dados',         icon: '📋', desc: 'Recolhe informação estruturada do utilizador (formulários conversacionais).', minPlan: 'free', field: 'skillDataCollection' },
-              { key: 'skillScheduling',     label: 'Agendamento',             icon: '📅', desc: 'Agenda consultas, reuniões ou serviços automaticamente.', minPlan: 'starter', field: 'skillScheduling' },
-              { key: 'skillFileUpload',     label: 'Envio de ficheiros',       icon: '📁', desc: 'Permite ao agente enviar documentos, catálogos e ficheiros ao utilizador.', minPlan: 'starter', field: 'skillFileUpload' },
-              { key: 'skillHumorDetection', label: 'Deteção de humor',         icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'pro', field: 'skillHumorDetection' },
+              { key: 'skillHandoff',        label: 'Handoff para humano',     icon: '🔀', desc: 'Transfere a conversa para um agente humano quando necessário.', minPlan: 'free', field: 'skillHandoff', addonPrice: null as string | null },
+              { key: 'skillDataCollection', label: 'Recolha de dados',         icon: '📋', desc: 'Recolhe informação estruturada do utilizador (formulários conversacionais).', minPlan: 'free', field: 'skillDataCollection', addonPrice: null as string | null },
+              { key: 'skillScheduling',     label: 'Agendamento',             icon: '📅', desc: 'Agenda consultas, reuniões ou serviços automaticamente.', minPlan: 'starter', field: 'skillScheduling', addonPrice: '€7/mês' },
+              { key: 'skillFileUpload',     label: 'Envio de ficheiros',       icon: '📁', desc: 'Permite ao agente enviar documentos, catálogos e ficheiros ao utilizador.', minPlan: 'starter', field: 'skillFileUpload', addonPrice: '€5/mês' },
+              { key: 'skillHumorDetection', label: 'Deteção de humor',         icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'pro', field: 'skillHumorDetection', addonPrice: '€9/mês' },
             ];
 
             const MB_WAY_COST: Record<string, string | null> = {
@@ -288,15 +288,20 @@ export default function AgentDetailPage() {
                       const active = !!((agent as unknown as Record<string,unknown>)[skill.field]);
                       return (
                         <div key={skill.key} className={`flex items-start gap-4 p-3 rounded-xl border transition-colors ${
-                          locked ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                          locked ? 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
                           : active ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
                           : 'border-gray-200 dark:border-gray-700'
                         }`}>
                           <span className="text-2xl mt-0.5">{skill.icon}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{skill.label}</span>
-                              {locked && (
+                              {locked && skill.addonPrice && (
+                                <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
+                                  Addon {skill.addonPrice}
+                                </span>
+                              )}
+                              {locked && !skill.addonPrice && (
                                 <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">
                                   Requer {skill.minPlan.charAt(0).toUpperCase() + skill.minPlan.slice(1)}+
                                 </span>
@@ -306,12 +311,20 @@ export default function AgentDetailPage() {
                               )}
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{skill.desc}</p>
+                            {locked && skill.addonPrice && (
+                              <button
+                                onClick={() => router.push('/dashboard/plans')}
+                                className="mt-2 text-[11px] text-orange-600 dark:text-orange-400 underline hover:no-underline"
+                              >
+                                Ativar por {skill.addonPrice} →
+                              </button>
+                            )}
                           </div>
                           <button
                             disabled={locked || skillsSaving}
                             onClick={() => handleToggleSkill(skill.field, active)}
                             className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-                              locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
+                              locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
                               : active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
                             }`}
                           >
@@ -331,25 +344,56 @@ export default function AgentDetailPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Cobrança MB Way</span>
                           {mbwayCost === null && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
-                          {mbwayCost && mbwayCost !== 'Incluído' && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">{mbwayCost}</span>}
+                          {mbwayCost && mbwayCost !== 'Incluído' && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">{mbwayCost} (pay-per-use)</span>}
                           {mbwayCost === 'Incluído' && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          Inicia cobranças MB Way diretamente na conversa. O agente usa o marcador [MBWAY:...] para disparar pagamentos.
+                          Inicia cobranças MB Way diretamente na conversa. Créditos debitados por transação — só pagas o que usas.
                         </p>
                       </div>
                     </div>
+
+                    {/* Whitelabel portal */}
+                    {(() => {
+                      const wlIncluded = planIdx >= planOrder.indexOf('business');
+                      const wlAddon = !wlIncluded ? (plan === 'starter' ? '€15/mês' : plan === 'pro' ? '€9/mês' : null) : null;
+                      return (
+                        <div className={`flex items-start gap-4 p-3 rounded-xl border ${
+                          wlIncluded ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-900/10'
+                          : wlAddon ? 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
+                          : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                        }`}>
+                          <span className="text-2xl mt-0.5">🎨</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Portal White-label</span>
+                              {wlIncluded && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Incluído no plano</span>}
+                              {wlAddon && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {wlAddon}</span>}
+                              {!wlIncluded && !wlAddon && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">Requer Starter+</span>}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              Portal público com a tua marca, sem branding Agentfy. URL: agentify.shaklabs.tech/w/{tenant.id}
+                            </p>
+                            {wlAddon && (
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-2 text-[11px] text-orange-600 dark:text-orange-400 underline hover:no-underline">
+                                Ativar por {wlAddon} →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
                 {/* Upgrade prompt if any locked */}
-                {SKILLS_DEF.some(s => planOrder.indexOf(s.minPlan) > planIdx) && (
-                  <div className="card bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-900/20 dark:to-purple-900/20 border border-brand-200 dark:border-brand-800">
-                    <p className="text-sm font-medium text-brand-700 dark:text-brand-300">🚀 Desbloqueia mais skills</p>
+                {(SKILLS_DEF.some(s => planOrder.indexOf(s.minPlan) > planIdx) || planIdx < planOrder.indexOf('business')) && (
+                  <div className="card bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800">
+                    <p className="text-sm font-medium text-orange-700 dark:text-orange-300">⚡ Addons disponíveis</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
-                      Faz upgrade para aceder a Agendamento, Upload de ficheiros, Deteção de humor e mais.
+                      Podes ativar skills individualmente como addons mensais, ou fazer upgrade do plano para as incluir todas.
                     </p>
-                    <button onClick={() => router.push('/dashboard/plans')} className="btn-primary text-sm">Ver planos →</button>
+                    <button onClick={() => router.push('/dashboard/plans')} className="btn-primary text-sm">Ver planos e addons →</button>
                   </div>
                 )}
               </div>

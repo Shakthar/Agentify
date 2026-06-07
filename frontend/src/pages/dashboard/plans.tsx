@@ -33,15 +33,19 @@ const FEATURES: FeatureRow[] = [
   // Skills
   { label: 'Skill: Handoff IA', icon: '🔀', values: [true, true, true, true, true] },
   { label: 'Skill: Recolha de dados', icon: '📋', values: [true, true, true, true, true] },
-  { label: 'Skill: Agendamento', icon: '📅', values: [false, true, true, true, true] },
-  { label: 'Skill: Upload de ficheiros', icon: '📁', values: [false, true, true, true, true] },
-  { label: 'Skill: Deteção de humor', icon: '😊', values: [false, false, true, true, true] },
-  { label: 'Skill: Cobrança MB Way', icon: '💳', values: ['Bloqueado', '25 crd/uso', '15 crd/uso', 'Incluído', 'Incluído'],
-    note: 'Créditos debitados por transação iniciada pelo agente' },
+  { label: 'Skill: Agendamento', icon: '📅', values: ['+€7/mês ➕', 'Incluído', 'Incluído', 'Incluído', 'Incluído'],
+    note: 'Addon mensal para plano Free; incluído no Starter+' },
+  { label: 'Skill: Upload de ficheiros', icon: '📁', values: ['+€5/mês ➕', 'Incluído', 'Incluído', 'Incluído', 'Incluído'],
+    note: 'Addon mensal para plano Free; incluído no Starter+' },
+  { label: 'Skill: Deteção de humor', icon: '😊', values: ['+€9/mês ➕', '+€9/mês ➕', 'Incluído', 'Incluído', 'Incluído'],
+    note: 'Addon mensal para Free/Starter; incluído no Pro+' },
+  { label: 'Skill: Cobrança MB Way', icon: '💳', values: ['—', '25 crd/transação', '15 crd/transação', 'Incluído', 'Incluído'],
+    note: 'Pay-per-use: créditos debitados por transação. Free não tem acesso.' },
   { label: 'Pedidos / Orders', icon: '🧾', values: [false, true, true, true, true] },
   { label: 'Relatórios avançados', icon: '📊', values: [false, false, true, true, true] },
   { label: 'API access',      icon: '🔌', values: [false, false, true, true, true] },
-  { label: 'White-label',     icon: '🎨', values: [false, false, false, true, true] },
+  { label: 'White-label / Portal próprio', icon: '🎨', values: ['—', '+€15/mês ➕', '+€9/mês ➕', 'Incluído', 'Incluído'],
+    note: 'Remove branding e activa portal público personalizado' },
   { label: 'Suporte',         icon: '🛟', values: ['Comunidade', 'Email', 'Prioritário', 'Dedicado', 'SLA 24h'] },
 ];
 
@@ -144,6 +148,29 @@ export default function PlansPage() {
                 </tr>
               </tfoot>
             </table>
+          </div>
+
+          {/* Addons callout */}
+          <div className="mt-6 p-4 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10">
+            <p className="text-sm font-semibold text-orange-700 dark:text-orange-300 mb-2">➕ Addons mensais disponíveis</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { icon: '📅', name: 'Agendamento', price: '€7/mês', plans: 'Free' },
+                { icon: '📁', name: 'Upload de ficheiros', price: '€5/mês', plans: 'Free' },
+                { icon: '😊', name: 'Deteção de humor', price: '€9/mês', plans: 'Free & Starter' },
+                { icon: '🎨', name: 'White-label', price: '€15/mês (Starter) · €9/mês (Pro)', plans: 'Starter & Pro' },
+              ].map((a) => (
+                <div key={a.name} className="flex items-start gap-2 bg-white dark:bg-gray-800 rounded-lg p-3 border border-orange-100 dark:border-orange-900">
+                  <span className="text-xl">{a.icon}</span>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{a.name}</p>
+                    <p className="text-[11px] text-orange-600 dark:text-orange-400 font-medium">{a.price}</p>
+                    <p className="text-[10px] text-gray-400">Para plano {a.plans}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-orange-600 dark:text-orange-400 mt-3">⚠️ Compra de addons disponível em breve. Contacta suporte@agentfy.tech para ativar manualmente.</p>
           </div>
 
           <p className="text-[11px] text-gray-400 mt-3">
