@@ -4,7 +4,7 @@
  */
 import prisma from './prisma.js';
 
-const PLATFORM_URL = process.env.FRONTEND_URL || 'https://agentify.shaklabs.tech';
+const PLATFORM_URL = process.env.FRONTEND_URL || 'https://agentfy.shaklabs.tech';
 
 export async function getPortalUrl(tenantId: string): Promise<string> {
   try {
