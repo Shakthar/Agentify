@@ -9,7 +9,7 @@ import { Agent, Plan, PLAN_LABELS, PLAN_COLORS } from '../../types';
 
 const PLAN_ORDER = ['free', 'starter', 'business', 'enterprise'];
 const WL_ADDON_PRICE: Record<string, string | null> = {
-  free: null, starter: '€5/agente/mês', business: '€3/agente/mês', enterprise: 'Incluído',
+  free: null, starter: '???5/agente/m??s', business: '???3/agente/m??s', enterprise: 'Inclu??do',
 };
 
 type Tab = 'agents' | 'domain' | 'branding';
@@ -88,9 +88,9 @@ export default function WhitelabelPage() {
         domain: domain.trim() || undefined,
       });
       await loadMe();
-      flash(true, 'Domínio guardado!');
+      flash(true, 'Dom??nio guardado!');
     } catch {
-      flash(false, 'Erro ao guardar domínio. Verifica se não está em uso por outro tenant.');
+      flash(false, 'Erro ao guardar dom??nio. Verifica se n??o est?? em uso por outro tenant.');
     } finally { setSaving(false); }
   };
 
@@ -98,7 +98,7 @@ export default function WhitelabelPage() {
 
   return (
     <div className="flex min-h-screen">
-      <Head><title>Agentfy — White-label</title></Head>
+      <Head><title>Agentfy ??? White-label</title></Head>
       <Navigation />
       <main className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-3xl mx-auto space-y-6">
@@ -106,9 +106,9 @@ export default function WhitelabelPage() {
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">🎨 White-label</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">???? White-label</h1>
               <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
-                Páginas públicas de chat com a tua marca, sem branding Agentfy.
+                P??ginas p??blicas de chat com a tua marca, sem branding Agentfy.
               </p>
             </div>
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan as Plan]}`}>
@@ -119,12 +119,12 @@ export default function WhitelabelPage() {
           {/* Plan gate for Free */}
           {!canUseWhitelabel && (
             <div className="card bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800">
-              <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">🔒 Funcionalidade bloqueada</p>
+              <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">???? Funcionalidade bloqueada</p>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">
-                O White-label está disponível a partir do plano <strong>Starter</strong> como addon de €5/agente/mês.
+                O White-label est?? dispon??vel a partir do plano <strong>Starter</strong> como addon de ???5/agente/m??s.
               </p>
               <button onClick={() => router.push('/dashboard/plans')} className="btn-primary text-sm">
-                Ver planos e fazer upgrade →
+                Ver planos e fazer upgrade ???
               </button>
             </div>
           )}
@@ -139,24 +139,24 @@ export default function WhitelabelPage() {
                 </div>
                 <div className="card text-center">
                   <p className="text-2xl font-bold text-orange-500">
-                    {addonPrice === 'Incluído' ? '€0' : addonPrice ? `€${parseInt(addonPrice) * wlAgents.length}` : '—'}
+                    {addonPrice === 'Inclu??do' ? '???0' : addonPrice ? `???${parseInt(addonPrice) * wlAgents.length}` : '???'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Custo/mês estimado</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Custo/m??s estimado</p>
                 </div>
                 <div className="card text-center">
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 break-all">
                     {domain || BASE_URL}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Domínio ativo</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Dom??nio ativo</p>
                 </div>
               </div>
 
               {/* Tabs */}
               <div className="flex border-b border-gray-200 dark:border-gray-700 gap-1">
                 {([
-                  { key: 'agents', label: '🤖 Agentes' },
-                  { key: 'domain', label: '🌐 Domínio' },
-                  { key: 'branding', label: '🎨 Branding' },
+                  { key: 'agents', label: '???? Agentes' },
+                  { key: 'domain', label: '???? Dom??nio' },
+                  { key: 'branding', label: '???? Branding' },
                 ] as { key: Tab; label: string }[]).map((t) => (
                   <button
                     key={t.key}
@@ -182,12 +182,12 @@ export default function WhitelabelPage() {
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       Ativa o white-label em cada agente individualmente.
-                      {addonPrice && addonPrice !== 'Incluído' && (
+                      {addonPrice && addonPrice !== 'Inclu??do' && (
                         <span className="ml-1 text-orange-600 font-medium">{addonPrice} por agente.</span>
                       )}
                     </p>
                   </div>
-                  {loading && <p className="text-sm text-gray-400">A carregar agentes…</p>}
+                  {loading && <p className="text-sm text-gray-400">A carregar agentes???</p>}
                   {agents.map((agent) => {
                     const wlUrl = `${domain || BASE_URL}/w/${agent.id}`;
                     return (
@@ -224,7 +224,7 @@ export default function WhitelabelPage() {
                                 rel="noopener noreferrer"
                                 className="text-[11px] text-brand-600 hover:underline shrink-0"
                               >
-                                Abrir ↗
+                                Abrir ???
                               </a>
                             </div>
                           )}
@@ -244,9 +244,9 @@ export default function WhitelabelPage() {
                   })}
                   {agents.length === 0 && !loading && (
                     <div className="card text-center py-8">
-                      <p className="text-gray-400">Ainda não tens agentes criados.</p>
+                      <p className="text-gray-400">Ainda n??o tens agentes criados.</p>
                       <button onClick={() => router.push('/dashboard/create')} className="btn-primary text-sm mt-3">
-                        Criar agente →
+                        Criar agente ???
                       </button>
                     </div>
                   )}
@@ -258,8 +258,8 @@ export default function WhitelabelPage() {
                 <div className="space-y-5">
                   <div className="card space-y-4">
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">URL padrão</h3>
-                      <p className="text-xs text-gray-500 mb-3">Sem domínio próprio, as páginas ficam disponíveis em:</p>
+                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">URL padr??o</h3>
+                      <p className="text-xs text-gray-500 mb-3">Sem dom??nio pr??prio, as p??ginas ficam dispon??veis em:</p>
                       <code className="text-sm bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg block font-mono">
                         {BASE_URL}/w/[agentId]
                       </code>
@@ -269,10 +269,10 @@ export default function WhitelabelPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Domínio personalizado
+                        Dom??nio personalizado
                       </label>
                       <p className="text-xs text-gray-500 mb-2">
-                        Ex: <code className="font-mono">chat.minha-empresa.pt</code> — sem https://
+                        Ex: <code className="font-mono">chat.minha-empresa.pt</code> ??? sem https://
                       </p>
                       <input
                         className="input font-mono text-sm"
@@ -287,15 +287,15 @@ export default function WhitelabelPage() {
                       disabled={saving}
                       className="btn-primary text-sm"
                     >
-                      {saving ? 'A guardar…' : 'Guardar domínio'}
+                      {saving ? 'A guardar???' : 'Guardar dom??nio'}
                     </button>
                   </div>
 
                   {/* DNS Instructions */}
                   <div className="card bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
-                    <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-3">📋 Instruções DNS</h3>
+                    <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-3">???? Instru????es DNS</h3>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                      Para usar um domínio próprio, adiciona os seguintes registos no teu provedor DNS (GoDaddy, Cloudflare, etc.):
+                      Para usar um dom??nio pr??prio, adiciona os seguintes registos no teu provedor DNS (GoDaddy, Cloudflare, etc.):
                     </p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs font-mono">
@@ -316,19 +316,19 @@ export default function WhitelabelPage() {
                       </table>
                     </div>
                     <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                      <p className="text-xs text-yellow-700 dark:text-yellow-300 font-semibold mb-1">⚠️ Passo adicional obrigatório</p>
+                      <p className="text-xs text-yellow-700 dark:text-yellow-300 font-semibold mb-1">?????? Passo adicional obrigat??rio</p>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Após configurar o DNS, o domínio tem que ser adicionado nas definições do projeto Vercel.
-                        Envia o domínio para <strong>contact@solutions.shaklabs.tech</strong> para ser ativado.
+                        Ap??s configurar o DNS, o dom??nio tem que ser adicionado nas defini????es do projeto Vercel.
+                        Envia o dom??nio para <strong>contact@solutions.shaklabs.tech</strong> para ser ativado.
                       </p>
                     </div>
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">ℹ️ Como funciona</p>
+                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">?????? Como funciona</p>
                       <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1 list-disc list-inside">
-                        <li>As chamadas ao chat vão sempre para o servidor Agentfy</li>
-                        <li>O domínio é só para a interface pública (página de chat)</li>
-                        <li>SSL/HTTPS é configurado automaticamente pelo Vercel</li>
-                        <li>Propagação DNS pode demorar até 48h</li>
+                        <li>As chamadas ao chat v??o sempre para o servidor Agentfy</li>
+                        <li>O dom??nio ?? s?? para a interface p??blica (p??gina de chat)</li>
+                        <li>SSL/HTTPS ?? configurado automaticamente pelo Vercel</li>
+                        <li>Propaga????o DNS pode demorar at?? 48h</li>
                       </ul>
                     </div>
                   </div>
@@ -343,7 +343,7 @@ export default function WhitelabelPage() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Nome da empresa
                       </label>
-                      <p className="text-xs text-gray-500 mb-2">Aparece no cabeçalho das páginas white-label.</p>
+                      <p className="text-xs text-gray-500 mb-2">Aparece no cabe??alho das p??ginas white-label.</p>
                       <input
                         className="input"
                         value={companyName}
@@ -356,7 +356,7 @@ export default function WhitelabelPage() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Cor principal (brand color)
                       </label>
-                      <p className="text-xs text-gray-500 mb-2">Usada em botões e elementos de destaque nas páginas públicas.</p>
+                      <p className="text-xs text-gray-500 mb-2">Usada em bot??es e elementos de destaque nas p??ginas p??blicas.</p>
                       <div className="flex items-center gap-3">
                         <input
                           type="color"
@@ -383,7 +383,7 @@ export default function WhitelabelPage() {
                         URL do logotipo
                       </label>
                       <p className="text-xs text-gray-500 mb-2">
-                        URL público de uma imagem (PNG/SVG). Recomendado: 200×60px.
+                        URL p??blico de uma imagem (PNG/SVG). Recomendado: 200??60px.
                       </p>
                       <input
                         className="input font-mono text-sm"
@@ -404,13 +404,13 @@ export default function WhitelabelPage() {
                       disabled={saving}
                       className="btn-primary text-sm"
                     >
-                      {saving ? 'A guardar…' : 'Guardar branding'}
+                      {saving ? 'A guardar???' : 'Guardar branding'}
                     </button>
                   </div>
 
                   {/* Preview */}
                   <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">👁️ Pré-visualização do cabeçalho</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">??????? Pr??-visualiza????o do cabe??alho</h3>
                     <div className="rounded-xl border border-gray-200 overflow-hidden">
                       <div
                         className="px-5 py-3 flex items-center gap-3"
@@ -433,7 +433,7 @@ export default function WhitelabelPage() {
                         </div>
                       </div>
                       <div className="p-4 bg-gray-50 dark:bg-gray-900 text-center text-xs text-gray-400">
-                        Área de chat do agente
+                        ??rea de chat do agente
                       </div>
                     </div>
                   </div>
@@ -446,4 +446,3 @@ export default function WhitelabelPage() {
     </div>
   );
 }
-                         
