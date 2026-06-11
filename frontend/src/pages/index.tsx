@@ -1,6 +1,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
