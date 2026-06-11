@@ -193,6 +193,21 @@ export default function Home() {
             </button>
           </form>
         </div>
+
+        {/* Legal footer */}
+        <div className="mt-6 text-center text-xs text-gray-400 dark:text-gray-600 space-x-3">
+          <Link href="/privacy-policy" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+            Política de Privacidade
+          </Link>
+          <span>·</span>
+          <Link href="/terms-of-service" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+            Termos de Serviço
+          </Link>
+          <span>·</span>
+          <Link href="/data-deletion" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+            Eliminação de Dados
+          </Link>
+        </div>
       </div>
     </div>
   );

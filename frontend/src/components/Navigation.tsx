@@ -102,6 +102,21 @@ export default function Navigation() {
           </button>
         </div>
       )}
+
+      {/* Legal links */}
+      <div className="pt-3 px-2 border-t border-gray-100 dark:border-gray-800 mt-2">
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <Link href="/privacy-policy" className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors">
+            Privacidade
+          </Link>
+          <Link href="/terms-of-service" className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors">
+            Termos
+          </Link>
+          <Link href="/data-deletion" className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors">
+            Dados
+          </Link>
+        </div>
+      </div>
     </aside>
   );
 }
