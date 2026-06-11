@@ -27,46 +27,48 @@ export interface PricingConfig {
 export function defaultConfig(): PricingConfig {
   return {
     plans: {
-      free:       { price: 0,   credits: 3000,  agents: 3   },
-      starter:    { price: 39,  credits: 10000, agents: 10  },
-      pro:        { price: 89,  credits: 30000, agents: 20  },
-      business:   { price: 159, credits: 60000, agents: 30  },
-      enterprise: { price: 259, credits: 75000, agents: 999 },
+      // FREE: 1.000 créditos concedidos UMA VEZ no signup (não renovam)
+      free:       { price: 0,   credits: 1000,  agents: 1  },
+      // STARTER: 5.000 créditos/mês renováveis, 1 agente
+      starter:    { price: 59,  credits: 5000,  agents: 1  },
+      // BUSINESS: 15.000 créditos/mês, 3 agentes (1 agente = 1 WhatsApp)
+      business:   { price: 159, credits: 15000, agents: 3  },
+      // ENTERPRISE: 40.000 créditos/mês, 10 agentes
+      enterprise: { price: 399, credits: 40000, agents: 10 },
     },
     features: {
+      // Scheduling incluído a partir do Business
       scheduling: {
-        free:       { mode: 'addon',    price: 7 },
-        starter:    { mode: 'included' },
-        pro:        { mode: 'included' },
+        free:       { mode: 'addon',    price: 12 },
+        starter:    { mode: 'addon',    price: 20 },  // addon Vendas/Upselling cobre
         business:   { mode: 'included' },
         enterprise: { mode: 'included' },
       },
       fileUpload: {
-        free:       { mode: 'addon',    price: 5 },
+        free:       { mode: 'addon',    price: 8 },
         starter:    { mode: 'included' },
-        pro:        { mode: 'included' },
         business:   { mode: 'included' },
         enterprise: { mode: 'included' },
       },
+      // Humor detection: addon no Starter, incluído no Business+
       humorDetection: {
-        free:       { mode: 'addon',    price: 9 },
+        free:       { mode: 'disabled' },
         starter:    { mode: 'addon',    price: 9 },
-        pro:        { mode: 'included' },
         business:   { mode: 'included' },
         enterprise: { mode: 'included' },
       },
+      // Payments: addon no Starter (€15/mês + créditos/tx), incluído no Business+
       payments: {
         free:       { mode: 'disabled' },
-        starter:    { mode: 'addon',    price: 25, creditsPerTx: 50 },
-        pro:        { mode: 'addon',    price: 15, creditsPerTx: 35 },
-        business:   { mode: 'addon',    price: 5,  creditsPerTx: 20 },
+        starter:    { mode: 'addon',    price: 15, creditsPerTx: 50 },
+        business:   { mode: 'included',            creditsPerTx: 20 },
         enterprise: { mode: 'included',            creditsPerTx: 10 },
       },
+      // Whitelabel: addon no Starter/Business, incluído no Enterprise
       whitelabel: {
         free:       { mode: 'disabled' },
         starter:    { mode: 'addon',    price: 5 },
-        pro:        { mode: 'addon',    price: 3 },
-        business:   { mode: 'included' },
+        business:   { mode: 'addon',    price: 3 },
         enterprise: { mode: 'included' },
       },
     },
@@ -109,7 +111,7 @@ export async function saveConfig(updates: Partial<PricingConfig>): Promise<Prici
 
 // ─── Sync para PLAN_LIMITS (retrocompatibilidade) ─────────────────────────────
 function syncToPlanLimits(): void {
-  const plans = ['free', 'starter', 'pro', 'business', 'enterprise'] as const;
+  const plans = ['free', 'starter', 'business', 'enterprise'] as const;
   for (const plan of plans) {
     const p = _config.plans[plan];
     const pmt = _config.features.payments[plan];

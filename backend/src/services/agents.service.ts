@@ -173,14 +173,16 @@ export async function updateAgent(
 
   // SECURITY: plan gate para skills e whitelabel no backend
   // (o frontend já bloqueia, mas um atacante podia chamar a API directamente)
-  const PLAN_ORDER = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  // New plan order: free → starter → business → enterprise (no 'pro')
+  const PLAN_ORDER = ['free', 'starter', 'business', 'enterprise'];
   const planIdx = PLAN_ORDER.indexOf(tenant.plan);
 
   if ((input.skillScheduling || input.skillFileUpload) && planIdx < PLAN_ORDER.indexOf('starter')) {
     throw new ForbiddenError('Skill requires Starter plan or higher');
   }
-  if (input.skillHumorDetection && planIdx < PLAN_ORDER.indexOf('pro')) {
-    throw new ForbiddenError('Skill requires Pro plan or higher');
+  // Humor detection is now an addon on Starter+ (no minimum plan gate beyond starter)
+  if (input.skillHumorDetection && planIdx < PLAN_ORDER.indexOf('starter')) {
+    throw new ForbiddenError('Skill requires Starter plan or higher');
   }
   if (input.skills?.scheduling && planIdx < PLAN_ORDER.indexOf('starter')) {
     throw new ForbiddenError('Skill requires Starter plan or higher');
@@ -188,8 +190,8 @@ export async function updateAgent(
   if (input.skills?.fileUpload && planIdx < PLAN_ORDER.indexOf('starter')) {
     throw new ForbiddenError('Skill requires Starter plan or higher');
   }
-  if (input.skills?.humorDetection && planIdx < PLAN_ORDER.indexOf('pro')) {
-    throw new ForbiddenError('Skill requires Pro plan or higher');
+  if (input.skills?.humorDetection && planIdx < PLAN_ORDER.indexOf('starter')) {
+    throw new ForbiddenError('Skill requires Starter plan or higher');
   }
   if (input.whitelabelEnabled && planIdx < PLAN_ORDER.indexOf('starter')) {
     throw new ForbiddenError('Whitelabel requires Starter plan or higher');

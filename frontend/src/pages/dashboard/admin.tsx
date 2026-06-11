@@ -78,12 +78,11 @@ interface Expense {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PLAN_LABELS_LOCAL: Record<string, string> = {
-  free: 'Free', starter: 'Starter', pro: 'Pro', business: 'Business', enterprise: 'Enterprise',
+  free: 'Free', starter: 'Starter', business: 'Business', enterprise: 'Enterprise',
 };
 const PLAN_COLORS: Record<string, string> = {
   free: 'bg-gray-100 text-gray-600',
   starter: 'bg-blue-100 text-blue-700',
-  pro: 'bg-purple-100 text-purple-700',
   business: 'bg-brand-100 text-brand-700',
   enterprise: 'bg-amber-100 text-amber-700',
 };
@@ -126,10 +125,10 @@ function SkillBadge({ label, active, highlight }: { label: string; active: boole
 }
 
 function PlanBar({ byPlan }: { byPlan: Record<string, number> }) {
-  const plans = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  const plans = ['free', 'starter', 'business', 'enterprise'];
   const total = plans.reduce((s, p) => s + (byPlan[p] ?? 0), 0) || 1;
   const barColors: Record<string, string> = {
-    free: 'bg-gray-400', starter: 'bg-blue-500', pro: 'bg-purple-500',
+    free: 'bg-gray-400', starter: 'bg-blue-500',
     business: 'bg-brand-600', enterprise: 'bg-amber-500',
   };
   return (
@@ -497,7 +496,7 @@ export default function AdminPage() {
                                           id={`plan-select-${selectedTenant.id}`}
                                           className="input text-xs flex-1"
                                         >
-                                          {['free','starter','pro','business','enterprise'].map(p => (
+                                          {['free','starter','business','enterprise'].map(p => (
                                             <option key={p} value={p}>{PLAN_LABELS_LOCAL[p]}</option>
                                           ))}
                                         </select>
@@ -631,8 +630,8 @@ export default function AdminPage() {
 
               <div className="card">
                 <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3">Receita por plano</h3>
-                {['starter', 'pro', 'business', 'enterprise'].map((plan) => {
-                  const PRICES: Record<string, number> = { starter: 39, pro: 89, business: 159, enterprise: 259 };
+                {['starter', 'business', 'enterprise'].map((plan) => {
+                  const PRICES: Record<string, number> = { starter: 59, business: 159, enterprise: 399 };
                   const count = metrics.tenants.byPlan[plan] ?? 0;
                   const rev = count * (PRICES[plan] ?? 0);
                   if (!count) return null;
@@ -646,7 +645,7 @@ export default function AdminPage() {
                     </div>
                   );
                 })}
-                {['starter', 'pro', 'business', 'enterprise'].every((p) => !(metrics.tenants.byPlan[p] ?? 0)) && (
+                {['starter', 'business', 'enterprise'].every((p) => !(metrics.tenants.byPlan[p] ?? 0)) && (
                   <p className="text-xs text-gray-400 py-2">Sem contas pagas ainda.</p>
                 )}
               </div>
@@ -748,7 +747,7 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {(['free','starter','pro','business','enterprise'] as const).map((plan) => (
+                          {(['free','starter','business','enterprise'] as const).map((plan) => (
                             <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
                               <td className="py-2 pr-3">
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
@@ -798,7 +797,7 @@ export default function AdminPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {(['free','starter','pro','business','enterprise'] as const).map((plan) => {
+                            {(['free','starter','business','enterprise'] as const).map((plan) => {
                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
                               const feat = (pricing.features as any)[featureKey]?.[plan] as FeaturePlanConfig | undefined;
                               const mode = feat?.mode ?? 'disabled';

@@ -298,15 +298,15 @@ export default function AgentCreator() {
 
         {/* STEP 3: Skills */}
         {step === 3 && (() => {
-          const planOrder = ['free','starter','pro','business','enterprise'];
+          const planOrder = ['free','starter','business','enterprise'];
           const planIdx = planOrder.indexOf(plan);
           const SKILLS_DEF = [
             { key: 'handoff'        as keyof FormData['skills'], icon: '🔀', label: 'Handoff com resumo IA',  desc: 'Escala para humano com resumo automático da conversa.', minPlan: 'free',    addonPrice: null as string | null },
             { key: 'dataCollection' as keyof FormData['skills'], icon: '📋', label: 'Recolha de dados',        desc: 'Formulário conversacional estruturado para captar info.', minPlan: 'free',    addonPrice: null },
             { key: 'scheduling'     as keyof FormData['skills'], icon: '📅', label: 'Agendamento',             desc: 'Agenda reuniões via Google Calendar / Calendly.', minPlan: 'starter', addonPrice: '€7/mês' },
             { key: 'fileUpload'     as keyof FormData['skills'], icon: '📁', label: 'Envio de ficheiros',      desc: 'O agente envia PDFs, catálogos e documentos na conversa.', minPlan: 'starter', addonPrice: '€5/mês' },
-            { key: 'humorDetection' as keyof FormData['skills'], icon: '😊', label: 'Deteção de humor',        desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'pro', addonPrice: '€9/mês' },
-            { key: 'payments'       as keyof FormData['skills'], icon: '💳', label: 'Pagamentos (MB Way)',    desc: 'Cobrar via MB Way diretamente na conversa. Custo por transação.', minPlan: 'starter', addonPrice: '+€25/mês' },
+            { key: 'humorDetection' as keyof FormData['skills'], icon: '😊', label: 'Deteção de humor',        desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'starter', addonPrice: '€9/mês' },
+            { key: 'payments'       as keyof FormData['skills'], icon: '💳', label: 'Pagamentos (MB Way)',    desc: 'Cobrar via MB Way diretamente na conversa. Custo por transação.', minPlan: 'starter', addonPrice: '+€15/mês' },
             { key: 'orders'         as keyof FormData['skills'], icon: '🧾', label: 'Pedidos / KDS',          desc: 'Painel de encomendas em tempo real (Kitchen Display System).', minPlan: 'starter', addonPrice: null },
           ];
           return (

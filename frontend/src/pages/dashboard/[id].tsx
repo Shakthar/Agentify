@@ -249,7 +249,7 @@ export default function AgentDetailPage() {
           {/* ⚡ Skills */}
           {activeTab === 'skills' && (() => {
             const plan = tenant.plan as string ?? 'free';
-            const planOrder = ['free','starter','pro','business','enterprise'];
+            const planOrder = ['free','starter','business','enterprise'];
             const planIdx = planOrder.indexOf(plan);
 
             const handleToggleSkill = async (field: string, current: boolean) => {
@@ -289,7 +289,6 @@ export default function AgentDetailPage() {
             function PlanBadge({ plan: p, label }: { plan: string; label: string }) {
               const cls = p === 'free'    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                 : p === 'starter'         ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400'
-                : p === 'pro'             ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
                 : 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400';
               return <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
             }
@@ -299,21 +298,20 @@ export default function AgentDetailPage() {
               { key: 'skillDataCollection', label: 'Recolha de dados',    icon: '📋', desc: 'Recolhe informação estruturada do utilizador (formulários conversacionais).', minPlan: 'free',    field: 'skillDataCollection', addonPrice: null },
               { key: 'skillScheduling',     label: 'Agendamento',         icon: '📅', desc: 'Agenda consultas, reuniões ou serviços automaticamente.',                      minPlan: 'starter', field: 'skillScheduling',     addonPrice: '€7/mês' },
               { key: 'skillFileUpload',     label: 'Envio de ficheiros',  icon: '📁', desc: 'Permite ao agente enviar documentos, catálogos e ficheiros ao utilizador.',    minPlan: 'starter', field: 'skillFileUpload',     addonPrice: '€5/mês' },
-              { key: 'skillHumorDetection', label: 'Deteção de humor',    icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.',                 minPlan: 'pro',     field: 'skillHumorDetection', addonPrice: '€9/mês' },
+              { key: 'skillHumorDetection', label: 'Deteção de humor',    icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.',                 minPlan: 'starter', field: 'skillHumorDetection', addonPrice: '€9/mês' },
             ];
 
             const MB_WAY: Record<string, { monthly: string | null; credits: string | null }> = {
               free:       { monthly: null,          credits: null },
-              starter:    { monthly: '+€25/mês',   credits: '50 crd/transação' },
-              pro:        { monthly: '+€15/mês',   credits: '35 crd/transação' },
-              business:   { monthly: '+€5/mês',    credits: '20 crd/transação' },
+              starter:    { monthly: '+€15/mês',  credits: '50 crd/transação' },
+              business:   { monthly: 'Incluído',   credits: '20 crd/transação' },
               enterprise: { monthly: 'Incluído',   credits: '10 crd/transação' },
             };
             const mbway = MB_WAY[plan] ?? MB_WAY.free;
             const mbwayAvail = mbway.monthly !== null;
 
-            const wlIncl = planIdx >= planOrder.indexOf('business');
-            const wlAddon = plan === 'starter' ? '€5/mês' : plan === 'pro' ? '€3/mês' : null;
+            const wlIncl = planIdx >= planOrder.indexOf('enterprise');
+            const wlAddon = plan === 'starter' ? '€5/mês' : plan === 'business' ? '€3/mês' : null;
             const wlAvail = wlIncl || wlAddon !== null;
             const wlActive = agent.whitelabelEnabled;
             const wlUrl = typeof window !== 'undefined' ? `${window.location.origin}/w/${agent.id}` : `/w/${agent.id}`;

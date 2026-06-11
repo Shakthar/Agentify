@@ -46,7 +46,7 @@ router.post('/platform-subscribe', asyncHandler(async (req: AuthenticatedRequest
   // Sem esta validação, um nome de plano arbitrário passa por `applyFreeUpgrade`
   // (price = 0 para planos inexistentes) e seta tenant.plan a um valor inválido,
   // causando TypeErrors em ALLOWED_MODELS[plan] e corrompendo a conta.
-  const validPlans = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  const validPlans = ['free', 'starter', 'business', 'enterprise'];
   if (!validPlans.includes(plan)) {
     res.status(400).json({ error: `Plano inválido. Valores aceites: ${validPlans.join(', ')}` });
     return;

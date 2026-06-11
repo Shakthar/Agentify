@@ -24,11 +24,10 @@ interface AgentUsage {
 }
 
 const PLANS = [
-  { id: 'free',       price: '€0',    agents: 3,  credits: '3.000',   label: 'Free' },
-  { id: 'starter',    price: '€39',   agents: 10, credits: '10.000',  label: 'Starter' },
-  { id: 'pro',        price: '€89',   agents: 20, credits: '30.000',  label: 'Pro' },
-  { id: 'business',   price: '€159',  agents: 30, credits: '60.000',  label: 'Business' },
-  { id: 'enterprise', price: '€259',  agents: 999, credits: '75.000+', label: 'Enterprise' },
+  { id: 'free',       price: '€0',    agents: 1,  credits: '1.000 (único)',  label: 'Free' },
+  { id: 'starter',    price: '€59',   agents: 1,  credits: '5.000/mês',      label: 'Starter' },
+  { id: 'business',   price: '€159',  agents: 3,  credits: '15.000/mês',     label: 'Business' },
+  { id: 'enterprise', price: '€399',  agents: 10, credits: '40.000/mês',     label: 'Enterprise' },
 ];
 
 // SVG pie chart (no external lib)

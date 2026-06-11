@@ -62,7 +62,7 @@ export default function TermsOfService() {
               <li>As informações fornecidas no registo devem ser verdadeiras, precisas e atualizadas</li>
               <li>Cada conta é pessoal e intransmissível sem consentimento escrito da ShakLabs</li>
               <li>É responsável por todas as atividades realizadas na sua conta</li>
-              <li>Deve notificar-nos imediatamente de qualquer acesso não autorizado em <a href="mailto:support@agentfy.tech" className="text-brand-600 hover:underline dark:text-brand-400">support@agentfy.tech</a></li>
+              <li>Deve notificar-nos imediatamente de qualquer acesso não autorizado em <a href="mailto:contact@solutions.shaklabs.tech" className="text-brand-600 hover:underline dark:text-brand-400">contact@solutions.shaklabs.tech</a></li>
             </ul>
           </section>
 
@@ -152,7 +152,7 @@ export default function TermsOfService() {
               Interrupções não programadas serão comunicadas o mais rapidamente possível.
             </p>
             <p>
-              Suporte técnico disponível via email em <a href="mailto:support@agentfy.tech" className="text-brand-600 hover:underline dark:text-brand-400">support@agentfy.tech</a>.
+              Suporte técnico disponível via email em <a href="mailto:contact@solutions.shaklabs.tech" className="text-brand-600 hover:underline dark:text-brand-400">contact@solutions.shaklabs.tech</a>.
             </p>
           </section>
 
@@ -225,7 +225,7 @@ export default function TermsOfService() {
             <div className="space-y-1 text-gray-600 dark:text-gray-400">
               <p><strong>ShakLabs, Lda.</strong> · Portugal</p>
               <p>Email geral: <a href="mailto:hello@agentfy.tech" className="text-brand-600 hover:underline dark:text-brand-400">hello@agentfy.tech</a></p>
-              <p>Suporte: <a href="mailto:support@agentfy.tech" className="text-brand-600 hover:underline dark:text-brand-400">support@agentfy.tech</a></p>
+              <p>Suporte: <a href="mailto:contact@solutions.shaklabs.tech" className="text-brand-600 hover:underline dark:text-brand-400">contact@solutions.shaklabs.tech</a></p>
               <p>Privacidade: <a href="mailto:privacy@agentfy.tech" className="text-brand-600 hover:underline dark:text-brand-400">privacy@agentfy.tech</a></p>
             </div>
           </section>

@@ -168,12 +168,11 @@ export interface CreateAgentInput {
   offHourEnd?: string;
 }
 
-export type Plan = 'free' | 'starter' | 'pro' | 'business' | 'enterprise';
+export type Plan = 'free' | 'starter' | 'business' | 'enterprise';
 
 export const PLAN_LABELS: Record<Plan, string> = {
   free: 'Free',
   starter: 'Starter',
-  pro: 'Pro',
   business: 'Business',
   enterprise: 'Enterprise',
 };
@@ -181,7 +180,6 @@ export const PLAN_LABELS: Record<Plan, string> = {
 export const PLAN_COLORS: Record<Plan, string> = {
   free: 'bg-gray-100 text-gray-700',
   starter: 'bg-blue-100 text-blue-700',
-  pro: 'bg-purple-100 text-purple-700',
   business: 'bg-orange-100 text-orange-700',
   enterprise: 'bg-green-100 text-green-700',
 };

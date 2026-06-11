@@ -59,27 +59,27 @@ export interface SendMessageInput {
   role: 'user' | 'assistant';
 }
 
-export type Plan = 'free' | 'starter' | 'pro' | 'business' | 'enterprise';
+export type Plan = 'free' | 'starter' | 'business' | 'enterprise';
 
 /**
  * Limites por plano.
- * - free: créditos concedidos UMA VEZ no signup, nunca resetam.
+ * - free: 1.000 créditos concedidos UMA VEZ no signup, nunca resetam.
  *         Para obter mais, o utilizador tem de fazer upgrade.
- * - starter/pro/business/enterprise: créditos resetam mensalmente
- *         via webhook do Stripe (implementação pendente).
+ * - starter/business/enterprise: créditos resetam mensalmente.
+ *
+ * 1 Agente = 1 Número WhatsApp (relação 1:1)
+ * 1 Agente PODE conectar a múltiplas plataformas (Shopify, Menu, etc.)
  */
 export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number; paymentSkillCost: number | null }> = {
-  free:       { agents: 3,   credits: 3000,  conversations: 100,      paymentSkillCost: null },  // null = bloqueado
-  starter:    { agents: 10,  credits: 10000, conversations: Infinity, paymentSkillCost: 50  },  // 50 créditos/transação
-  pro:        { agents: 20,  credits: 30000, conversations: Infinity, paymentSkillCost: 35  },  // 35 créditos/transação
-  business:   { agents: 30,  credits: 60000, conversations: Infinity, paymentSkillCost: 20  },  // 20 créditos/transação
-  enterprise: { agents: 999, credits: 75000, conversations: Infinity, paymentSkillCost: 10  },  // 10 créditos/transação
+  free:       { agents: 1,  credits: 1000,  conversations: Infinity, paymentSkillCost: null },  // null = bloqueado
+  starter:    { agents: 1,  credits: 5000,  conversations: Infinity, paymentSkillCost: 50  },  // addon €15/mês + 50 créditos/tx
+  business:   { agents: 3,  credits: 15000, conversations: Infinity, paymentSkillCost: 20  },  // incluído, 20 créditos/tx
+  enterprise: { agents: 10, credits: 40000, conversations: Infinity, paymentSkillCost: 10  },  // incluído, 10 créditos/tx
 };
 
 export const ALLOWED_MODELS: Record<Plan, string[]> = {
   free:       ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini'],
   starter:    ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929'],
-  pro:        ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o'],
   business:   ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gemini-1.5-pro'],
   enterprise: ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gemini-1.5-pro', 'claude-opus-4-5-20251101'],
 };

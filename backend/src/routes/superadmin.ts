@@ -38,7 +38,7 @@ router.get('/tenants/:id', asyncHandler(async (req: AuthenticatedRequest, res: R
 // PATCH /api/superadmin/tenants/:id/plan
 router.patch('/tenants/:id/plan', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { plan, creditsOverride } = req.body as { plan: string; creditsOverride?: number };
-  const validPlans = ['free', 'starter', 'pro', 'business', 'enterprise'];
+  const validPlans = ['free', 'starter', 'business', 'enterprise'];
   if (!plan || !validPlans.includes(plan)) {
     res.status(400).json({ error: `plan inválido. Valores aceites: ${validPlans.join(', ')}` });
     return;

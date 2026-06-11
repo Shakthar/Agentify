@@ -7,9 +7,9 @@ import { useAgent } from '../../hooks/useAgent';
 import api from '../../utils/api';
 import { Agent, Plan, PLAN_LABELS, PLAN_COLORS } from '../../types';
 
-const PLAN_ORDER = ['free', 'starter', 'pro', 'business', 'enterprise'];
+const PLAN_ORDER = ['free', 'starter', 'business', 'enterprise'];
 const WL_ADDON_PRICE: Record<string, string | null> = {
-  free: null, starter: '€5/agente/mês', pro: '€3/agente/mês', business: 'Incluído', enterprise: 'Incluído',
+  free: null, starter: '€5/agente/mês', business: '€3/agente/mês', enterprise: 'Incluído',
 };
 
 type Tab = 'agents' | 'domain' | 'branding';
@@ -319,7 +319,7 @@ export default function WhitelabelPage() {
                       <p className="text-xs text-yellow-700 dark:text-yellow-300 font-semibold mb-1">⚠️ Passo adicional obrigatório</p>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         Após configurar o DNS, o domínio tem que ser adicionado nas definições do projeto Vercel.
-                        Envia o domínio para <strong>suporte@agentfy.tech</strong> para ser ativado.
+                        Envia o domínio para <strong>contact@solutions.shaklabs.tech</strong> para ser ativado.
                       </p>
                     </div>
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -446,3 +446,4 @@ export default function WhitelabelPage() {
     </div>
   );
 }
+                         
