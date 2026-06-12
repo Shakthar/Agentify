@@ -13,22 +13,38 @@ export async function getPlatformMetrics() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const yearStart = new Date(new Date().getFullYear(), 0, 1);
+
   const [
     totalTenants,
     totalAgents,
     activeAgents,
     totalConversations,
     todayConversations,
+    thisMonthConversations,
+    thisYearConversations,
     totalMessages,
     tenantsByPlan,
     expenses,
     creditLogs,
+    addonWhatsapp,
+    addonWhitelabel,
+    addonHumorDetection,
+    addonScheduling,
+    addonFileUpload,
+    addonHandoff,
   ] = await Promise.all([
     prisma.tenant.count({ where: { deletedAt: null } }),
     prisma.agent.count(),
     prisma.agent.count({ where: { isActive: true } }),
     prisma.conversation.count(),
     prisma.conversation.count({ where: { createdAt: { gte: todayStart } } }),
+    prisma.conversation.count({ where: { createdAt: { gte: monthStart } } }),
+    prisma.conversation.count({ where: { createdAt: { gte: yearStart } } }),
     prisma.message.count(),
     prisma.tenant.groupBy({ by: ['plan'], _count: { id: true }, where: { deletedAt: null } }),
     prisma.platformExpense.findMany({ orderBy: { createdAt: 'desc' } }),
@@ -36,6 +52,12 @@ export async function getPlatformMetrics() {
       where: { reason: 'chat' },
       select: { amount: true, details: true },
     }),
+    prisma.agent.count({ where: { whatsappEnabled: true } }),
+    prisma.agent.count({ where: { whitelabelEnabled: true } }),
+    prisma.agent.count({ where: { skillHumorDetection: true } }),
+    prisma.agent.count({ where: { skillScheduling: true } }),
+    prisma.agent.count({ where: { skillFileUpload: true } }),
+    prisma.agent.count({ where: { skillHandoff: true } }),
   ]);
 
   // Revenue
@@ -68,10 +90,17 @@ export async function getPlatformMetrics() {
     }
   }
 
+  const totalAgentsForPct = totalAgents || 1;
+
   return {
     tenants: { total: totalTenants, byPlan: planBreakdown },
     agents:  { total: totalAgents, active: activeAgents },
-    conversations: { total: totalConversations, today: todayConversations },
+    conversations: {
+      total: totalConversations,
+      today: todayConversations,
+      thisMonth: thisMonthConversations,
+      thisYear: thisYearConversations,
+    },
     messages: { total: totalMessages },
     revenue: { mrr, arr: mrr * 12 },
     expenses: {
@@ -79,12 +108,20 @@ export async function getPlatformMetrics() {
       items: expenses,
     },
     usage: {
-      creditsConsumed: totalCreditsConsumed, // unidade interna
+      creditsConsumed: totalCreditsConsumed,
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
-      realApiCostEur: Math.round(realApiCostEur * 100) / 100, // custo real EUR
+      realApiCostEur: Math.round(realApiCostEur * 100) / 100,
     },
     balance: mrr - totalExpenses,
+    addons: [
+      { key: 'whatsapp',       label: 'WhatsApp ativo',       count: addonWhatsapp,       pct: Math.round((addonWhatsapp / totalAgentsForPct) * 100) },
+      { key: 'whitelabel',     label: 'White-label',          count: addonWhitelabel,     pct: Math.round((addonWhitelabel / totalAgentsForPct) * 100) },
+      { key: 'humorDetection', label: 'Detecao de Humor',     count: addonHumorDetection, pct: Math.round((addonHumorDetection / totalAgentsForPct) * 100) },
+      { key: 'scheduling',     label: 'Agendamento',          count: addonScheduling,     pct: Math.round((addonScheduling / totalAgentsForPct) * 100) },
+      { key: 'fileUpload',     label: 'Upload de Ficheiros',  count: addonFileUpload,     pct: Math.round((addonFileUpload / totalAgentsForPct) * 100) },
+      { key: 'handoff',        label: 'Handoff para Humano',  count: addonHandoff,        pct: Math.round((addonHandoff / totalAgentsForPct) * 100) },
+    ],
   };
 }
 
