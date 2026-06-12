@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Navigation from '../../components/Navigation';
@@ -955,11 +955,6 @@ export default function AdminPage() {
             </>
           )}
         </div>
-      </main>
-    </div>
-  );
-}
-
       </main>
     </div>
   );
