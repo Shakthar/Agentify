@@ -47,20 +47,24 @@ interface TenantDetail {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface AddonStat {
+  key: string; label: string; count: number; pct: number;
+}
 interface PlatformMetrics {
   tenants: { total: number; byPlan: Record<string, number> };
   agents: { total: number; active: number };
-  conversations: { total: number; today: number };
+  conversations: { total: number; today: number; thisMonth: number; thisYear: number };
   messages: { total: number };
   revenue: { mrr: number; arr: number };
   expenses: { monthly: number; items: Expense[] };
   usage: {
-    creditsConsumed: number;   // créditos internos (unidade virtual)
-    inputTokens: number;       // tokens reais enviados ao LLM
-    outputTokens: number;      // tokens reais recebidos do LLM
-    realApiCostEur: number;    // custo real em EUR pago à Anthropic/OpenAI
+    creditsConsumed: number;
+    inputTokens: number;
+    outputTokens: number;
+    realApiCostEur: number;
   };
   balance: number;
+  addons: AddonStat[];
 }
 
 interface TenantRow {
@@ -351,12 +355,12 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <KpiCard label="Contas" value={metrics.tenants.total} />
                 <KpiCard label="Agentes" value={metrics.agents.total} sub={`${metrics.agents.active} ativos`} />
-                <KpiCard label="Conversas" value={metrics.conversations.total} sub={`${metrics.conversations.today} hoje`} />
-                <KpiCard label="Mensagens" value={metrics.messages.total.toLocaleString()} />
+                <KpiCard label="Conversas totais" value={metrics.conversations.total.toLocaleString()} sub={`${metrics.messages.total.toLocaleString()} mensagens`} />
+                <KpiCard label="Conversas este ano" value={metrics.conversations.thisYear.toLocaleString()} sub={`${metrics.conversations.thisMonth} este mês · ${metrics.conversations.today} hoje`} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <KpiCard label="MRR" value={`€${metrics.revenue.mrr.toFixed(2)}`} accent="text-green-600" />
-                <KpiCard label="ARR" value={`€${metrics.revenue.arr.toFixed(2)}`} accent="text-green-600" />
+                <KpiCard label="Receita Mensal Recorrente" value={`€${metrics.revenue.mrr.toFixed(2)}`} accent="text-green-600" />
+                <KpiCard label="Receita Anual Recorrente" value={`€${metrics.revenue.arr.toFixed(2)}`} accent="text-green-600" />
                 <KpiCard
                   label="Balanço mensal"
                   value={`€${metrics.balance.toFixed(2)}`}
@@ -402,10 +406,60 @@ export default function AdminPage() {
                 {(metrics.usage?.creditsConsumed ?? 0) > 0 && (
                   <p className="text-[10px] text-gray-400 mt-3 border-t border-gray-100 dark:border-gray-700 pt-2">
                     💡 Eficiência: €{((metrics.usage?.realApiCostEur ?? 0) / (metrics.usage?.creditsConsumed ?? 1) * 1000).toFixed(4)} por 1 000 créditos consumidos
-                    {' · '}Receita por 1 000 créditos: €{(metrics.revenue.mrr / ((metrics.usage?.creditsConsumed ?? 1) / 1000)).toFixed(2)}
+                    {' · '}Receita mensal por 1 000 créditos: €{(metrics.revenue.mrr / ((metrics.usage?.creditsConsumed ?? 1) / 1000)).toFixed(2)}
                   </p>
                 )}
               </div>
+              {/* Conversas por período */}
+              <div className="card">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-4">
+                  💬 Conversas por período
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                  {[
+                    { label: 'Hoje',      value: metrics.conversations.today,     accent: 'text-brand-600' },
+                    { label: 'Este mês',  value: metrics.conversations.thisMonth, accent: 'text-brand-600' },
+                    { label: 'Este ano',  value: metrics.conversations.thisYear,  accent: 'text-gray-800 dark:text-gray-100' },
+                    { label: 'Total',     value: metrics.conversations.total,     accent: 'text-gray-800 dark:text-gray-100' },
+                  ].map(({ label, value, accent }) => (
+                    <div key={label}>
+                      <p className="text-[11px] text-gray-400 mb-0.5">{label}</p>
+                      <p className={`text-2xl font-bold ${accent}`}>{value.toLocaleString('pt-PT')}</p>
+                      {metrics.conversations.total > 0 && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          {Math.round((value / metrics.conversations.total) * 100)}% do total
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Addons / Skills ativos */}
+              {metrics.addons && metrics.addons.length > 0 && (
+                <div className="card">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-4">
+                    🔌 Addons e Skills ativos — adopção por agentes ({metrics.agents.total} total)
+                  </p>
+                  <div className="space-y-2.5">
+                    {metrics.addons.map((addon) => (
+                      <div key={addon.key} className="flex items-center gap-3">
+                        <p className="text-xs text-gray-700 dark:text-gray-300 w-44 shrink-0">{addon.label}</p>
+                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-brand-500 rounded-full transition-all"
+                            style={{ width: `${Math.min(addon.pct, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-20 text-right shrink-0">
+                          {addon.count} agente{addon.count !== 1 ? 's' : ''} <span className="text-gray-400 font-normal">({addon.pct}%)</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-4">
                 <PlanBar byPlan={metrics.tenants.byPlan} />
               </div>
@@ -419,7 +473,7 @@ export default function AdminPage() {
                 <table className="w-full text-sm min-w-[700px]">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                      {['Conta', 'Plano', 'Agentes', 'Conversas', 'Créditos', 'MRR', 'Criada', ''].map((h) => (
+                      {['Conta', 'Plano', 'Agentes', 'Conversas', 'Créditos', 'Mensalidade', 'Criada', ''].map((h) => (
                         <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
                       ))}
                     </tr>
@@ -571,9 +625,9 @@ export default function AdminPage() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">💚 Receita mensal (MRR)</p>
+                  <p className="text-xs text-gray-500 mb-1">💚 Receita Mensal Recorrente</p>
                   <p className="text-3xl font-bold text-green-600">€{metrics.revenue.mrr.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400 mt-1">ARR: €{metrics.revenue.arr.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400 mt-1">Receita Anual Recorrente: €{metrics.revenue.arr.toFixed(2)}</p>
                 </div>
                 <div className="card">
                   <p className="text-xs text-gray-500 mb-1">❤️ Despesas fixas/mês</p>
@@ -853,7 +907,7 @@ export default function AdminPage() {
                       {pricingSaving ? 'A guardar...' : '💾 Guardar alterações'}
                     </button>
                   </div>
-                </>
+                              </>
               )}
             </div>
           )}
@@ -901,6 +955,11 @@ export default function AdminPage() {
             </>
           )}
         </div>
+      </main>
+    </div>
+  );
+}
+
       </main>
     </div>
   );
