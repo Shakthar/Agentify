@@ -54,7 +54,7 @@ export async function listConversations(tenantId: string, params: ListConversati
       take,
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true, agentId: true, channelType: true, visitorId: true,
+        id: true, agentId: true, channelType: true, visitorId: true, visitorName: true,
         sentiment: true, urgency: true, resolved: true,
         handedOffToHuman: true, tokensUsed: true, creditsUsed: true,
         createdAt: true, closedAt: true,
@@ -272,22 +272,38 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   }
 
   // Injeta historial de pedidos anteriores do mesmo visitante (cliente recorrente)
+  // e recupera nome do visitante guardado em conversas anteriores
+  let knownVisitorName: string | null = conversation.visitorName ?? null;
+
   if (conversation.visitorId) {
     try {
       // Busca conversas anteriores deste visitante neste agente (excluindo a atual)
-      const pastConvIds = await prisma.conversation.findMany({
+      const pastConvs = await prisma.conversation.findMany({
         where: {
           agentId: conversation.agentId,
           visitorId: conversation.visitorId,
           id: { not: conversation.id },
         },
-        select: { id: true },
+        select: { id: true, visitorName: true },
       });
 
-      if (pastConvIds.length > 0) {
+      // Recupera nome do visitante de conversas anteriores (se ainda não está na conversa atual)
+      if (!knownVisitorName) {
+        const nameFromPast = pastConvs.find((c) => c.visitorName)?.visitorName ?? null;
+        if (nameFromPast) {
+          knownVisitorName = nameFromPast;
+          // Persiste o nome na conversa atual para evitar lookups repetidos
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { visitorName: nameFromPast },
+          }).catch(() => { /* ignorar falha de persistência */ });
+        }
+      }
+
+      if (pastConvs.length > 0) {
         const pastOrders = await prisma.order.findMany({
           where: {
-            conversationId: { in: pastConvIds.map((c) => c.id) },
+            conversationId: { in: pastConvs.map((c) => c.id) },
             status: { in: ['paid', 'done'] },
           },
           orderBy: { createdAt: 'desc' },
@@ -322,6 +338,21 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     }
   }
 
+  // Injeta instrução de identificação do visitante
+  // (nome para personalização e inclusão nos pedidos)
+  if (knownVisitorName) {
+    systemPrompt += `\n\n---\nNOME DO CLIENTE: ${knownVisitorName}`
+      + `\nTrata o cliente pelo nome "${knownVisitorName}" nas tuas respostas.`
+      + ` Inclui sempre o nome no resumo do pedido e na descrição enviada para pagamento.`;
+  } else {
+    systemPrompt += '\n\n---\nIDENTIFICAÇÃO DO CLIENTE (obrigatório):'
+      + '\nAinda não sabes o nome deste cliente. Pede o nome no início da conversa ou,'
+      + ' no máximo, antes de apresentares o resumo final do pedido.'
+      + ' Quando o cliente disser o nome, inclui o marcador [VISITOR_NAME:NomeAqui] na tua resposta'
+      + ' (sem espaços antes/depois dos dois pontos, exatamente assim: [VISITOR_NAME:João]).'
+      + ' Após aprender o nome, usa-o nas respostas seguintes e inclui-o sempre no resumo e descrição do pedido.';
+  }
+
   // Chamada ao LLM
   let llmResponse;
   try {
@@ -343,9 +374,23 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
 
   // Parseia [MBWAY:phone|amount|description] da resposta do LLM
   const mbwayMatch = llmResponse.content.match(/\[MBWAY:([^|\]]+)\|([^|\]]+)\|([^\]]+)\]/i);
+
+  // Parseia [VISITOR_NAME:Nome] — aprende e persiste o nome do visitante
+  const visitorNameMatch = llmResponse.content.match(/\[VISITOR_NAME:([^\]]+)\]/i);
+  if (visitorNameMatch) {
+    const learnedName = visitorNameMatch[1].trim().slice(0, 100);
+    if (learnedName) {
+      prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { visitorName: learnedName },
+      }).catch(() => { /* ignorar falha de persistência do nome */ });
+    }
+  }
+
   const cleanContent = llmResponse.content
     .replace(/\[SEND_DOC:[a-z0-9]+\]/gi, '')
     .replace(/\[MBWAY:[^\]]+\]/gi, '')
+    .replace(/\[VISITOR_NAME:[^\]]+\]/gi, '')
     .trim();
 
   let docAttachment: { id: string; name: string; url: string } | null = null;

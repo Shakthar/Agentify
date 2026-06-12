@@ -149,7 +149,8 @@ model Conversation {
   channelType           String     // whatsapp, web, email
   externalId            String?    // WhatsApp message ID, etc
   visitorId             String?    // Visitor/customer identifier
-  
+  visitorName           String?    // Nome do cliente (aprendido durante a conversa)
+
   // Content (encrypted)
   messages              Message[]
   summary               String?    @db.Text
