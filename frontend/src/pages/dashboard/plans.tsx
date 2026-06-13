@@ -469,7 +469,7 @@ export default function PlansPage() {
                         <th key={plan.id} className={`py-3 px-3 text-center relative ${currentPlan === plan.id ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}>
                           {currentPlan === plan.id && (
                             <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
-                          )}
+                                                 )}
                           <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
                         </th>
                       ))}
