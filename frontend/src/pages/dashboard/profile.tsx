@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -20,6 +20,53 @@ interface ProfileForm {
   addressCity: string;
   addressCountry: string;
   addressZip: string;
+}
+
+type Theme = 'light' | 'dark' | 'system';
+
+function ThemeCard() {
+  const [theme, setTheme] = useState<Theme>('system');
+
+  useEffect(() => {
+    try {
+      setTheme((localStorage.getItem('theme') as Theme) || 'system');
+    } catch {}
+  }, []);
+
+  const applyTheme = useCallback((t: Theme) => {
+    setTheme(t);
+    try { localStorage.setItem('theme', t); } catch {}
+    const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', isDark);
+  }, []);
+
+  const options: { value: Theme; label: string; icon: string }[] = [
+    { value: 'light',  label: 'Claro',    icon: '☀️' },
+    { value: 'dark',   label: 'Escuro',   icon: '🌙' },
+    { value: 'system', label: 'Sistema',  icon: '💻' },
+  ];
+
+  return (
+    <div className="card space-y-4">
+      <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">🎨 Aparência</h2>
+      <div className="flex gap-3">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => applyTheme(opt.value)}
+            className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
+              theme === opt.value
+                ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400'
+                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            <span className="text-xl">{opt.icon}</span>
+            <span>{opt.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ProfilePage() {
@@ -275,6 +322,9 @@ export default function ProfilePage() {
             )}
             <button type="submit" className="btn-primary" disabled={pwSaving}>{pwSaving ? 'A alterar...' : '🔒 Alterar palavra-passe'}</button>
           </form>
+
+          {/* ─── APARÊNCIA ────────────────────────────────────────────── */}
+          <ThemeCard />
 
           {/* ─── 2FA ──────────────────────────────────────────────────── */}
           <div className="card space-y-4">
