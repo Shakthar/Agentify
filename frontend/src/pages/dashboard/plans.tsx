@@ -280,7 +280,7 @@ export default function PlansPage() {
 
   return (
     <div className="flex min-h-screen">
-      <Head><title>Agentify — Planos e Skills</title></Head>
+      <Head><title>Agentfy — Planos e Skills</title></Head>
       <Navigation />
       <main className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-6xl mx-auto">

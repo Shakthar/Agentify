@@ -177,7 +177,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Agentify — Agentes de IA para Atendimento no WhatsApp</title>
+        <title>Agentfy — Agentes de IA para Atendimento no WhatsApp</title>
         <meta name="description" content="Cria agentes de IA para atendimento ao cliente no WhatsApp em minutos. Sem código. Créditos renováveis. GDPR compliant." />
       </Head>
 
@@ -289,7 +289,7 @@ export default function Home() {
             <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6 leading-tight">
               O teu negócio perde vendas<br />
               <span className="text-brand-600 dark:text-brand-400">enquanto dormes.</span><br />
-              <span className="text-2xl md:text-3xl font-semibold text-gray-600 dark:text-gray-300">O Agentify resolve isso.</span>
+              <span className="text-2xl md:text-3xl font-semibold text-gray-600 dark:text-gray-300">O Agentfy resolve isso.</span>
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
               Um agente de IA no teu WhatsApp que responde, processa pedidos e aceita pagamentos — 24 horas por dia, 7 dias por semana.
@@ -346,7 +346,7 @@ export default function Home() {
         <section className="py-10 px-4 bg-white dark:bg-gray-900 border-y border-gray-100 dark:border-gray-800">
           <div className="max-w-4xl mx-auto">
             <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">
-              Negócios que já automatizaram o atendimento com Agentify
+              Negócios que já automatizaram o atendimento com Agentfy
             </p>
             {/* Logos placeholder */}
             <div className="flex flex-wrap items-center justify-center gap-8 mb-10 opacity-60">
@@ -533,7 +533,7 @@ export default function Home() {
                   { icon: '⚡', name: 'Créditos extras', desc: 'Compra quando precisas, ao preço do teu plano' },
                   { icon: '🔄', name: 'Rollover', desc: '85% dos créditos não usados transferidos para o mês seguinte' },
                   { icon: '🤖', name: 'Mais agentes', desc: 'Starter +€20/ag · Business +€15/ag · Enterprise +€10/ag' },
-                  { icon: '🎨', name: 'White-label', desc: 'Portal com a tua marca, sem branding Agentify' },
+                  { icon: '🎨', name: 'White-label', desc: 'Portal com a tua marca, sem branding Agentfy' },
                 ].map(a => (
                   <div key={a.name} className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-orange-100 dark:border-orange-900">
                     <span className="text-xl">{a.icon}</span>
@@ -623,7 +623,7 @@ export default function Home() {
               </div>
             </div>
             <div className="mt-8 pt-6 border-t border-gray-800 text-center text-xs text-gray-600">
-              © {new Date().getFullYear()} Agentify by Shaklabs.tech · Feito em Portugal 🇵🇹 · GDPR Compliant
+              © {new Date().getFullYear()} Agentfy by Shaklabs.tech · Feito em Portugal 🇵🇹 · GDPR Compliant
             </div>
           </div>
         </footer>

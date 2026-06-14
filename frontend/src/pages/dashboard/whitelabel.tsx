@@ -94,7 +94,7 @@ export default function WhitelabelPage() {
     } finally { setSaving(false); }
   };
 
-  const BASE_URL = 'agentify.shaklabs.tech';
+  const BASE_URL = 'agentfy.shaklabs.tech';
 
   return (
     <div className="flex min-h-screen">

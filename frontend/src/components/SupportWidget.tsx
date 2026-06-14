@@ -38,15 +38,15 @@ const FAQ: Array<{ keywords: string[]; answer: string }> = [
   },
   {
     keywords: ['gdpr', 'rgpd', 'segurança', 'seguranca', 'dados', 'privacidade'],
-    answer: `O Agentify é 100% GDPR/RGPD compliant:\n\n• Encriptação AES-256\n• Servidores na EU\n• Exportação e eliminação de dados a pedido\n• Auditoria disponível (Enterprise)\n• Backups diários automáticos`,
+    answer: `O Agentfy é 100% GDPR/RGPD compliant:\n\n• Encriptação AES-256\n• Servidores na EU\n• Exportação e eliminação de dados a pedido\n• Auditoria disponível (Enterprise)\n• Backups diários automáticos`,
   },
   {
     keywords: ['whitelabel', 'white-label', 'marca', 'revend', 'minha marca'],
-    answer: `Sim, o White-label permite disponibilizar a plataforma com a tua marca:\n\n• Starter: +€5/agente/mês\n• Business: +€3/agente/mês\n• Enterprise: incluído\n\nOs teus clientes acedem com o teu logo, cores e domínio — sem qualquer referência ao Agentify.`,
+    answer: `Sim, o White-label permite disponibilizar a plataforma com a tua marca:\n\n• Starter: +€5/agente/mês\n• Business: +€3/agente/mês\n• Enterprise: incluído\n\nOs teus clientes acedem com o teu logo, cores e domínio — sem qualquer referência ao Agentfy.`,
   },
   {
     keywords: ['brasil', 'brazil', 'brasil', 'português do brasil', 'pt-br'],
-    answer: `Sim, o Agentify funciona no Brasil! 🇧🇷\n\n• Suporte a PIX\n• WhatsApp com números brasileiros\n• Responde em Português do Brasil\n• A plataforma detecta automaticamente o idioma do cliente`,
+    answer: `Sim, o Agentfy funciona no Brasil! 🇧🇷\n\n• Suporte a PIX\n• WhatsApp com números brasileiros\n• Responde em Português do Brasil\n• A plataforma detecta automaticamente o idioma do cliente`,
   },
   {
     keywords: ['suporte', 'contacto', 'contactar', 'ajuda', 'email', 'falar'],
@@ -68,7 +68,7 @@ function getBotResponse(userText: string): string {
   if (match) return match.answer;
 
   // Fallback genérico
-  return `Obrigado pela tua pergunta! Para obter uma resposta mais detalhada, entra em contacto connosco:\n\n📧 contact@solutions.shaklabs.tech\n\nPodes também consultar os nossos planos em https://agentify.shaklabs.tech/#pricing`;
+  return `Obrigado pela tua pergunta! Para obter uma resposta mais detalhada, entra em contacto connosco:\n\n📧 contact@solutions.shaklabs.tech\n\nPodes também consultar os nossos planos em https://agentfy.shaklabs.tech/#pricing`;
 }
 
 // ─── Widget ───────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export default function SupportWidget() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'bot',
-      text: 'Olá! 👋 Sou o assistente do Agentify. Como posso ajudar?\n\nPodes perguntar sobre planos, créditos, WhatsApp, GDPR, addons ou qualquer outra dúvida.',
+      text: 'Olá! 👋 Sou o assistente do Agentfy. Como posso ajudar?\n\nPodes perguntar sobre planos, créditos, WhatsApp, GDPR, addons ou qualquer outra dúvida.',
     },
   ]);
   const [input, setInput] = useState('');
@@ -127,7 +127,7 @@ export default function SupportWidget() {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-base">🤖</div>
               <div>
-                <p className="text-white text-sm font-semibold leading-tight">Suporte Agentify</p>
+                <p className="text-white text-sm font-semibold leading-tight">Suporte Agentfy</p>
                 <p className="text-brand-200 text-[10px]">Responde em segundos</p>
               </div>
             </div>
