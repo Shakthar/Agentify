@@ -140,15 +140,24 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
   res.status(200).send('EVENT_RECEIVED');
 
   const body = req.body;
-  if (body.object !== 'whatsapp_business_account') return;
+  console.log(`[WhatsApp Webhook] payload recebido: object=${body.object} entries=${body.entry?.length ?? 0}`);
+  if (body.object !== 'whatsapp_business_account') {
+    console.warn(`[WhatsApp Webhook] object inesperado: ${body.object} — ignorado`);
+    return;
+  }
 
   for (const entry of (body.entry ?? []) as WhatsAppEntry[]) {
+    console.log(`[WhatsApp Webhook] entry id=${entry.id} changes=${entry.changes?.length ?? 0}`);
     for (const change of (entry.changes ?? [])) {
-      if (change.field !== 'messages') continue;
+      if (change.field !== 'messages') {
+        console.log(`[WhatsApp Webhook] campo ignorado: ${change.field}`);
+        continue;
+      }
 
       const value       = change.value;
       const phoneId     = value.metadata?.phone_number_id as string | undefined;
       const messages    = (value.messages ?? []) as WhatsAppMessage[];
+      console.log(`[WhatsApp Webhook] phone_number_id=${phoneId} mensagens=${messages.length}`);
 
       for (const msg of messages) {
         const from = msg.from; // Número do remetente (ex: 351912345678)
