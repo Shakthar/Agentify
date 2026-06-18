@@ -263,13 +263,28 @@ export default function AdminPage() {
     finally { setWpLoading(false); }
   }
 
-  async function testAgent(agentId: string) {
+  async function testAgent(agentId: string, phoneNumberId: string | null) {
+    if (!phoneNumberId) {
+      setWpTestResult(prev => ({ ...prev, [agentId]: { ok: false, msg: 'Phone Number ID não configurado — impossível testar routing.' } }));
+      return;
+    }
     setWpTestId(agentId);
     try {
-      const r = await api.post('/api/superadmin/whatsapp/test', { agentId, text: 'Olá, teste de diagnóstico.' });
-      setWpTestResult(prev => ({ ...prev, [agentId]: { ok: true, msg: r.data.response } }));
+      // Usa /simulate que faz o routing REAL por phone_number_id (igual ao webhook do Meta)
+      const r = await api.post('/api/webhooks/whatsapp/simulate', { phoneNumberId, text: 'Olá, teste de diagnóstico.' });
+      const routedTo: string = r.data.agent;
+      const agentName = wpData?.agents.find(a => a.id === agentId)?.name ?? '';
+      const routingOk = routedTo === agentName;
+      const msg = routingOk
+        ? `Routing OK → "${routedTo}" respondeu. Resposta: ${String(r.data.agentResponse ?? '').slice(0, 200)}`
+        : `Routing ERRADO! Phone ID ${phoneNumberId} foi para "${routedTo}" em vez de "${agentName}". Verifica se o Phone Number ID está correto no agente.`;
+      setWpTestResult(prev => ({ ...prev, [agentId]: { ok: routingOk, msg } }));
     } catch (e: any) {
-      const msg = e?.response?.data?.error ?? 'Erro desconhecido';
+      const errData = e?.response?.data;
+      const agentes = errData?.agentesWhatsAppAtivos as Array<{name: string; whatsappNumber: string}> | undefined;
+      const msg = agentes
+        ? `Nenhum agente encontrado para ID "${phoneNumberId}". Ativos: ${agentes.map(a => `${a.name} → ${a.whatsappNumber}`).join(' | ')}`
+        : errData?.error ?? 'Erro desconhecido';
       setWpTestResult(prev => ({ ...prev, [agentId]: { ok: false, msg } }));
     } finally { setWpTestId(null); }
   }
@@ -1073,12 +1088,12 @@ export default function AdminPage() {
                                           {!a.isActive && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700">Inativo</span>}
                                         </div>
                                         <button
-                                          onClick={() => testAgent(a.id)}
-                                          disabled={isTesting || a.status === 'error'}
+                                          onClick={() => testAgent(a.id, a.phoneNumberId)}
+                                          disabled={isTesting || !a.phoneNumberId}
                                           className="text-xs btn-secondary px-3 py-1.5 shrink-0 disabled:opacity-40"
-                                          title={a.status === 'error' ? 'Corrija os erros antes de testar' : 'Testar pipeline LLM'}
+                                          title={!a.phoneNumberId ? 'Phone Number ID não configurado' : 'Testa o routing real pelo phone_number_id (como o Meta faz)'}
                                         >
-                                          {isTesting ? '⏳ A testar...' : '🧪 Testar'}
+                                          {isTesting ? '⏳ A testar...' : '🧪 Testar routing'}
                                         </button>
                                       </div>
 

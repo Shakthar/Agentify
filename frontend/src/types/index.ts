@@ -38,6 +38,7 @@ export interface Agent {
   whitelabelEnabled: boolean;
   whatsappEnabled: boolean;
   whatsappNumber?: string;
+  whatsappTokenConfigured?: boolean;
   notifyPhone?: string;
   emailEnabled: boolean;
   skillHandoff: boolean;

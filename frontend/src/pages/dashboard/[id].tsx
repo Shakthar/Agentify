@@ -52,6 +52,8 @@ export default function AgentDetailPage() {
   const [phoneId, setPhoneId] = useState('');
   const [notifyPhone, setNotifyPhone] = useState('');
   const [wpEnabled, setWpEnabled] = useState(false);
+  const [wpToken, setWpToken] = useState('');
+  const [wpTokenVisible, setWpTokenVisible] = useState(false);
   const [wpSaving, setWpSaving] = useState(false);
   const [wpMsg, setWpMsg] = useState('');
   const [wpTokenOk, setWpTokenOk] = useState(true);
@@ -65,6 +67,7 @@ export default function AgentDetailPage() {
       setPhoneId(data.whatsappNumber ?? '');
       setNotifyPhone(data.notifyPhone ?? '');
       setWpEnabled(data.whatsappEnabled ?? false);
+      // token is write-only — never returned from API, leave blank
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
@@ -94,7 +97,9 @@ export default function AgentDetailPage() {
     if (!agent) return;
     setWpSaving(true);
     try {
-      const updated = await updateAgent(agent.id, { whatsappNumber: phoneId, whatsappEnabled: wpEnabled, notifyPhone: notifyPhone || undefined });
+      const payload: Record<string, unknown> = { whatsappNumber: phoneId, whatsappEnabled: wpEnabled, notifyPhone: notifyPhone || undefined };
+      if (wpToken.trim()) payload.whatsappToken = wpToken.trim();
+      const updated = await updateAgent(agent.id, payload);
       setAgent(updated);
       setWpMsg('Guardado com sucesso!');
       setTimeout(() => setWpMsg(''), 3000);
@@ -627,6 +632,31 @@ export default function AgentDetailPage() {
                       Phone Number ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico do Meta)</span>
                     </label>
                     <input className="input" placeholder="ex: 123456789012345" value={phoneId} onChange={(e) => setPhoneId(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Token por agente <span className="text-gray-400 dark:text-gray-500 font-normal">(opcional — sobrepõe o token global do servidor)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        className="input pr-20"
+                        type={wpTokenVisible ? 'text' : 'password'}
+                        placeholder={agent?.whatsappTokenConfigured ? '••••••••  (já configurado — deixa vazio para manter)' : 'EAAxxxxxxx... (Access Token do Meta)'}
+                        value={wpToken}
+                        onChange={(e) => setWpToken(e.target.value)}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setWpTokenVisible(v => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1"
+                      >
+                        {wpTokenVisible ? 'Ocultar' : 'Mostrar'}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                      Usa isto quando este número pertence a uma conta Meta diferente do servidor principal. Gera em: Meta for Developers → App → WhatsApp → API Setup.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
