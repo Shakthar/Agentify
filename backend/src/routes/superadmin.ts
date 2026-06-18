@@ -81,6 +81,113 @@ router.delete('/expenses/:id', asyncHandler(async (req: AuthenticatedRequest, re
   res.json({ ok: true });
 }));
 
+// ─── WhatsApp diagnostics ─────────────────────────────────────────────────────
+
+// GET /api/superadmin/whatsapp
+// Devolve todos os agentes com WhatsApp e um diagnóstico por agente
+router.get('/whatsapp', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
+  const agents = await (await import('../lib/prisma.js')).default.agent.findMany({
+    where: { whatsappEnabled: true },
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      whatsappEnabled: true,
+      whatsappNumber: true,
+      whatsappToken: true,     // só para saber se está preenchido (não devolver o valor)
+      tenantId: true,
+      tenant: { select: { name: true, email: true, plan: true } },
+      _count: { select: { conversations: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const globalToken = process.env.WHATSAPP_TOKEN;
+  const metaSecret  = process.env.META_APP_SECRET;
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+
+  const agentDiag = agents.map((a) => {
+    const issues: string[] = [];
+    const warnings: string[] = [];
+
+    if (!a.isActive)         issues.push('Agente inativo (isActive=false)');
+    if (!a.whatsappNumber)   issues.push('Phone Number ID não configurado');
+    else if (!/^\d{10,20}$/.test(a.whatsappNumber))
+                             issues.push(`Phone Number ID parece inválido ("${a.whatsappNumber}") — deve ser numérico com 10-20 dígitos`);
+
+    const hasToken = !!a.whatsappToken || !!globalToken;
+    if (!hasToken)           issues.push('Sem token WhatsApp (nem por agente nem global WHATSAPP_TOKEN)');
+    if (!a.whatsappToken && globalToken) warnings.push('A usar token global (env) — considera configurar token por agente');
+
+    return {
+      id:             a.id,
+      name:           a.name,
+      tenant:         a.tenant.name,
+      tenantEmail:    a.tenant.email,
+      plan:           a.tenant.plan,
+      isActive:       a.isActive,
+      whatsappEnabled: a.whatsappEnabled,
+      phoneNumberId:  a.whatsappNumber ?? null,
+      hasAgentToken:  !!a.whatsappToken,
+      hasGlobalToken: !!globalToken,
+      conversations:  a._count.conversations,
+      status:         issues.length > 0 ? 'error' : warnings.length > 0 ? 'warning' : 'ok',
+      issues,
+      warnings,
+    };
+  });
+
+  res.json({
+    env: {
+      WHATSAPP_TOKEN:       globalToken ? `${globalToken.slice(0, 12)}…` : null,
+      META_APP_SECRET:      metaSecret  ? '✓ configurado' : '✗ em falta',
+      WHATSAPP_VERIFY_TOKEN: verifyToken ? '✓ configurado' : '✗ em falta',
+      FRONTEND_URL:         process.env.FRONTEND_URL ?? null,
+    },
+    agents: agentDiag,
+    summary: {
+      total:    agentDiag.length,
+      ok:       agentDiag.filter(a => a.status === 'ok').length,
+      warning:  agentDiag.filter(a => a.status === 'warning').length,
+      error:    agentDiag.filter(a => a.status === 'error').length,
+    },
+  });
+}));
+
+// POST /api/superadmin/whatsapp/test
+// Envia uma mensagem de teste a um agente para validar o fluxo completo
+router.post('/whatsapp/test', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { agentId, text = 'ping' } = req.body as { agentId?: string; text?: string };
+  if (!agentId) { res.status(400).json({ error: 'agentId obrigatório' }); return; }
+
+  const prisma = (await import('../lib/prisma.js')).default;
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    include: { tenant: { select: { encryptionKey: true } } },
+  });
+  if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
+  if (!agent.whatsappEnabled || !agent.isActive) {
+    res.status(400).json({ error: 'Agente não está ativo ou WhatsApp não ativado' }); return;
+  }
+  if (!agent.whatsappNumber) {
+    res.status(400).json({ error: 'Phone Number ID não configurado neste agente' }); return;
+  }
+
+  // Testar chamada à conversação (sem enviar WhatsApp real — só valida o LLM pipeline)
+  const { sendMessage } = await import('../services/conversations.service.js');
+  let conversation = await prisma.conversation.findFirst({
+    where: { agentId: agent.id, tenantId: agent.tenantId, channelType: 'whatsapp', externalId: 'admin_test', resolved: false, closedAt: null },
+  });
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: { agentId: agent.id, tenantId: agent.tenantId, channelType: 'whatsapp', externalId: 'admin_test', visitorId: 'admin_test' },
+    });
+  }
+
+  const result = await sendMessage(agent.tenantId, conversation.id, text);
+  res.json({ ok: true, agentName: agent.name, phoneNumberId: agent.whatsappNumber, response: result.content.slice(0, 300) });
+}));
+
 // ─── Pricing config ───────────────────────────────────────────────────────────
 
 // GET /api/superadmin/config

@@ -8,6 +8,29 @@ import { ROUTES } from '../../utils/constants';
 import { AuditLogEntry } from '../../types';
 import api from '../../utils/api';
 
+// ─── WhatsApp diagnostics types ──────────────────────────────────────────────
+interface WpAgentDiag {
+  id: string;
+  name: string;
+  tenant: string;
+  tenantEmail: string;
+  plan: string;
+  isActive: boolean;
+  whatsappEnabled: boolean;
+  phoneNumberId: string | null;
+  hasAgentToken: boolean;
+  hasGlobalToken: boolean;
+  conversations: number;
+  status: 'ok' | 'warning' | 'error';
+  issues: string[];
+  warnings: string[];
+}
+interface WhatsAppDiagnostics {
+  env: Record<string, string | null>;
+  agents: WpAgentDiag[];
+  summary: { total: number; ok: number; warning: number; error: number };
+}
+
 // ─── PricingConfig (mirrors backend) ─────────────────────────────────────────
 interface FeaturePlanConfig {
   mode: 'disabled' | 'addon' | 'included';
@@ -164,7 +187,7 @@ export default function AdminPage() {
   const { tenant } = useAuth();
   const { auditLogs, auditTotal, loading: auditLoading, fetchAuditLogs } = useAdmin();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'balance' | 'pricing' | 'logs'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'balance' | 'pricing' | 'logs' | 'whatsapp'>('dashboard');
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -183,6 +206,12 @@ export default function AdminPage() {
   const [selectedTenant, setSelectedTenant] = useState<TenantDetail | null>(null);
   const [tenantDetailLoading, setTenantDetailLoading] = useState(false);
   const [planChanging, setPlanChanging] = useState(false);
+
+  // WhatsApp diagnostics state
+  const [wpData, setWpData] = useState<WhatsAppDiagnostics | null>(null);
+  const [wpLoading, setWpLoading] = useState(false);
+  const [wpTestId, setWpTestId] = useState<string | null>(null);
+  const [wpTestResult, setWpTestResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
 
   const isAdmin = tenant?.isAdmin;
 
@@ -226,6 +255,23 @@ export default function AdminPage() {
 
   async function loadPricing() {
     try { const r = await api.get('/api/superadmin/config'); setPricing(r.data); } catch { /* ignore */ }
+  }
+
+  async function loadWhatsApp() {
+    setWpLoading(true);
+    try { const r = await api.get('/api/superadmin/whatsapp'); setWpData(r.data); } catch { /* ignore */ }
+    finally { setWpLoading(false); }
+  }
+
+  async function testAgent(agentId: string) {
+    setWpTestId(agentId);
+    try {
+      const r = await api.post('/api/superadmin/whatsapp/test', { agentId, text: 'Olá, teste de diagnóstico.' });
+      setWpTestResult(prev => ({ ...prev, [agentId]: { ok: true, msg: r.data.response } }));
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? 'Erro desconhecido';
+      setWpTestResult(prev => ({ ...prev, [agentId]: { ok: false, msg } }));
+    } finally { setWpTestId(null); }
   }
 
   async function savePricing() {
@@ -309,6 +355,7 @@ export default function AdminPage() {
     { key: 'balance',   label: '💰 Balanço' },
     { key: 'pricing',   label: '🏷️ Preços' },
     { key: 'logs',      label: '📋 Auditoria' },
+    { key: 'whatsapp',  label: '💬 WhatsApp' },
   ] as { key: typeof activeTab; label: string }[];
 
   if (!tenant || !isAdmin) return null;
@@ -336,6 +383,7 @@ export default function AdminPage() {
                 setActiveTab(t.key);
                 if (t.key === 'logs') fetchAuditLogs(0, PAGE_SIZE);
                 if (t.key === 'pricing' && !pricing) loadPricing();
+                if (t.key === 'whatsapp') loadWhatsApp();
               }}
                 className={`px-4 pb-2 text-sm font-medium transition-colors ${
                   activeTab === t.key ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
@@ -913,6 +961,193 @@ export default function AdminPage() {
           )}
 
           {/* ─── Auditoria ─── */}
+          {/* ─── WhatsApp ─── */}
+          {activeTab === 'whatsapp' && (
+            <div className="space-y-5">
+              {/* Reload button */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Diagnóstico WhatsApp</h2>
+                <button onClick={loadWhatsApp} disabled={wpLoading}
+                  className="text-xs btn-secondary px-3 py-1.5">
+                  {wpLoading ? '⏳ A carregar...' : '🔄 Atualizar'}
+                </button>
+              </div>
+
+              {wpLoading && !wpData && (
+                <p className="text-gray-400 text-sm text-center py-10">A carregar diagnóstico...</p>
+              )}
+
+              {wpData && (
+                <>
+                  {/* Summary pills */}
+                  <div className="flex flex-wrap gap-3">
+                    {[
+                      { label: 'Total', val: wpData.summary.total, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
+                      { label: '✅ OK', val: wpData.summary.ok, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+                      { label: '⚠️ Aviso', val: wpData.summary.warning, color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+                      { label: '❌ Erro', val: wpData.summary.error, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+                    ].map(p => (
+                      <div key={p.label} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${p.color}`}>
+                        {p.label}: {p.val}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ENV Config card */}
+                  <div className="card space-y-2">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Configuração global (ENV)</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {Object.entries(wpData.env).map(([k, v]) => (
+                        <div key={k} className="flex items-start gap-2 text-xs">
+                          <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${v && !v.startsWith('✗') ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <div>
+                            <span className="font-mono text-gray-500 dark:text-gray-400">{k}</span>
+                            <span className="ml-1 text-gray-700 dark:text-gray-300">{v ?? '—'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Agents table */}
+                  {wpData.agents.length === 0 ? (
+                    <div className="card text-center py-10 text-gray-400 text-sm">
+                      Nenhum agente com WhatsApp ativado.
+                    </div>
+                  ) : (() => {
+                    // Group agents by tenant
+                    const groups = wpData.agents.reduce<Record<string, { tenant: string; email: string; plan: string; agents: WpAgentDiag[] }>>((acc, a) => {
+                      if (!acc[a.tenantEmail]) acc[a.tenantEmail] = { tenant: a.tenant, email: a.tenantEmail, plan: a.plan, agents: [] };
+                      acc[a.tenantEmail].agents.push(a);
+                      return acc;
+                    }, {});
+
+                    return (
+                      <div className="space-y-6">
+                        {Object.entries(groups).map(([email, group]) => {
+                          const worstStatus = group.agents.some(a => a.status === 'error') ? 'error'
+                            : group.agents.some(a => a.status === 'warning') ? 'warning' : 'ok';
+                          const tenantBadge = worstStatus === 'ok'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : worstStatus === 'warning'
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+                          return (
+                            <div key={email}>
+                              {/* Tenant header */}
+                              <div className="flex items-center gap-3 mb-2 px-1">
+                                <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold text-sm shrink-0">
+                                  {group.tenant[0]?.toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{group.tenant}</span>
+                                  <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">{email}</span>
+                                </div>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${tenantBadge}`}>
+                                  {group.agents.length} agente{group.agents.length !== 1 ? 's' : ''} · plano {group.plan}
+                                </span>
+                              </div>
+
+                              {/* Agents in this tenant */}
+                              <div className="space-y-2 pl-0 sm:pl-10">
+                                {group.agents.map((a) => {
+                                  const testRes = wpTestResult[a.id];
+                                  const isTesting = wpTestId === a.id;
+                                  const statusColor =
+                                    a.status === 'ok'      ? 'border-green-500 dark:border-green-600' :
+                                    a.status === 'warning' ? 'border-yellow-500 dark:border-yellow-600' :
+                                                             'border-red-500 dark:border-red-600';
+                                  const statusBadge =
+                                    a.status === 'ok'      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                    a.status === 'warning' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                             'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+                                  return (
+                                    <div key={a.id} className={`card border-l-4 ${statusColor} space-y-3`}>
+                                      {/* Header */}
+                                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{a.name}</span>
+                                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge}`}>
+                                            {a.status === 'ok' ? '✅ OK' : a.status === 'warning' ? '⚠️ Aviso' : '❌ Erro'}
+                                          </span>
+                                          {!a.isActive && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700">Inativo</span>}
+                                        </div>
+                                        <button
+                                          onClick={() => testAgent(a.id)}
+                                          disabled={isTesting || a.status === 'error'}
+                                          className="text-xs btn-secondary px-3 py-1.5 shrink-0 disabled:opacity-40"
+                                          title={a.status === 'error' ? 'Corrija os erros antes de testar' : 'Testar pipeline LLM'}
+                                        >
+                                          {isTesting ? '⏳ A testar...' : '🧪 Testar'}
+                                        </button>
+                                      </div>
+
+                                      {/* Details grid */}
+                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                                          <p className="text-gray-400 mb-0.5">Phone Number ID</p>
+                                          <p className="font-mono text-gray-800 dark:text-gray-200 truncate">{a.phoneNumberId ?? <span className="text-red-400">—</span>}</p>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                                          <p className="text-gray-400 mb-0.5">Token</p>
+                                          <p className={a.hasAgentToken ? 'text-green-600 dark:text-green-400' : a.hasGlobalToken ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500'}>
+                                            {a.hasAgentToken ? '🔑 por agente' : a.hasGlobalToken ? '🌐 global (env)' : '✗ em falta'}
+                                          </p>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                                          <p className="text-gray-400 mb-0.5">WhatsApp</p>
+                                          <p className={a.whatsappEnabled ? 'text-green-600 dark:text-green-400' : 'text-red-500'}>
+                                            {a.whatsappEnabled ? '✓ ativado' : '✗ desativado'}
+                                          </p>
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                                          <p className="text-gray-400 mb-0.5">Conversas</p>
+                                          <p className="text-gray-800 dark:text-gray-200">{a.conversations}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* Issues */}
+                                      {a.issues.length > 0 && (
+                                        <div className="space-y-1">
+                                          {a.issues.map((issue, i) => (
+                                            <div key={i} className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                                              <span className="shrink-0 mt-0.5">❌</span><span>{issue}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {a.warnings.length > 0 && (
+                                        <div className="space-y-1">
+                                          {a.warnings.map((w, i) => (
+                                            <div key={i} className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3 py-2">
+                                              <span className="shrink-0 mt-0.5">⚠️</span><span>{w}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Test result */}
+                                      {testRes && (
+                                        <div className={`text-xs rounded-lg px-3 py-2 ${testRes.ok ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'}`}>
+                                          <span className="font-semibold">{testRes.ok ? '✅ Resposta do agente:' : '❌ Erro:'}</span>{' '}
+                                          <span className="italic">{testRes.msg}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          )}
+
           {activeTab === 'logs' && (
             <>
               <div className="flex items-center justify-between mb-3">
