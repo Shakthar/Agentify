@@ -1,0 +1,13 @@
+@echo off
+cd /d C:\Dev\Agentify
+echo Removendo lock file se existir...
+if exist .git\index.lock del /f .git\index.lock
+echo Fazendo git add...
+git add -A
+echo Fazendo commit...
+git commit -m "feat: nova pricing 4 planos, landing page, widget suporte, emails atualizados"
+echo Fazendo push...
+git push origin main
+echo.
+echo === CONCLUIDO ===
+pause

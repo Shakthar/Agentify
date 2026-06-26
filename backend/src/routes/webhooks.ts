@@ -130,8 +130,16 @@ router.get('/whatsapp', (req: Request, res: Response) => {
 // ─── POST /api/webhooks/whatsapp ─────────────────────────────────────────────
 // Meta envia mensagens recebidas para este endpoint
 router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
+  // Log de entrada — para diagnóstico de routing multi-número
+  const body = req.body;
+  const phoneIds = (body?.entry ?? []).flatMap((e: WhatsAppEntry) =>
+    (e.changes ?? []).map(c => c.value?.metadata?.phone_number_id).filter(Boolean)
+  );
+  console.log(`[WhatsApp Webhook POST] chegou — phone_number_ids: [${phoneIds.join(', ') || 'nenhum'}]`);
+
   // Verificar assinatura HMAC-SHA256 antes de processar qualquer payload
   if (!verifyMetaSignature(req)) {
+    console.error(`[WhatsApp Webhook POST] assinatura inválida para phone_ids=[${phoneIds.join(', ')}] — a rejeitar com 403`);
     res.status(403).send('Forbidden');
     return;
   }
