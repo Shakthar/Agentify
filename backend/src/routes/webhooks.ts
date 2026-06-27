@@ -147,7 +147,6 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
   // Responder 200 imediatamente — Meta retenta se não receber 200 em 20s
   res.status(200).send('EVENT_RECEIVED');
 
-  const body = req.body;
   console.log(`[WhatsApp Webhook] payload recebido: object=${body.object} entries=${body.entry?.length ?? 0}`);
   if (body.object !== 'whatsapp_business_account') {
     console.warn(`[WhatsApp Webhook] object inesperado: ${body.object} — ignorado`);
