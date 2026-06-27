@@ -65,6 +65,7 @@ export default function ConversationHistory({ agentId }: Props) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [filter, setFilter] = useState<'all' | 'whatsapp' | 'web'>('all');
   const [search, setSearch] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const TAKE = 30;
 
@@ -78,6 +79,7 @@ export default function ConversationHistory({ agentId }: Props) {
 
   async function loadConversations(newSkip: number, reset: boolean) {
     setLoading(true);
+    setError(null);
     try {
       const { data } = await api.get(`/api/conversations`, {
         params: { agentId, skip: newSkip, take: TAKE },
@@ -87,8 +89,13 @@ export default function ConversationHistory({ agentId }: Props) {
       setConversations((prev) => reset ? filtered : [...prev, ...filtered]);
       setTotal(data.total);
       setSkip(newSkip + TAKE);
-    } catch {
-      /* ignore */
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 401 || status === 403) {
+        setError('Sessão expirada — faz logout e login novamente para ver as conversas.');
+      } else {
+        setError('Erro ao carregar conversas. Tenta novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -148,7 +155,14 @@ export default function ConversationHistory({ agentId }: Props) {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
-          {loading && conversations.length === 0 ? (
+          {error ? (
+            <div className="p-4 text-center text-xs text-red-500 space-y-2">
+              <p>⚠️ {error}</p>
+              {error.includes('Sessão') && (
+                <a href="/dashboard" className="text-brand-600 underline block">Recarregar página</a>
+              )}
+            </div>
+          ) : loading && conversations.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-400">A carregar...</div>
           ) : displayed.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-400">
