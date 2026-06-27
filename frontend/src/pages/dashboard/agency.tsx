@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../../components/Navigation';
-import { apiFetch } from '../../utils/api';
+import apiFetch from '../../utils/api';
 
 interface SubAccount {
   id: string;
