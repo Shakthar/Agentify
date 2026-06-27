@@ -164,7 +164,12 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
       const bodyValue   = change.value;
       const phoneId     = bodyValue.metadata?.phone_number_id as string | undefined;
       const messages    = (bodyValue.messages ?? []) as WhatsAppMessage[];
-      console.log(`[WhatsApp Webhook] phone_number_id=${phoneId} mensagens=${messages.length}`);
+      const statuses    = (bodyValue as any).statuses ?? [];
+      console.log(`[WhatsApp Webhook] phone_number_id=${phoneId} mensagens=${messages.length} statuses=${statuses.length}`);
+      // Log delivery status updates from Meta
+      for (const st of statuses) {
+        console.log(`[WhatsApp Status] id=${st.id} status=${st.status} recipient=${st.recipient_id} ts=${st.timestamp}${st.errors ? ' errors=' + JSON.stringify(st.errors) : ''}`);
+      }
 
       for (const msg of messages) {
         const from = msg.from; // Número do remetente (ex: 351912345678)
