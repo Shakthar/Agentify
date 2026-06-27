@@ -21,6 +21,7 @@ export interface PricingConfig {
     humorDetection: Record<string, FeaturePlanConfig>;
     payments:       Record<string, FeaturePlanConfig>; // price=mensalidade, creditsPerTx=créditos/tx
     whitelabel:     Record<string, FeaturePlanConfig>; // price=€/agente/mês
+    vendas:         Record<string, FeaturePlanConfig>; // sempre addon — bundle com Pedidos/KDS
   };
 }
 
@@ -70,6 +71,13 @@ export function defaultConfig(): PricingConfig {
         starter:    { mode: 'addon',    price: 5 },
         business:   { mode: 'addon',    price: 3 },
         enterprise: { mode: 'included' },
+      },
+      // Vendas: sempre addon em todos os planos — inclui Pedidos/KDS
+      vendas: {
+        free:       { mode: 'disabled' },
+        starter:    { mode: 'addon',    price: 15 },
+        business:   { mode: 'addon',    price: 15 },
+        enterprise: { mode: 'addon',    price: 15 },
       },
     },
   };

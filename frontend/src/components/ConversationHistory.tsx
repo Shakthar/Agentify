@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import api from '../utils/api';
 import { Conversation, Message } from '../types';
 
@@ -18,10 +18,10 @@ function sentimentColor(s?: number) {
 }
 
 function sentimentLabel(s?: number) {
-  if (s === undefined || s === null) return '–';
-  if (s >= 0.3) return '😊';
-  if (s <= -0.3) return '😠';
-  return '😐';
+  if (s === undefined || s === null) return '-';
+  if (s >= 0.3) return 'ok';
+  if (s <= -0.3) return 'mau';
+  return 'neutro';
 }
 
 function urgencyBadge(u?: string) {
@@ -44,11 +44,11 @@ function formatDate(d: string) {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}min atrás`;
+  if (mins < 60) return `${mins}min`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h atrás`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d atrás`;
+  if (days < 7) return `${days}d`;
   return date.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
 }
 
@@ -69,15 +69,7 @@ export default function ConversationHistory({ agentId }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const TAKE = 30;
 
-  useEffect(() => {
-    loadConversations(0, true);
-  }, [agentId, filter]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [selected?.messages]);
-
-  async function loadConversations(newSkip: number, reset: boolean) {
+  const loadConversations = useCallback(async (newSkip: number, reset: boolean) => {
     setLoading(true);
     setError(null);
     try {
@@ -89,17 +81,25 @@ export default function ConversationHistory({ agentId }: Props) {
       setConversations((prev) => reset ? filtered : [...prev, ...filtered]);
       setTotal(data.total);
       setSkip(newSkip + TAKE);
-    } catch (e: any) {
-      const status = e?.response?.status;
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
       if (status === 401 || status === 403) {
-        setError('Sessão expirada — faz logout e login novamente para ver as conversas.');
+        setError('Sessao expirada - faz logout e login novamente para ver as conversas.');
       } else {
         setError('Erro ao carregar conversas. Tenta novamente.');
       }
     } finally {
       setLoading(false);
     }
-  }
+  }, [agentId, filter]);
+
+  useEffect(() => {
+    loadConversations(0, true);
+  }, [loadConversations]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selected?.messages]);
 
   async function openConversation(conv: Conversation) {
     setLoadingMessages(true);
@@ -122,7 +122,7 @@ export default function ConversationHistory({ agentId }: Props) {
 
   return (
     <div className="flex h-[600px] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Sidebar — lista de conversas */}
+      {/* Sidebar */}
       <div className="w-72 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         {/* Header */}
         <div className="p-3 border-b border-gray-200 dark:border-gray-700">
@@ -131,7 +131,7 @@ export default function ConversationHistory({ agentId }: Props) {
           </h3>
           <input
             type="text"
-            placeholder="Filtrar por número..."
+            placeholder="Filtrar por numero..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-2.5 py-1.5 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-600"
@@ -147,7 +147,7 @@ export default function ConversationHistory({ agentId }: Props) {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                {f === 'whatsapp' ? '📱 WA' : f === 'web' ? '🌐 Web' : '🔀 Todas'}
+                {f === 'whatsapp' ? 'WA' : f === 'web' ? 'Web' : 'Todas'}
               </button>
             ))}
           </div>
@@ -157,16 +157,16 @@ export default function ConversationHistory({ agentId }: Props) {
         <div className="flex-1 overflow-y-auto">
           {error ? (
             <div className="p-4 text-center text-xs text-red-500 space-y-2">
-              <p>⚠️ {error}</p>
-              {error.includes('Sessão') && (
-                <a href="/dashboard" className="text-brand-600 underline block">Recarregar página</a>
+              <p>{error}</p>
+              {error.includes('expirada') && (
+                <a href="/dashboard/profile" className="text-brand-600 underline block">Ir para perfil</a>
               )}
             </div>
           ) : loading && conversations.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-400">A carregar...</div>
           ) : displayed.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-400">
-              {filter === 'whatsapp' ? 'Sem conversas WhatsApp ainda.' : filter === 'web' ? 'Sem conversas Web ainda.' : 'Sem conversas ainda.'}
+              {filter === 'whatsapp' ? 'Sem conversas WhatsApp.' : filter === 'web' ? 'Sem conversas Web.' : 'Sem conversas ainda.'}
             </div>
           ) : (
             displayed.map((conv) => (
@@ -179,8 +179,8 @@ export default function ConversationHistory({ agentId }: Props) {
               >
                 <div className="flex items-center justify-between gap-1 mb-0.5">
                   <span className="font-medium text-xs text-gray-900 dark:text-gray-100 truncate">
-                    {conv.channelType === 'whatsapp' ? '📱 ' : '🌐 '}
-                    {conv.visitorId ?? 'Anónimo'}
+                    {conv.channelType === 'whatsapp' ? '[WA] ' : '[Web] '}
+                    {conv.visitorId ?? 'Anonimo'}
                   </span>
                   <span className="text-[10px] text-gray-400 shrink-0">{formatDate(conv.createdAt)}</span>
                 </div>
@@ -188,7 +188,7 @@ export default function ConversationHistory({ agentId }: Props) {
                   <span className={`text-xs ${sentimentColor(conv.sentiment)}`}>{sentimentLabel(conv.sentiment)}</span>
                   {urgencyBadge(conv.urgency)}
                   {conv.resolved && (
-                    <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">resolvida</span>
+                    <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">ok</span>
                   )}
                   <span className="ml-auto text-[10px] text-gray-400">
                     {(conv._count?.messages ?? 0)} msg
@@ -197,7 +197,6 @@ export default function ConversationHistory({ agentId }: Props) {
               </button>
             ))
           )}
-          {/* Load more */}
           {displayed.length < total && !loading && (
             <button
               onClick={() => loadConversations(skip, false)}
@@ -209,35 +208,35 @@ export default function ConversationHistory({ agentId }: Props) {
         </div>
       </div>
 
-      {/* Main — painel de mensagens */}
+      {/* Main — mensagens */}
       <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
         {!selected ? (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-2">
-            <span className="text-4xl">💬</span>
+            <span className="text-4xl">chat</span>
             <p className="text-sm">Seleciona uma conversa para ver as mensagens</p>
           </div>
         ) : (
           <>
-            {/* Conversation header */}
+            {/* Header */}
             <div className="px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div>
                 <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                  {selected.channelType === 'whatsapp' ? '📱 ' : '🌐 '}
-                  {selected.visitorId ?? 'Anónimo'}
+                  {selected.channelType === 'whatsapp' ? '[WA] ' : '[Web] '}
+                  {selected.visitorId ?? 'Anonimo'}
                 </p>
                 <p className="text-[10px] text-gray-400">
                   Iniciada em {new Date(selected.createdAt).toLocaleString('pt-PT')}
-                  {selected.closedAt && ` · Encerrada ${new Date(selected.closedAt).toLocaleString('pt-PT')}`}
+                  {selected.closedAt && ` - Encerrada ${new Date(selected.closedAt).toLocaleString('pt-PT')}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 {urgencyBadge(selected.urgency)}
-                <span className={`text-lg ${sentimentColor(selected.sentiment)}`}>{sentimentLabel(selected.sentiment)}</span>
+                <span className={`text-xs ${sentimentColor(selected.sentiment)}`}>{sentimentLabel(selected.sentiment)}</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {selected.tokensUsed} tokens · {selected.creditsUsed} créditos
+                  {selected.tokensUsed} tokens
                 </span>
                 {selected.resolved && (
-                  <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Resolvida ✓</span>
+                  <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Resolvida</span>
                 )}
               </div>
             </div>
@@ -264,7 +263,7 @@ export default function ConversationHistory({ agentId }: Props) {
                       <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       <p className={`text-[10px] mt-1 text-right ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'}`}>
                         {formatTime(msg.timestamp)}
-                        {msg.tokens > 0 && ` · ${msg.tokens}t`}
+                        {msg.tokens > 0 && ` - ${msg.tokens}t`}
                       </p>
                     </div>
                   </div>

@@ -219,6 +219,7 @@ const configPatchSchema = z.object({
     humorDetection: z.record(featurePlanSchema).optional(),
     payments:       z.record(featurePlanSchema).optional(),
     whitelabel:     z.record(featurePlanSchema).optional(),
+    vendas:         z.record(featurePlanSchema).optional(),
   }).optional(),
 }).strict();
 

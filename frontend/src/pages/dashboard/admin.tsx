@@ -45,6 +45,7 @@ interface PricingConfig {
     humorDetection: Record<string, FeaturePlanConfig>;
     payments:       Record<string, FeaturePlanConfig>;
     whitelabel:     Record<string, FeaturePlanConfig>;
+    vendas:         Record<string, FeaturePlanConfig>;
   };
 }
 interface PC { price: number; credits: number; agents: number }
@@ -890,17 +891,19 @@ export default function AdminPage() {
 
                   {/* Features per plan */}
                   {([
-                    ['scheduling',     '📅 Agendamento',        false],
-                    ['fileUpload',     '📁 Upload ficheiros',    false],
-                    ['humorDetection', '😊 Deteção de humor',   false],
-                    ['payments',       '💳 Pagamentos',          true ],
-                    ['whitelabel',     '🎨 White-label',         false],
+                    ['scheduling',     '📅 Agendamento',           false],
+                    ['fileUpload',     '📁 Upload ficheiros',       false],
+                    ['humorDetection', '😊 Deteção de humor',      false],
+                    ['payments',       '💳 Pagamentos',             true ],
+                    ['whitelabel',     '🎨 White-label',            false],
+                    ['vendas',         '🏷️ Vendas + Pedidos/KDS',  false],
                   ] as [string, string, boolean][]).map(([featureKey, featureLabel, hasCredits]) => (
                     <div key={featureKey} className="card">
                       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">{featureLabel}</h3>
                       <p className="text-[10px] text-gray-400 mb-4">
                         {featureKey === 'whitelabel' ? 'Preço = €/agente/mês' :
                          featureKey === 'payments'   ? 'Preço = mensalidade €/mês · Créditos = por transação' :
+                         featureKey === 'vendas'     ? 'Sempre addon — inclui Pedidos/KDS. Preço = €/mês (mesmo para business/enterprise)' :
                          'Preço = addon €/mês (só relevante se mode=addon)'}
                       </p>
                       <div className="overflow-x-auto">

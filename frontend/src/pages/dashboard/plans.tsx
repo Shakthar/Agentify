@@ -84,13 +84,13 @@ const SKILLS: SkillDef[] = [
   // ── Revenue ─────────────────────────────────────────────────────────
   {
     id: 'vendas',
-    name: 'Vendas',
+    name: 'Vendas + Pedidos/KDS',
     icon: '🏷️',
     category: 'revenue',
-    desc: 'Upselling, cross-sell e reconhecimento de cliente recorrente',
-    detail: 'Pacote completo de vendas com 3 capacidades incluídas:\n\n• Upselling — durante o pedido, o agente sugere naturalmente itens adicionais ou upgrades (ex: "Quer adicionar uma bebida?")\n• Cross-sell — sugere produtos complementares com base no que o cliente está a comprar\n• Vendas proativas — reconhece clientes recorrentes: analisa os últimos pedidos pagos e, se o mesmo pedido se repetir 3+ vezes, o agente cumprimenta e pergunta logo se quer repetir o habitual',
-    plans: { free: 'unavailable', starter: 'addon', business: 'included', enterprise: 'included' },
-    addonPrice: { starter: 20 },
+    desc: 'Upselling inteligente, cliente recorrente e gestão de pedidos com KDS',
+    detail: 'Addon de vendas com boas práticas integradas + sistema Pedidos/KDS incluído:\n\n• Trata sempre o cliente pelo nome — usa o histórico para personalizar cada conversa\n• Clientes recorrentes: analisa o histórico de pedidos e sugere automaticamente o que o cliente costuma pedir ("Olá João! Queres o teu habitual — pizza margherita + sumo?")\n• Upselling natural — sugere itens adicionais no momento certo, de forma amigável e assertiva, sem ser invasivo\n• Cross-sell contextual — recomenda produtos complementares com base no pedido atual\n• Histórico de preferências — aprende com as conversas anteriores para afinar sugestões ao longo do tempo\n• Inclui sistema de Pedidos/KDS: painel de cozinha em tempo real, gestão de estados e notificações',
+    plans: { free: 'unavailable', starter: 'addon', business: 'addon', enterprise: 'addon' },
+    addonPrice: { starter: 15, business: 15, enterprise: 15 },
   },
   {
     id: 'payments',
