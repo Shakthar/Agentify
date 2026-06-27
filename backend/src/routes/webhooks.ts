@@ -214,9 +214,12 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
         if (agent.whatsappToken && agent.tenant.encryptionKey) {
           const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
           const [iv, ciphertext] = agent.whatsappToken.split(':');
-          try { if (dataKey) agentToken = decrypt(ciphertext, iv, dataKey); } catch { /* usa fallback */ }
+          try { if (dataKey) agentToken = decrypt(ciphertext, iv, dataKey); } catch (decErr) {
+            console.error('[WhatsApp] Erro ao desencriptar token do agente:', decErr);
+          }
         }
         const effectiveToken = agentToken ?? process.env.WHATSAPP_TOKEN;
+        console.log(`[WhatsApp] Token: agente=${agentToken ? 'sim' : 'não'} env=${process.env.WHATSAPP_TOKEN ? 'sim' : 'não'} effectiveToken=${effectiveToken ? 'presente' : 'AUSENTE!'}`);
 
         // Reutilizar conversa aberta deste contacto ou criar nova
         let conversation = await prisma.conversation.findFirst({
@@ -230,6 +233,7 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
           },
         });
 
+        console.log(`[WhatsApp] Conversa existente: ${conversation ? conversation.id : 'nenhuma, a criar nova'}`);
         if (!conversation) {
           conversation = await prisma.conversation.create({
             data: {
@@ -240,26 +244,34 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
               visitorId:   from,
             },
           });
+          console.log(`[WhatsApp] Conversa criada: ${conversation.id}`);
         }
 
         // Processar mensagem no LLM
+        console.log(`[WhatsApp] A enviar para LLM (conversa=${conversation.id})...`);
         let result: { content: string; docAttachment?: { id: string; name: string; url: string } | null; mbwayCharge?: { orderId: string; phone: string; amount: number; description: string; mock: boolean } | null };
         try {
           result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
+          console.log(`[WhatsApp] LLM respondeu (${result.content.length} chars). A enviar resposta WhatsApp...`);
         } catch (err) {
-          console.error('[WhatsApp] Erro ao processar mensagem:', err);
-          // Informar o utilizador que algo falhou em vez de silêncio total
-          await sendWhatsAppText(
-            phoneId,
-            from,
-            '⚠️ Ocorreu um erro ao processar a sua mensagem. Por favor, tente novamente mais tarde.',
-            effectiveToken,
-          );
+          console.error('[WhatsApp] Erro ao processar mensagem LLM:', err);
+          try {
+            await sendWhatsAppText(
+              phoneId,
+              from,
+              '⚠️ Ocorreu um erro ao processar a sua mensagem. Por favor, tente novamente mais tarde.',
+              effectiveToken,
+            );
+          } catch (sendErr) {
+            console.error('[WhatsApp] Erro ao enviar mensagem de erro:', sendErr);
+          }
           continue;
         }
 
         // Enviar resposta de volta ao WhatsApp
+        console.log(`[WhatsApp] A chamar sendWhatsAppText para ${from}...`);
         await sendWhatsAppText(phoneId, from, result.content, effectiveToken);
+        console.log(`[WhatsApp] sendWhatsAppText concluído para ${from}`);
         // Enviar documento separado se o agente o indicou
         if (result.docAttachment) {
           await sendWhatsAppDocument(phoneId, from, result.docAttachment.url, result.docAttachment.name, effectiveToken);

@@ -174,10 +174,18 @@ export default function AgentCreator() {
         {/* STEP 0: Descrever negócio */}
         {step === 0 && (
           <div className="space-y-5">
+            {templateSystemPrompt && (
+              <div className="flex items-start gap-2 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-lg">
+                <span className="text-base shrink-0">📚</span>
+                <div className="text-sm text-brand-700 dark:text-brand-300">
+                  <span className="font-medium">Template &quot;{templateName ?? 'Setor'}&quot; carregado.</span> Descreve o teu negócio e a IA adapta este template especificamente para ti — substituindo todos os campos genéricos com as tuas informações reais.
+                </div>
+              </div>
+            )}
             <div className="card">
               <h2 className="text-lg font-semibold mb-1">Descreve o teu negócio</h2>
               <p className="text-sm text-gray-500 mb-4">
-                A IA vai gerar automaticamente o nome, descrição e system prompt do agente.
+                {templateSystemPrompt ? 'A IA vai adaptar o template ao teu negócio, preenchendo todos os detalhes com as tuas informações reais.' : 'A IA vai gerar automaticamente o nome, descrição e system prompt do agente.'}
               </p>
               <textarea
                 className="input resize-none"

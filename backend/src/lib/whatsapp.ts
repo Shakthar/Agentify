@@ -47,12 +47,14 @@ export async function sendWhatsAppText(
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', to: normalizedTo, type: 'text', text: { body: text } }),
     });
+    const respBody = await resp.text();
     if (!resp.ok) {
-      const errBody = await resp.text();
-      console.error(`[WhatsApp] Erro ao enviar texto para ${normalizedTo} (original: ${to}):`, errBody);
+      console.error(`[WhatsApp] Erro ao enviar texto para ${normalizedTo} (original: ${to}) status=${resp.status}:`, respBody);
+    } else {
+      console.log(`[WhatsApp] Mensagem enviada com sucesso para ${normalizedTo} (status=${resp.status}):`, respBody.slice(0, 200));
     }
   } catch (err) {
-    console.error('[WhatsApp] Falha ao enviar texto:', err);
+    console.error('[WhatsApp] Falha ao enviar texto (network/fetch error):', err);
   }
 }
 
