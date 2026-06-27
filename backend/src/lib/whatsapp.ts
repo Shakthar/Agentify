@@ -16,10 +16,11 @@
  */
 function normalizeWhatsAppNumber(to: string): string {
   // Remover tudo exceto dígitos
-  let digits = to.replace(/\D/g, '');
+  let digits = to.replace(/\\D/g, '');
 
-  // Brasil: 55 + DDD (2 dígitos) + número (8 dígitos) = 12 → inserir o 9
+  // Brasil: 55 + DDD (2 dígitos) + número (8 dígitos) = 12 → inserir o 9 após DDD
   if (digits.startsWith('55') && digits.length === 12) {
+    // 55 + DDD (2) = 4 caracteres, depois inserir 9
     const fixed = digits.slice(0, 4) + '9' + digits.slice(4);
     console.log(`[WhatsApp] Número BR normalizado (9th digit): ${digits} → ${fixed}`);
     digits = fixed;
@@ -41,6 +42,7 @@ export async function sendWhatsAppText(
     return;
   }
   const normalizedTo = normalizeWhatsAppNumber(to);
+  console.log(`[WhatsApp] Enviando texto para ${normalizedTo} (original: ${to}): "${text.slice(0, 50)}..."`);
   try {
     const resp = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
       method: 'POST',
@@ -50,6 +52,8 @@ export async function sendWhatsAppText(
     if (!resp.ok) {
       const errBody = await resp.text();
       console.error(`[WhatsApp] Erro ao enviar texto para ${normalizedTo} (original: ${to}):`, errBody);
+    } else {
+      console.log(`[WhatsApp] Texto enviado com sucesso para ${normalizedTo}`);
     }
   } catch (err) {
     console.error('[WhatsApp] Falha ao enviar texto:', err);
@@ -75,8 +79,11 @@ export async function sendWhatsAppDocument(
     if (!resp.ok) {
       const errBody = await resp.text();
       console.error(`[WhatsApp] Erro ao enviar documento para ${normalizedTo}:`, errBody);
+    } else {
+      console.log(`[WhatsApp] Documento enviado com sucesso para ${normalizedTo}`);
     }
   } catch (err) {
     console.error('[WhatsApp] Falha ao enviar documento:', err);
   }
 }
+
