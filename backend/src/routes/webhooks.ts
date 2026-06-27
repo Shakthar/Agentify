@@ -161,9 +161,9 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
         continue;
       }
 
-      const value       = change.value;
-      const phoneId     = value.metadata?.phone_number_id as string | undefined;
-      const messages    = (value.messages ?? []) as WhatsAppMessage[];
+      const bodyValue   = change.value;
+      const phoneId     = bodyValue.metadata?.phone_number_id as string | undefined;
+      const messages    = (bodyValue.messages ?? []) as WhatsAppMessage[];
       console.log(`[WhatsApp Webhook] phone_number_id=${phoneId} mensagens=${messages.length}`);
 
       for (const msg of messages) {
@@ -269,8 +269,8 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
           const { phone, amount, description, mock } = result.mbwayCharge;
           const amountFmt = amount.toFixed(2).replace('.', ',');
           const waMsg = mock
-            ? `🧾 *Pedido recebido!* (modo teste)\n\n📋 ${description}\n💶 Total: €${amountFmt}\n\n⚠️ MB Way em modo teste — não é cobrado nada.`
-            : `💳 Enviamos um pedido de pagamento MB Way de *€${amountFmt}* para o número +${phone}.\n\n📱 Abre a app MB Way e aceita o pagamento para confirmar o teu pedido:\n📋 ${description}`;
+            ? `🧾 *Pedido recebido!* (modo teste)\\n\\n📋 ${description}\\n💶 Total: €${amountFmt}\\n\\n⚠️ MB Way em modo teste — não é cobrado nada.`
+            : `💳 Enviamos um pedido de pagamento MB Way de *€${amountFmt}* para o número +${phone}.\\n\\n📱 Abre a app MB Way e aceita o pagamento para confirmar o teu pedido:\\n📋 ${description}`;
           await sendWhatsAppText(phoneId, from, waMsg, effectiveToken);
         }
       }
@@ -301,3 +301,4 @@ interface WhatsAppMessage {
 }
 
 export default router;
+
