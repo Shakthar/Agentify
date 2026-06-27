@@ -256,6 +256,7 @@ export default function AgentDetailPage() {
             const plan = tenant.plan as string ?? 'free';
             const planOrder = ['free','starter','business','enterprise'];
             const planIdx = planOrder.indexOf(plan);
+            const isAdmin = !!tenant.isAdmin; // admins bypass all plan/addon gates (test mode)
 
             const handleToggleSkill = async (field: string, current: boolean) => {
               setSkillsSaving(true); setSkillsMsg('');
@@ -315,9 +316,9 @@ export default function AgentDetailPage() {
             const mbway = MB_WAY[plan] ?? MB_WAY.free;
             const mbwayAvail = mbway.monthly !== null;
 
-            const wlIncl = planIdx >= planOrder.indexOf('enterprise');
+            const wlIncl = isAdmin || planIdx >= planOrder.indexOf('enterprise');
             const wlAddon = plan === 'starter' ? '€5/mês' : plan === 'business' ? '€3/mês' : null;
-            const wlAvail = wlIncl || wlAddon !== null;
+            const wlAvail = isAdmin || wlIncl || wlAddon !== null;
             const wlActive = agent.whitelabelEnabled;
             const wlUrl = typeof window !== 'undefined' ? `${window.location.origin}/w/${agent.id}` : `/w/${agent.id}`;
 
@@ -333,7 +334,7 @@ export default function AgentDetailPage() {
 
                     {SKILLS_DEF.map((sk) => {
                       const minIdx = planOrder.indexOf(sk.minPlan);
-                      const locked = planIdx < minIdx;
+                      const locked = !isAdmin && planIdx < minIdx;
                       const active = !!((agent as unknown as Record<string, unknown>)[sk.field]);
                       return (
                         <div key={sk.key} className="flex items-start gap-3 py-3">
@@ -370,7 +371,7 @@ export default function AgentDetailPage() {
                             {mbwayAvail && mbway.monthly === 'Incluído' && <PlanBadge plan="enterprise" label="Incluído" />}
                             {mbwayAvail && mbway.credits && <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded-full">{mbway.credits}</span>}
                           </div>
-                          <TogglePill active={mbwayAvail} locked={!mbwayAvail} disabled onClick={() => { if (!mbwayAvail) router.push('/dashboard/plans'); }} label="Pagamentos MB Way" />
+                          <TogglePill active={mbwayAvail} locked={!isAdmin && !mbwayAvail} disabled={!isAdmin && !mbwayAvail} onClick={() => { if (!mbwayAvail && !isAdmin) router.push('/dashboard/plans'); }} label="Pagamentos MB Way" />
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">Cobra via MB Way diretamente na conversa. Mensalidade + créditos por transação.</p>
                         {!mbwayAvail && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline">Ativar no Starter+ →</button>}
@@ -380,8 +381,8 @@ export default function AgentDetailPage() {
                     {/* Vendas + Pedidos/KDS — addon disponível em todos os planos pagos */}
                     {(() => {
                       const vendasActive = agent.skillVendas;
-                      // Addon disponível a partir do Starter (não free)
-                      const vendasAvail = planIdx >= planOrder.indexOf('starter');
+                      // Addon disponível a partir do Starter (não free) — admins sempre podem
+                      const vendasAvail = isAdmin || planIdx >= planOrder.indexOf('starter');
                       return (
                         <div className="flex items-start gap-3 py-3">
                           <span className="text-lg shrink-0 w-7 text-center mt-0.5">🏷️</span>
@@ -703,14 +704,13 @@ export default function AgentDetailPage() {
                   {wpMsg && (
                     <p className={`text-xs mt-1 ${wpMsg.includes('Erro') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{wpMsg}</p>
                   )}
-                  <button onClick={handleSaveWhatsApp} disabled={wpSaving} className="btn-primary text-sm">
+                  <button onClick={handleSaveWhatsApp} disabled={wpSaving} className="btn-primary text-sm w-full mt-2">
                     {wpSaving ? 'A guardar...' : '💾 Guardar configuração WhatsApp'}
                   </button>
                 </div>
               </div>
             </div>
           )}
-
         </div>
       </main>
     </div>
