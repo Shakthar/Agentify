@@ -16,6 +16,9 @@ export const ROUTES = {
   profile: '/dashboard/profile',
   whitelabelDashboard: '/dashboard/whitelabel',
   ordersLive: '/dashboard/orders/live',
+  crm: '/dashboard/crm',
+  prompts: '/dashboard/prompts',
+  agency: '/dashboard/agency',
   whitelabel: (agentId: string) => `/w/${agentId}`,
   portal: (agentId: string) => `/w/${agentId}`, // alias kept for compat
 } as const;

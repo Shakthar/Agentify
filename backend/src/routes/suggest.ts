@@ -13,6 +13,7 @@ router.use(authenticate);
 const suggestSchema = z.object({
   businessDescription: z.string().min(20).max(2000),
   language: z.string().max(10).optional().default('pt'),
+  templateSystemPrompt: z.string().max(3000).optional(),
 });
 
 // POST /api/suggest/suggest
@@ -27,6 +28,7 @@ router.post('/suggest', authLimiter, suggestLimiter, asyncHandler(async (req: Au
     req.tenant!.id,
     parsed.data.businessDescription,
     parsed.data.language,
+    parsed.data.templateSystemPrompt,
   );
   res.json(result);
 }));

@@ -70,7 +70,10 @@ export default function AgentsPage() {
                     {agent.name[0]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{agent.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{agent.name}</p>
+                      {(agent as any).testMode && <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 px-1.5 py-0.5 rounded-full font-medium shrink-0">🧪 Teste</span>}
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{agent.description || agent.model}</p>
                     <div className="flex gap-3 mt-1 text-xs text-gray-400 dark:text-gray-500">
                       <span>{agent.totalConversations} conversas</span>

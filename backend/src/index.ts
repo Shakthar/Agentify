@@ -21,6 +21,9 @@ import agentDocsRouter from './routes/agentDocs.js';
 import paymentsRouter from './routes/payments.js';
 import superadminRouter from './routes/superadmin.js';
 import publicRouter from './routes/public.js';
+import crmRouter from './routes/crm.js';
+import referralRouter from './routes/referral.js';
+import agencyRouter from './routes/agency.js';
 import { registerChatSocket } from './sockets/chat.socket.js';
 import { startIngestionWorker, stopIngestionWorker } from './workers/ingestion.worker.js';
 import { closeQueue } from './lib/queue.js';
@@ -111,6 +114,9 @@ app.get('/health', (_req, res) => {
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/agents', agentsRouter);
+app.use('/api/crm', crmRouter);
+app.use('/api/referral', referralRouter);
+app.use('/api/agency', agencyRouter);
 app.use('/api/agents/:agentId/knowledge', knowledgeRouter);
 app.use('/api/agents/:agentId/docs', agentDocsRouter);
 app.use('/api/payments', paymentsRouter);
@@ -147,5 +153,5 @@ async function shutdown(signal: string) {
   // Força saída se não fechar a tempo
   setTimeout(() => process.exit(0), 10000).unref();
 }
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
-process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));

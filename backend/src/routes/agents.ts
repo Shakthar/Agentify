@@ -39,6 +39,24 @@ const createAgentSchema = z.object({
   skillFileUpload:     z.boolean().optional(),
   skillHumorDetection: z.boolean().optional(),
   skillVendas:         z.boolean().optional(),
+  testMode:            z.boolean().optional(),
+  languageMode:        z.string().optional(),
+  ratingEnabled:       z.boolean().optional(),
+  proactiveEnabled:    z.boolean().optional(),
+  proactiveMaxPerDay:  z.number().int().min(1).max(500).optional(),
+  proactiveMonthBudget: z.number().int().min(1).max(5000).optional(),
+  followUpEnabled:     z.boolean().optional(),
+  followUpHours:       z.number().int().min(1).max(168).optional(),
+  followUpMessage:     z.string().max(1000).optional(),
+  alertEmail:          z.string().email().optional().or(z.literal('')),
+  alertHandoffThreshold:    z.number().int().min(1).optional(),
+  alertResolutionThreshold: z.number().int().min(1).max(100).optional(),
+  alertWeeklyReport:   z.boolean().optional(),
+  crmEnabled:          z.boolean().optional(),
+  instagramEnabled:    z.boolean().optional(),
+  instagramAccountId:  z.string().optional(),
+  calendarEnabled:     z.boolean().optional(),
+  calendarId:          z.string().optional(),
 });
 
 const updateAgentSchema = createAgentSchema.partial();
@@ -89,6 +107,54 @@ router.delete('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Respon
 router.patch('/:id/toggle', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await agentsService.toggleAgent(req.tenant!.id, req.params.id);
   res.json(result);
+}));
+
+// GET /api/agents/:id/export-csv
+router.get('/:id/export-csv', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const prismaD = await import('../lib/prisma.js');
+  const conversations = await prismaD.default.conversation.findMany({
+    where: { agentId: req.params.id, tenantId: req.tenant!.id },
+    include: { messages: { orderBy: { createdAt: 'asc' } as any } },
+    orderBy: { createdAt: 'desc' },
+    take: 2000,
+  });
+  const bom = '\xEF\xBB\xBF';
+  const header = 'ID,Data,Canal,Visitante,Mensagens,Tokens,Resolvido,Avaliacao,Texto';
+  const rows = conversations.map((c: any) => {
+    const d = new Date(c.createdAt).toISOString().slice(0, 10);
+    const name = (c.visitorName ?? c.visitorId ?? '').replace(/,/g, ' ');
+    const txt = (c.ratingText ?? '').replace(/,/g, ' ').replace(/\n/g, ' ');
+    return `${c.id},${d},${c.channelType},${name},${c._count?.messages ?? 0},${c.tokensUsed},${c.resolved ? 'sim' : 'nao'},${c.rating ?? ''},${txt}`;
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="conversas-${req.params.id}.csv"`);
+  res.send(bom + [header, ...rows].join('\n'));
+}));
+
+// POST /api/agents/:id/conversations/:convId/rate
+router.post('/:id/conversations/:convId/rate', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { rating, ratingText } = req.body;
+  if (!rating || rating < 1 || rating > 5) throw new BadRequestError('Rating 1-5');
+  const prismaD = await import('../lib/prisma.js');
+  const conv = await prismaD.default.conversation.findFirst({ where: { id: req.params.convId, tenantId: req.tenant!.id } });
+  if (!conv) { res.status(404).json({ error: 'Not found' }); return; }
+  const updated = await prismaD.default.conversation.update({
+    where: { id: req.params.convId },
+    data: { rating: Number(rating), ratingText: ratingText ?? null } as any,
+  });
+  res.json(updated);
+}));
+
+// GET /api/agents/:id/observe
+router.get('/:id/observe', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const prismaD = await import('../lib/prisma.js');
+  const open = await prismaD.default.conversation.findMany({
+    where: { agentId: req.params.id, tenantId: req.tenant!.id, resolved: false },
+    include: { messages: { orderBy: { createdAt: 'desc' } as any, take: 5 } },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+  res.json({ conversations: open, agentId: req.params.id });
 }));
 
 export default router;

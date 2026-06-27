@@ -43,7 +43,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations'>('overview');
   const [skillsSaving, setSkillsSaving] = useState(false);
   const [skillsMsg, setSkillsMsg] = useState('');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
@@ -57,6 +57,9 @@ export default function AgentDetailPage() {
   const [wpSaving, setWpSaving] = useState(false);
   const [wpMsg, setWpMsg] = useState('');
   const [wpTokenOk, setWpTokenOk] = useState(true);
+  const [tmSaving, setTmSaving] = useState(false);
+  const [intSaving, setIntSaving] = useState(false);
+  const [intMsg, setIntMsg] = useState('');
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
@@ -120,6 +123,18 @@ export default function AgentDetailPage() {
   if (!tenant || loading) return null;
   if (!agent) return null;
 
+  const handleToggleTestMode = async () => {
+    if (agent.testMode) {
+      if (!confirm('Ativar modo produção? Pagamentos passarão a ser reais e os agendamentos usarão a agenda real. Confirmas?')) return;
+    }
+    setTmSaving(true);
+    try {
+      const updated = await updateAgent(agent.id, { testMode: !agent.testMode });
+      setAgent(updated);
+    } catch { /* ignore */ }
+    finally { setTmSaving(false); }
+  };
+
   return (
     <div className="flex min-h-screen">
       <Head><title>Agentfy — {agent.name}</title></Head>
@@ -133,7 +148,12 @@ export default function AgentDetailPage() {
                 {agent.name[0]}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.name}</h1>
+                  {agent.testMode && (
+                    <span className="text-xs bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 px-2 py-0.5 rounded-full font-medium border border-yellow-300 dark:border-yellow-700">🧪 Modo Teste</span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{agent.description || agent.model}</p>
               </div>
             </div>
@@ -324,6 +344,52 @@ export default function AgentDetailPage() {
 
             return (
               <div className="space-y-4">
+              {/* Modo Teste / Producao */}
+              <div className={`card border-2 ${agent.testMode ? 'border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/10' : 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/10'}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-base">{agent.testMode ? '🧪' : '🟢'}</span>
+                      <h3 className={`text-sm font-semibold ${agent.testMode ? 'text-yellow-700 dark:text-yellow-300' : 'text-green-700 dark:text-green-400'}`}>
+                        {agent.testMode ? 'Modo Teste (Sandbox)' : 'Modo Produção'}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
+                      {agent.testMode
+                        ? 'Pagamentos em sandbox, agendamentos na agenda de testes. Nenhuma ação real.'
+                        : 'Pagamentos reais, agenda real. Certifica-te de que tudo está configurado corretamente.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleTestMode}
+                    disabled={tmSaving}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      agent.testMode
+                        ? 'bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-300'
+                        : 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 hover:bg-green-300'
+                    }`}
+                  >
+                    {tmSaving ? 'A guardar...' : agent.testMode ? '🟢 Ativar produção' : '🧪 Voltar a testes'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Observacao ao vivo */}
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">🔭 Observação ao vivo</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Vê as conversas a decorrer em tempo real (atualiza de 5 em 5 segundos). Só leitura.</p>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/dashboard/agents/${agent.id}/observe`)}
+                    className="btn-secondary text-xs shrink-0"
+                  >
+                    Abrir →
+                  </button>
+                </div>
+              </div>
+
                 <div className="card">
                   <div className="mb-4">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">⚡ Skills do agente</h3>
@@ -472,7 +538,12 @@ export default function AgentDetailPage() {
                 <input className="input" value={editForm.description ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System Prompt</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">System Prompt</label>
+                  <button type="button" onClick={() => router.push('/dashboard/prompts')} className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 underline">
+                    📚 Ver biblioteca de prompts
+                  </button>
+                </div>
                 <textarea className="input resize-none" rows={10} value={editForm.systemPrompt ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, systemPrompt: e.target.value }))} />
               </div>
 
@@ -621,8 +692,296 @@ export default function AgentDetailPage() {
 
           {/* ─── Histórico de conversas ─── */}
           {activeTab === 'history' && agent && (
-            <ConversationHistory agentId={agent.id} />
+            <div>
+              <div className="flex justify-end mb-3">
+                <a
+                  href={`/api/agents/${agent.id}/export-csv`}
+                  download
+                  className="btn-secondary text-xs flex items-center gap-1"
+                >
+                  📥 Exportar CSV
+                </a>
+              </div>
+              <ConversationHistory agentId={agent.id} />
+            </div>
           )}
+
+
+          {/* --- Integracoes --- */}
+          {activeTab === 'integrations' && (() => {
+            const COST_PER_MSG = 0.06; // EUR estimado por mensagem proativa WhatsApp
+            const estDaily = agent.proactiveMaxPerDay * COST_PER_MSG * 30;
+            const estMonthly = Math.min(estDaily, agent.proactiveMonthBudget * COST_PER_MSG);
+
+            const handleSaveIntegrations = async (patch: Record<string, unknown>) => {
+              setIntSaving(true); setIntMsg('');
+              try {
+                const updated = await updateAgent(agent.id, patch);
+                setAgent(updated);
+                setIntMsg('Guardado!');
+                setTimeout(() => setIntMsg(''), 2000);
+              } catch { setIntMsg('Erro ao guardar.'); }
+              finally { setIntSaving(false); }
+            };
+
+            return (
+              <div className="space-y-5">
+                {intMsg && <p className="text-xs text-green-600 dark:text-green-400">{intMsg}</p>}
+
+                {/* Multi-lingua */}
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">🌍 Multi-língua</h3>
+                  <p className="text-xs text-gray-400 mb-3">O agente deteta o idioma do cliente e responde na mesma língua, ou podes forçar um idioma fixo.</p>
+                  <select
+                    className="input w-full max-w-xs"
+                    value={agent.languageMode ?? 'auto'}
+                    onChange={(e) => handleSaveIntegrations({ languageMode: e.target.value })}
+                  >
+                    <option value="auto">🔄 Auto — deteta do cliente</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                  </select>
+                </div>
+
+                {/* Avaliacao */}
+                <div className="card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">⭐ Avaliação pós-conversa</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Após fechar uma conversa, o agente pede avaliação (1-5 estrelas) ao cliente via WhatsApp/webchat.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIntegrations({ ratingEnabled: !agent.ratingEnabled })}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.ratingEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.ratingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  {agent.ratingEnabled && (
+                    <p className="text-[11px] text-green-600 dark:text-green-400">✓ Ativo — resultados visíveis no Histórico de conversas.</p>
+                  )}
+                </div>
+
+                {/* Notificacoes Proativas */}
+                <div className="card border-2 border-orange-200 dark:border-orange-800/50">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">📣 Notificações Proativas</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">O agente inicia conversas WhatsApp (confirmações, lembretes, follow-ups).</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIntegrations({ proactiveEnabled: !agent.proactiveEnabled })}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.proactiveEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.proactiveEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-3 mb-3 text-xs text-orange-700 dark:text-orange-300 space-y-1">
+                    <p className="font-semibold">⚠️ Atenção — custo real por mensagem</p>
+                    <p>Cada mensagem proativa WhatsApp custa ~€{COST_PER_MSG.toFixed(2)} (tarifa Meta). Mensagens em excesso geram cobranças significativas.</p>
+                    <p>Define os limites abaixo. O agente para automaticamente ao atingir o máximo.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Máx. por dia</label>
+                      <input type="number" min={1} max={500} className="input w-full"
+                        value={agent.proactiveMaxPerDay}
+                        onChange={(e) => setAgent(a => a ? { ...a, proactiveMaxPerDay: Number(e.target.value) } : a)}
+                        onBlur={(e) => handleSaveIntegrations({ proactiveMaxPerDay: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Máx. por mês</label>
+                      <input type="number" min={1} max={5000} className="input w-full"
+                        value={agent.proactiveMonthBudget}
+                        onChange={(e) => setAgent(a => a ? { ...a, proactiveMonthBudget: Number(e.target.value) } : a)}
+                        onBlur={(e) => handleSaveIntegrations({ proactiveMonthBudget: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-500 dark:text-gray-400">
+                    💰 Custo estimado: até <strong>€{(agent.proactiveMaxPerDay * COST_PER_MSG * 30).toFixed(0)}/mês</strong> (pelo limite diário) · limite mensal: <strong>€{(agent.proactiveMonthBudget * COST_PER_MSG).toFixed(0)}</strong>
+                    <br/><span className="text-[10px]">Estimativa baseada em €{COST_PER_MSG}/msg · valores reais variam por país e tipo de mensagem</span>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-400">
+                    Este mês: <strong>{agent.proactiveSentMonth}</strong> enviadas · Hoje: <strong>{agent.proactiveSentToday}</strong>
+                  </div>
+                </div>
+
+                {/* Follow-up Automatico */}
+                <div className="card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">🔁 Follow-up automático</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Envia mensagem de follow-up X horas após uma conversa terminar sem conversão. Não conta como início de conversa — usa a janela de 24h gratuita da Meta.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIntegrations({ followUpEnabled: !agent.followUpEnabled })}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.followUpEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.followUpEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  {agent.followUpEnabled && (
+                    <div className="space-y-3 mt-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Enviar após (horas)</label>
+                        <input type="number" min={1} max={23} className="input w-32"
+                          value={agent.followUpHours}
+                          onChange={(e) => setAgent(a => a ? { ...a, followUpHours: Number(e.target.value) } : a)}
+                          onBlur={(e) => handleSaveIntegrations({ followUpHours: Number(e.target.value) })}
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Máx 23h para ficar dentro da janela gratuita</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mensagem de follow-up</label>
+                        <textarea className="input w-full h-20 resize-none" placeholder="Ex: Olá {nome}! Ainda posso ajudar com algo? 😊"
+                          value={agent.followUpMessage ?? ''}
+                          onChange={(e) => setAgent(a => a ? { ...a, followUpMessage: e.target.value } : a)}
+                          onBlur={(e) => handleSaveIntegrations({ followUpMessage: e.target.value })}
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Usa {'{nome}'} para personalizar com o nome do cliente</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Alertas */}
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">🔔 Alertas por email</h3>
+                  <p className="text-xs text-gray-400 mb-3">Recebe avisos quando o agente tem anomalias, e relatório semanal com métricas.</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Email para alertas</label>
+                      <input type="email" className="input w-full" placeholder="email@empresa.com"
+                        defaultValue={agent.alertEmail ?? ''}
+                        onBlur={(e) => handleSaveIntegrations({ alertEmail: e.target.value || undefined })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Alerta: handoffs/dia {'>'} </label>
+                        <input type="number" min={1} className="input w-full" placeholder="ex: 5"
+                          defaultValue={agent.alertHandoffThreshold ?? ''}
+                          onBlur={(e) => handleSaveIntegrations({ alertHandoffThreshold: e.target.value ? Number(e.target.value) : undefined })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Alerta: resolução {'<'} %</label>
+                        <input type="number" min={1} max={100} className="input w-full" placeholder="ex: 60"
+                          defaultValue={agent.alertResolutionThreshold ?? ''}
+                          onBlur={(e) => handleSaveIntegrations({ alertResolutionThreshold: e.target.value ? Number(e.target.value) : undefined })}
+                        />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox"
+                        checked={agent.alertWeeklyReport}
+                        onChange={(e) => handleSaveIntegrations({ alertWeeklyReport: e.target.checked })}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">Receber relatório semanal com métricas do agente</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* CRM */}
+                <div className="card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">👥 CRM de Contactos</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Agrega todos os clientes que interagiram, com notas, tags e histórico. Addon — incluído no White-label.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIntegrations({ crmEnabled: !agent.crmEnabled })}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.crmEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.crmEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  {agent.crmEnabled && (
+                    <button onClick={() => router.push('/dashboard/crm')} className="btn-secondary text-xs mt-2">
+                      Abrir CRM →
+                    </button>
+                  )}
+                </div>
+
+                {/* Google Calendar */}
+                <div className="card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">📅 Google Calendar</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Liga a agenda real do cliente. Quando ativo, o skill de agendamento usa disponibilidade real.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIntegrations({ calendarEnabled: !agent.calendarEnabled })}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.calendarEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.calendarEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  {agent.calendarEnabled && (
+                    <div className="mt-3 space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Calendar ID (Google)</label>
+                        <input className="input w-full" placeholder="ex: primary ou nome@gmail.com"
+                          defaultValue={agent.calendarId ?? ''}
+                          onBlur={(e) => handleSaveIntegrations({ calendarId: e.target.value || undefined })}
+                        />
+                      </div>
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                        🔗 Para ligar a conta Google, vai às <strong>Definições da plataforma → Integrações → Google Calendar</strong> e completa o OAuth. Depois volta aqui e introduz o Calendar ID.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Instagram DM */}
+                <div className="card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">📸 Instagram DM</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Responde automaticamente a mensagens diretas no Instagram. Usa a mesma API Meta do WhatsApp.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIntegrations({ instagramEnabled: !agent.instagramEnabled })}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.instagramEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
+                    >
+                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.instagramEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                  {agent.instagramEnabled && (
+                    <div className="mt-3 space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Instagram Account ID</label>
+                        <input className="input w-full" placeholder="ex: 17841400008460056"
+                          defaultValue={agent.instagramAccountId ?? ''}
+                          onBlur={(e) => handleSaveIntegrations({ instagramAccountId: e.target.value || undefined })}
+                        />
+                      </div>
+                      <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded text-xs text-pink-700 dark:text-pink-300">
+                        1. No Meta for Developers, adiciona o produto <strong>Instagram Graph API</strong> à tua app.<br/>
+                        2. Liga a conta Instagram Business.<br/>
+                        3. Adiciona o webhook URL: <code className="font-mono bg-pink-100 dark:bg-pink-900/40 px-1 rounded">{`${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/instagram`}</code><br/>
+                        4. O Token de acesso é o mesmo que usas no WhatsApp se for a mesma app Meta.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            );
+          })()}
 
           {/* ─── WhatsApp ─── */}
           {activeTab === 'whatsapp' && (

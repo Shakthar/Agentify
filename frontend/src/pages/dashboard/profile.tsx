@@ -105,6 +105,10 @@ export default function ProfilePage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmMsg, setConfirmMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Referral
+  const [referral, setReferral] = useState<{ code: string; referralCredits: number; count: number } | null>(null);
+  const [refCopied, setRefCopied] = useState(false);
+
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
     // Load full profile from API
@@ -128,6 +132,10 @@ export default function ProfilePage() {
       .then(({ data }) => setInvoices(data.invoices ?? []))
       .catch(() => {/* silently ignore */})
       .finally(() => setInvLoading(false));
+
+    api.get('/api/referral/me')
+      .then(({ data }) => setReferral({ code: data.code, referralCredits: data.referralCredits, count: data.referrals }))
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
 
@@ -325,6 +333,50 @@ export default function ProfilePage() {
 
           {/* ─── APARÊNCIA ────────────────────────────────────────────── */}
           <ThemeCard />
+
+          {/* Referral */}
+          <div className="card space-y-4">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">🎁 Programa de Indicação</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Indica amigos e recebe créditos em conta. Por cada novo cliente que subscreva um plano pago usando o teu código, ambos ganham <strong className="text-gray-800 dark:text-gray-200">30 dias grátis</strong>.
+            </p>
+            {referral ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-brand-600 dark:text-brand-400">{referral.count}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Indicações</div>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{referral.referralCredits}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Dias de crédito</div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Código de indicação</label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
+                      <span className="font-mono font-bold text-brand-600 dark:text-brand-400 tracking-widest text-sm">{referral.code}</span>
+                    </div>
+                    <button onClick={() => { navigator.clipboard.writeText(referral.code); setRefCopied(true); setTimeout(() => setRefCopied(false), 2000); }} className="btn-secondary text-xs px-3">
+                      {refCopied ? '✓ Copiado' : '📋 Código'}
+                    </button>
+                    <button onClick={() => { const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${referral.code}`; navigator.clipboard.writeText(url); setRefCopied(true); setTimeout(() => setRefCopied(false), 2000); }} className="btn-primary text-xs px-3">
+                      {refCopied ? '✓' : '🔗 Link'}
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                  <p className="font-medium text-gray-700 dark:text-gray-300">Como funciona:</p>
+                  <p>1️⃣ Partilha o link <code className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">/register?ref={referral.code}</code></p>
+                  <p>2️⃣ O amigo regista-se e subscreve um plano pago</p>
+                  <p>3️⃣ Ambos recebem 30 dias gratuitos no plano ativo</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">A carregar…</p>
+            )}
+          </div>
 
           {/* ─── 2FA ──────────────────────────────────────────────────── */}
           <div className="card space-y-4">

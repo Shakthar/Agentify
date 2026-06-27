@@ -6,7 +6,7 @@ import { Plan, PLAN_LABELS, PLAN_COLORS } from '../types';
 import LanguageSwitcher from './LanguageSwitcher';
 import Logo from './Logo';
 
-const navItems = [
+const BASE_NAV_ITEMS = [
   { href: ROUTES.dashboard,          label: 'Dashboard',   icon: '◈'  },
   { href: ROUTES.agents,             label: 'Agentes',     icon: '🤖' },
   { href: ROUTES.credits,            label: 'Créditos',    icon: '⚡' },
@@ -28,6 +28,12 @@ const mobileItems = [
 export default function Navigation() {
   const router = useRouter();
   const { tenant, logout } = useAuth();
+  const navItems = [
+    ...BASE_NAV_ITEMS,
+    ...(tenant?.isAgency || tenant?.isAdmin ? [{ href: ROUTES.agency, label: 'Agência', icon: '🏢' }] : []),
+    { href: ROUTES.crm, label: 'CRM', icon: '👥' },
+    { href: ROUTES.prompts, label: 'Prompts', icon: '📚' },
+  ];
 
   const handleLogout = async () => {
     await logout();

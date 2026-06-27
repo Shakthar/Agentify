@@ -8,6 +8,8 @@ export interface Tenant {
   creditsUsed: number;
   createdAt: string;
   isAdmin?: boolean;
+  isAgency?: boolean;
+  agencyId?: string;
   // Profile / billing
   phone?: string;
   vatNumber?: string;
@@ -47,6 +49,26 @@ export interface Agent {
   skillFileUpload: boolean;
   skillHumorDetection: boolean;
   skillVendas: boolean;
+  testMode: boolean;
+  languageMode: string;
+  ratingEnabled: boolean;
+  proactiveEnabled: boolean;
+  proactiveMaxPerDay: number;
+  proactiveMonthBudget: number;
+  proactiveSentToday: number;
+  proactiveSentMonth: number;
+  followUpEnabled: boolean;
+  followUpHours: number;
+  followUpMessage?: string;
+  alertEmail?: string;
+  alertHandoffThreshold?: number;
+  alertResolutionThreshold?: number;
+  alertWeeklyReport: boolean;
+  crmEnabled: boolean;
+  instagramEnabled: boolean;
+  instagramAccountId?: string;
+  calendarEnabled: boolean;
+  calendarId?: string;
   totalConversations: number;
   totalMessages: number;
   averageResolution: number;
@@ -145,6 +167,25 @@ export interface AuthResponse {
   creditsTotal?: number;
 }
 
+export interface CrmContact {
+  id: string;
+  tenantId: string;
+  agentId?: string;
+  phone?: string;
+  name?: string;
+  email?: string;
+  status: 'lead' | 'cliente' | 'inativo' | 'vip';
+  tags: string[];
+  notes?: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  totalConversations: number;
+  totalMessages: number;
+  avgSentiment?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateAgentInput {
   name: string;
   description?: string;
@@ -168,6 +209,7 @@ export interface CreateAgentInput {
   offHoursMessage?: string;
   offHourStart?: string;
   offHourEnd?: string;
+  testMode?: boolean;
 }
 
 export type Plan = 'free' | 'starter' | 'business' | 'enterprise';

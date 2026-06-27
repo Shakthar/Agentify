@@ -38,6 +38,32 @@ interface CreateAgentInput {
   skillFileUpload?: boolean;
   skillHumorDetection?: boolean;
   skillVendas?: boolean;
+  testMode?: boolean;
+  // Multi-lingua
+  languageMode?: string;
+  // Rating
+  ratingEnabled?: boolean;
+  // Proactive
+  proactiveEnabled?: boolean;
+  proactiveMaxPerDay?: number;
+  proactiveMonthBudget?: number;
+  // Follow-up
+  followUpEnabled?: boolean;
+  followUpHours?: number;
+  followUpMessage?: string;
+  // Alertas
+  alertEmail?: string;
+  alertHandoffThreshold?: number;
+  alertResolutionThreshold?: number;
+  alertWeeklyReport?: boolean;
+  // CRM
+  crmEnabled?: boolean;
+  // Instagram
+  instagramEnabled?: boolean;
+  instagramAccountId?: string;
+  // Calendar
+  calendarEnabled?: boolean;
+  calendarId?: string;
 }
 
 type UpdateAgentInput = Partial<CreateAgentInput>;
@@ -123,6 +149,15 @@ export async function createAgent(
       skillFileUpload: skills?.fileUpload ?? false,
       skillHumorDetection: skills?.humorDetection ?? false,
       skillVendas: false,
+      testMode: input.testMode ?? true,
+      languageMode: input.languageMode ?? 'auto',
+      ratingEnabled: input.ratingEnabled ?? true,
+      proactiveEnabled: false,
+      followUpEnabled: false,
+      alertWeeklyReport: false,
+      crmEnabled: false,
+      instagramEnabled: false,
+      calendarEnabled: false,
     },
   });
 
@@ -142,6 +177,7 @@ export async function getAgent(tenantId: string, agentId: string) {
   const { whatsappToken: _omit, ...safeAgent } = agent;
   return {
     ...safeAgent,
+    testMode: agent.testMode,
     whatsappTokenConfigured: !!agent.whatsappToken, // indica se está configurado sem expor o valor
     skills: {
       handoff: agent.skillHandoff,

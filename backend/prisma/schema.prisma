@@ -63,7 +63,20 @@ model Tenant {
   deletedAt             DateTime?
 
   // Relations
+  // Programa de indicação
+  referralCode          String?    @unique
+  referralCredits       Int        @default(0)
+  referredBy            String?    // código do tenant que indicou
+
+  // Agency model
+  isAgency              Boolean    @default(false)
+  agencyId              String?    // tenant pai (agência)
+  agencyName            String?
+  agencyBrandColor      String?
+  agencyLogoUrl         String?
+
   agents                Agent[]
+  crmContacts           CrmContact[]
   conversations         Conversation[]
   creditHistory         CreditLog[]
   refreshTokens         RefreshToken[]
@@ -127,6 +140,46 @@ model Agent {
   totalMessages         Int        @default(0)
   averageResolution     Float      @default(0)
   
+  // Multi-língua
+  languageMode          String     @default("auto") // auto | pt | en | es | fr
+
+  // Avaliação pós-conversa
+  ratingEnabled         Boolean    @default(true)
+
+  // Notificações proativas
+  proactiveEnabled      Boolean    @default(false)
+  proactiveMaxPerDay    Int        @default(50)
+  proactiveMonthBudget  Int        @default(100)
+  proactiveSentToday    Int        @default(0)
+  proactiveSentMonth    Int        @default(0)
+  proactiveResetDay     DateTime?
+  proactiveResetMonth   DateTime?
+
+  // Follow-up automático
+  followUpEnabled       Boolean    @default(false)
+  followUpHours         Int        @default(24)
+  followUpMessage       String?    @db.Text
+
+  // Alertas
+  alertEmail                String?
+  alertHandoffThreshold     Int?
+  alertResolutionThreshold  Int?
+  alertWeeklyReport         Boolean    @default(false)
+
+  // CRM
+  crmEnabled            Boolean    @default(false)
+
+  // Instagram DM
+  instagramEnabled      Boolean    @default(false)
+  instagramAccountId    String?
+  instagramToken        String?
+
+  // Google Calendar
+  calendarEnabled       Boolean    @default(false)
+  calendarId            String?
+  calendarToken         String?
+
+  testMode              Boolean    @default(true) // Modo sandbox — desativar para produção
   isActive              Boolean    @default(true)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
@@ -142,6 +195,32 @@ model Agent {
   @@index([tenantId])
 }
 
+
+// ===== CRM CONTACTS =====
+model CrmContact {
+  id                  String     @id @default(cuid())
+  tenantId            String
+  agentId             String?
+  phone               String?
+  name                String?
+  email               String?
+  status              String     @default("lead") // lead | cliente | inativo | vip
+  tags                String[]   @default([])
+  notes               String?    @db.Text
+  firstSeenAt         DateTime   @default(now())
+  lastSeenAt          DateTime   @default(now())
+  totalConversations  Int        @default(0)
+  totalMessages       Int        @default(0)
+  avgSentiment        Float?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  tenant              Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([phone])
+}
+
 // ===== CONVERSATIONS =====
 model Conversation {
   id                    String     @id @default(cuid())
@@ -151,6 +230,14 @@ model Conversation {
   externalId            String?    // WhatsApp message ID, etc
   visitorId             String?    // Visitor/customer identifier
   visitorName           String?    // Nome do cliente (aprendido durante a conversa)
+
+  // Avaliação pós-conversa
+  rating                Int?       // 1-5 estrelas
+  ratingText            String?    @db.Text
+
+  // Follow-up automático
+  followUpSent          Boolean    @default(false)
+  followUpScheduledAt   DateTime?
 
   // Content (encrypted)
   messages              Message[]
@@ -408,8 +495,4 @@ model PlatformInvoice {
 }
 
 // ===== PLATFORM CONFIG (pricing & feature flags — editable by superadmin) =====
-model PlatformConfig {
-  key       String   @id
-  value     Json
-  updatedAt DateTime @updatedAt
-}
+model PlatformCo

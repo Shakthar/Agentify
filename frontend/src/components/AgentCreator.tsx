@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import { useAgent } from '../hooks/useAgent';
 import { useAuth } from '../hooks/useAuth';
@@ -65,6 +65,9 @@ export default function AgentCreator() {
 
   const [step, setStep] = useState(0);
   const [businessDescription, setBusinessDescription] = useState('');
+  const [templateSystemPrompt, setTemplateSystemPrompt] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState<string | null>(null);
+
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
@@ -73,6 +76,20 @@ export default function AgentCreator() {
 
   const plan = tenant?.plan ?? 'free';
   const models = AVAILABLE_MODELS_BY_PLAN[plan] ?? AVAILABLE_MODELS_BY_PLAN.free;
+
+  // Ler template da query string (vindo de /dashboard/prompts)
+  useEffect(() => {
+    if (!router.isReady) return;
+    const qs = router.query.systemPrompt as string | undefined;
+    const qt = router.query.templateName as string | undefined;
+    if (qs && qs.length > 10) {
+      setTemplateSystemPrompt(qs);
+      if (qt) setTemplateName(qt);
+      // Pre-preenche o system prompt e salta para step 1 para o utilizador editar
+      setForm(prev => ({ ...prev, systemPrompt: qs }));
+      // Manter em step 0 para o utilizador ainda descrever o negocio antes de gerar
+    }
+  }, [router.isReady, router.query]);
 
   const update = (field: keyof FormData, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -87,6 +104,7 @@ export default function AgentCreator() {
     try {
       const { data } = await api.post('/api/suggest/suggest', {
         businessDescription: businessDescription.trim(),
+        ...(templateSystemPrompt ? { templateSystemPrompt } : {}),
       });
       setForm((prev) => ({
         ...prev,

@@ -27,7 +27,26 @@ Rules:
 - Include how the agent should handle: greetings, unknown questions, escalation to human
 - Do NOT include placeholder text like [Company Name] — infer from the description`;
 
-export async function suggestAgent(tenantId: string, businessDescription: string, language: string) {
+const ADAPT_TEMPLATE_PROMPT = `You are an expert AI assistant builder. A base template system prompt has been provided for a specific industry sector. Your job is to ADAPT this template to the specific business described by the user.
+
+Return ONLY valid JSON with these exact fields:
+{
+  "name": "short agent name (max 40 chars)",
+  "description": "one-line description (max 120 chars)",
+  "systemPrompt": "the adapted system prompt (300-600 words)",
+  "suggestedModel": "claude-haiku-4-5-20251001",
+  "temperature": 0.7
+}
+
+Rules:
+- Keep the structure and best practices from the template
+- Replace ALL placeholder variables like {nome_negocio}, {horarios}, {telefone}, etc. with the real information inferred from the business description
+- Adjust the tone and responsibilities to match the specific business
+- The system prompt must be in the same language as the business description
+- suggestedModel: use "claude-haiku-4-5-20251001" for simple support, "claude-sonnet-4-5-20250929" for complex/sales
+- Do NOT leave any unfilled placeholders — if information is missing, use a sensible default or omit that line`;
+
+export async function suggestAgent(tenantId: string, businessDescription: string, language: string, templateSystemPrompt?: string) {
   // SECURITY: Verificar e reservar cr\u00e9ditos antes de chamar o LLM.
   // Sem este check, qualquer tenant pode chamar claude-sonnet infinitamente
   // (dentro do suggestLimiter) sem gastar cr\u00e9ditos — o operador paga a fatura.
@@ -42,13 +61,19 @@ export async function suggestAgent(tenantId: string, businessDescription: string
     throw new PaymentRequiredError('Cr\u00e9ditos insuficientes para gerar sugest\u00e3o. Compra mais cr\u00e9ditos ou faz upgrade do plano.');
   }
 
-  const userMessage = `Business description (language: ${language}):\n\n${businessDescription}\n\nGenerate the agent configuration JSON now.`;
+  const activeSystemPrompt = templateSystemPrompt
+    ? ADAPT_TEMPLATE_PROMPT + `\n\nBASE TEMPLATE TO ADAPT:\n${templateSystemPrompt}`
+    : SUGGESTION_PROMPT;
+
+  const userMessage = templateSystemPrompt
+    ? `Business description (language: ${language}):\n\n${businessDescription}\n\nAdapt the template above for this specific business. Generate the JSON now.`
+    : `Business description (language: ${language}):\n\n${businessDescription}\n\nGenerate the agent configuration JSON now.`;
 
   let result;
   try {
     result = await callLLM(
       SUGGEST_MODEL,
-      SUGGESTION_PROMPT,
+      activeSystemPrompt,
       [{ role: 'user', content: userMessage }],
       1500,
       0.7,
