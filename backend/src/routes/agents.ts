@@ -38,6 +38,7 @@ const createAgentSchema = z.object({
   skillScheduling:     z.boolean().optional(),
   skillFileUpload:     z.boolean().optional(),
   skillHumorDetection: z.boolean().optional(),
+  skillVendas:         z.boolean().optional(),
 });
 
 const updateAgentSchema = createAgentSchema.partial();

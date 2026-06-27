@@ -113,6 +113,7 @@ model Agent {
   skillScheduling       Boolean    @default(true)
   skillFileUpload       Boolean    @default(true)
   skillHumorDetection   Boolean    @default(false) // Pro+
+  skillVendas           Boolean    @default(false) // Addon — inclui Pedidos/KDS
   skillCRM              String?    // HubSpot, Salesforce, etc
   skillTicketing        String?
   

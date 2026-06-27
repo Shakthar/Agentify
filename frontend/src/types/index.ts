@@ -46,6 +46,7 @@ export interface Agent {
   skillScheduling: boolean;
   skillFileUpload: boolean;
   skillHumorDetection: boolean;
+  skillVendas: boolean;
   totalConversations: number;
   totalMessages: number;
   averageResolution: number;
@@ -191,5 +192,5 @@ export const MODEL_LABELS: Record<string, string> = {
   'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5',
   'gpt-4o':                     'GPT-4o',
   'gemini-1.5-pro':             'Gemini 1.5 Pro',
-  'claude-opus-4-5-20251101':   'Claude Opus 4.5',
+  'claude-opus-4-5-20251101': 'Claude Opus 4.5',
 };

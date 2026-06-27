@@ -11,6 +11,7 @@ interface AgentSkills {
   scheduling?: boolean;
   fileUpload?: boolean;
   humorDetection?: boolean;
+  vendas?: boolean;
 }
 
 interface CreateAgentInput {
@@ -36,6 +37,7 @@ interface CreateAgentInput {
   skillScheduling?: boolean;
   skillFileUpload?: boolean;
   skillHumorDetection?: boolean;
+  skillVendas?: boolean;
 }
 
 type UpdateAgentInput = Partial<CreateAgentInput>;
@@ -120,6 +122,7 @@ export async function createAgent(
       skillScheduling: skills?.scheduling ?? false,
       skillFileUpload: skills?.fileUpload ?? false,
       skillHumorDetection: skills?.humorDetection ?? false,
+      skillVendas: false,
     },
   });
 
@@ -146,6 +149,7 @@ export async function getAgent(tenantId: string, agentId: string) {
       scheduling: agent.skillScheduling,
       fileUpload: agent.skillFileUpload,
       humorDetection: agent.skillHumorDetection,
+      vendas: agent.skillVendas,
     },
     statistics: {
       totalConversations: agent.totalConversations,
@@ -217,6 +221,7 @@ export async function updateAgent(
         skillScheduling: skills.scheduling,
         skillFileUpload: skills.fileUpload,
         skillHumorDetection: skills.humorDetection,
+        skillVendas: skills.vendas,
       }
     : {};
 
@@ -250,6 +255,6 @@ export async function toggleAgent(tenantId: string, agentId: string) {
     data: { isActive: !existing.isActive },
   });
 
-  writeAuditLog(tenantId, agent.isActive ? 'agent_activated' : 'agent_deactivated', 'agent', agentId);
-  return { id: agent.id, isActive: agent.isActive };
+  writeAuditLog(tenantId, agent.isActive ? 'agent_activated' : 'agent_deactivated', 'agent', agentId, { isActive: agent.isActive });
+  return agent;
 }

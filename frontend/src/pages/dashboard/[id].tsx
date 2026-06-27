@@ -377,27 +377,49 @@ export default function AgentDetailPage() {
                       </div>
                     </div>
 
-                    {/* Pedidos / KDS */}
-                    <div className="flex items-start gap-3 py-3">
-                      <span className="text-lg shrink-0 w-7 text-center mt-0.5">🧾</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Pedidos / KDS</span>
-                            {!mbwayAvail && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
-                            {mbwayAvail && <span className="text-[10px] text-green-600 dark:text-green-400">● Ativo</span>}
+                    {/* Vendas + Pedidos/KDS — addon disponível em todos os planos pagos */}
+                    {(() => {
+                      const vendasActive = agent.skillVendas;
+                      // Addon disponível a partir do Starter (não free)
+                      const vendasAvail = planIdx >= planOrder.indexOf('starter');
+                      return (
+                        <div className="flex items-start gap-3 py-3">
+                          <span className="text-lg shrink-0 w-7 text-center mt-0.5">🏷️</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Vendas + Pedidos/KDS</span>
+                                {!vendasAvail && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
+                                {vendasAvail && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon +€15/mês</span>}
+                                {vendasActive && <span className="text-[10px] text-green-600 dark:text-green-400">● Ativa</span>}
+                              </div>
+                              <TogglePill
+                                active={vendasActive}
+                                locked={!vendasAvail}
+                                disabled={skillsSaving || !vendasAvail}
+                                onClick={() => handleToggleSkill('skillVendas', vendasActive)}
+                                label={vendasActive ? 'Desativar Vendas' : 'Ativar Vendas'}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
+                              Perfil completo de vendas: trata o cliente pelo nome, sugere o habitual dos recorrentes, upselling natural e cross-sell. Inclui painel KDS em tempo real.
+                            </p>
+                            {!vendasAvail && (
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para Starter+ →</button>
+                            )}
+                            {vendasAvail && !vendasActive && (
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon +€15/mês →</button>
+                            )}
+                            {vendasActive && (
+                              <div className="flex flex-wrap gap-3 mt-1">
+                                <button onClick={() => setActiveTab('orders')} className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Abrir aba Pedidos →</button>
+                                <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[11px] text-gray-500 dark:text-gray-400 hover:underline">KDS autenticado ↗</a>
+                              </div>
+                            )}
                           </div>
-                          <TogglePill active={mbwayAvail} locked={!mbwayAvail} disabled onClick={() => { if (mbwayAvail) router.push('/dashboard/orders/live'); }} label="Pedidos KDS" />
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">Painel KDS em tempo real. Requer Pagamentos MB Way ativos.</p>
-                        {mbwayAvail && (
-                          <div className="flex flex-wrap gap-3 mt-1">
-                            <button onClick={() => setActiveTab('orders')} className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Abrir aba Pedidos →</button>
-                            <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[11px] text-gray-500 dark:text-gray-400 hover:underline">🔑 KDS autenticado</a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* Portal White-label */}
                     <div className="flex items-start gap-3 py-3">
@@ -674,34 +696,21 @@ export default function AgentDetailPage() {
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${wpEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">WhatsApp ativo neste agente</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {wpEnabled ? 'Ativo' : 'Inativo'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={handleSaveWhatsApp} disabled={wpSaving} className="btn-primary">
-                      {wpSaving ? 'A guardar...' : 'Guardar configuração'}
-                    </button>
-                    {wpMsg && <span className={`text-sm ${wpMsg.includes('Erro') ? 'text-red-500' : 'text-green-600'}`}>{wpMsg}</span>}
-                  </div>
+                  {wpMsg && (
+                    <p className={`text-xs mt-1 ${wpMsg.includes('Erro') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{wpMsg}</p>
+                  )}
+                  <button onClick={handleSaveWhatsApp} disabled={wpSaving} className="btn-primary text-sm">
+                    {wpSaving ? 'A guardar...' : '💾 Guardar configuração WhatsApp'}
+                  </button>
                 </div>
               </div>
-
-              {wpTokenOk ? (
-                <div className="card bg-green-50 border-green-200">
-                  <p className="text-sm text-green-700">
-                    ✅ <strong>Token configurado.</strong> O backend está pronto para enviar e receber mensagens WhatsApp.
-                  </p>
-                </div>
-              ) : (
-                <div className="card bg-amber-50 border-amber-200">
-                  <p className="text-sm text-amber-800">
-                    <strong>⚠️ Falta no servidor:</strong> abre <code className="bg-amber-100 px-1 rounded">backend/.env</code> e preenche:
-                  </p>
-                  <pre className="mt-2 text-xs bg-amber-100 rounded p-3 font-mono">{`WHATSAPP_TOKEN="<token gerado no Meta>"`}</pre>
-                  <p className="text-xs text-amber-700 mt-1">Reinicia o backend depois.</p>
-                </div>
-              )}
             </div>
           )}
+
         </div>
       </main>
     </div>

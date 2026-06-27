@@ -54,7 +54,7 @@ interface PC { price: number; credits: number; agents: number }
 interface AgentDetail {
   id: string; name: string; model: string; isActive: boolean; whitelabelEnabled: boolean;
   skillHandoff: boolean; skillDataCollection: boolean; skillScheduling: boolean;
-  skillFileUpload: boolean; skillHumorDetection: boolean;
+  skillFileUpload: boolean; skillHumorDetection: boolean; skillVendas: boolean;
   whatsappEnabled: boolean; webChatEnabled: boolean;
   _count: { conversations: number; orders: number };
   createdAt: string;
@@ -329,7 +329,10 @@ export default function AdminPage() {
       const next = JSON.parse(JSON.stringify(prev)) as PricingConfig;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let obj: any = next;
-      for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+      for (let i = 0; i < path.length - 1; i++) {
+        if (obj[path[i]] === undefined || obj[path[i]] === null) obj[path[i]] = {};
+        obj = obj[path[i]];
+      }
       obj[path[path.length - 1]] = v;
       return next;
     });
@@ -340,7 +343,10 @@ export default function AdminPage() {
       if (!prev) return prev;
       const next = JSON.parse(JSON.stringify(prev)) as PricingConfig;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (next.features as any)[feature][plan].mode = val;
+      const f = next.features as any;
+      if (!f[feature]) f[feature] = {};
+      if (!f[feature][plan]) f[feature][plan] = { mode: 'disabled' };
+      f[feature][plan].mode = val;
       return next;
     });
   }
@@ -662,6 +668,7 @@ export default function AdminPage() {
                                             <SkillBadge label="Agenda"     active={agent.skillScheduling} />
                                             <SkillBadge label="Upload"     active={agent.skillFileUpload} />
                                             <SkillBadge label="Humor"      active={agent.skillHumorDetection} />
+                                            <SkillBadge label="Vendas+KDS" active={agent.skillVendas} highlight />
                                             <SkillBadge label="Whitelabel" active={agent.whitelabelEnabled} highlight />
                                           </div>
                                         </div>
@@ -1200,13 +1207,13 @@ export default function AdminPage() {
                   </tbody>
                 </table>
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
-                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">← Anterior</button>
-                  <span className="text-xs text-gray-400">{skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
+                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">← Anterior</button>                  <span className="text-xs text-gray-400">{skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
                   <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">Próximo →</button>
                 </div>
               </div>
             </>
           )}
+
         </div>
       </main>
     </div>
