@@ -55,14 +55,14 @@ export default function AgencyPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [subRes, brandRes] = await Promise.all([
-        apiFetch('/api/agency/subaccounts'),
-        apiFetch('/api/agency/branding'),
+      const [{ data: subRes }, { data: brandRes }] = await Promise.all([
+        apiFetch.get('/api/agency/subaccounts'),
+        apiFetch.get('/api/agency/branding'),
       ]);
       setAccounts(subRes.subaccounts ?? []);
       setBranding({ agencyName: brandRes.agencyName ?? '', agencyBrandColor: brandRes.agencyBrandColor ?? '#6366f1', agencyLogoUrl: brandRes.agencyLogoUrl ?? '' });
     } catch (e: any) {
-      if (e?.status === 403 || e?.message?.includes('403')) setForbidden(true);
+      if (e?.response?.status === 403 || e?.message?.includes('403')) setForbidden(true);
     } finally {
       setLoading(false);
     }
@@ -74,14 +74,14 @@ export default function AgencyPage() {
     e.preventDefault();
     setCreating(true); setFormErr('');
     try {
-      const sub = await apiFetch('/api/agency/subaccounts', { method: 'POST', body: JSON.stringify(formData) });
+      const { data: sub } = await apiFetch.post('/api/agency/subaccounts', formData);
       setAccounts(prev => [sub, ...prev]);
       setShowForm(false);
       setFormData({ name: '', email: '', password: '', companyName: '', plan: 'starter' });
       setMsg('Subconta criada com sucesso!');
       setTimeout(() => setMsg(''), 3000);
     } catch (e: any) {
-      setFormErr(e?.message ?? 'Erro ao criar subconta.');
+      setFormErr(e?.response?.data?.error ?? e?.message ?? 'Erro ao criar subconta.');
     } finally {
       setCreating(false);
     }
@@ -89,7 +89,7 @@ export default function AgencyPage() {
 
   const handleChangePlan = async (subId: string, plan: SubAccount['plan']) => {
     try {
-      const updated = await apiFetch(`/api/agency/subaccounts/${subId}`, { method: 'PATCH', body: JSON.stringify({ plan }) });
+      const { data: updated } = await apiFetch.patch(`/api/agency/subaccounts/${subId}`, { plan });
       setAccounts(prev => prev.map(a => a.id === subId ? { ...a, plan: updated.plan } : a));
     } catch { alert('Erro ao alterar plano.'); }
   };
@@ -97,10 +97,10 @@ export default function AgencyPage() {
   const handleToggleActive = async (subId: string, isActive: boolean) => {
     try {
       if (!isActive) {
-        await apiFetch(`/api/agency/subaccounts/${subId}`, { method: 'DELETE' });
+        await apiFetch.delete(`/api/agency/subaccounts/${subId}`);
         setAccounts(prev => prev.map(a => a.id === subId ? { ...a, isActive: false, subscriptionStatus: 'suspended' } : a));
       } else {
-        const updated = await apiFetch(`/api/agency/subaccounts/${subId}`, { method: 'PATCH', body: JSON.stringify({ isActive: true, subscriptionStatus: 'active' }) });
+        const { data: updated } = await apiFetch.patch(`/api/agency/subaccounts/${subId}`, { isActive: true, subscriptionStatus: 'active' });
         setAccounts(prev => prev.map(a => a.id === subId ? { ...a, ...updated } : a));
       }
     } catch { alert('Erro.'); }
@@ -110,7 +110,7 @@ export default function AgencyPage() {
     e.preventDefault();
     setBrandingSaving(true);
     try {
-      const updated = await apiFetch('/api/agency/branding', { method: 'PATCH', body: JSON.stringify(branding) });
+      const { data: updated } = await apiFetch.patch('/api/agency/branding', branding);
       setBranding(updated);
       setMsg('Branding guardado!');
       setTimeout(() => setMsg(''), 2000);
