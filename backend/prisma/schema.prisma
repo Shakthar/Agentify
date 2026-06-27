@@ -495,4 +495,9 @@ model PlatformInvoice {
 }
 
 // ===== PLATFORM CONFIG (pricing & feature flags — editable by superadmin) =====
-model PlatformCo
+model PlatformConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
