@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../../../../components/Navigation';
-import { apiFetch } from '../../../../utils/api';
+import apiFetch from '../../../../utils/api';
 
 interface Message {
   id: string;
@@ -32,7 +32,7 @@ export default function ObservePage() {
   const fetchLive = async () => {
     if (!agentId) return;
     try {
-      const data = await apiFetch(`/api/agents/${agentId}/observe`);
+      const { data } = await apiFetch.get(`/api/agents/${agentId}/observe`);
       setConversations(data.conversations ?? []);
       setError('');
     } catch (e: any) {

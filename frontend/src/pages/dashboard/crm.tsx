@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Navigation from '../../components/Navigation';
-import { apiFetch } from '../../utils/api';
+import apiFetch from '../../utils/api';
 
 interface CrmContact {
   id: string;
@@ -52,7 +52,7 @@ export default function CrmPage() {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (filterStatus) params.set('status', filterStatus);
-      const data = await apiFetch(`/api/crm?${params}`);
+      const { data } = await apiFetch.get(`/api/crm?${params}`);
       setContacts(data.contacts ?? []);
       setTotal(data.total ?? 0);
     } catch { /* ignore */ }
@@ -64,7 +64,7 @@ export default function CrmPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const r = await apiFetch('/api/crm/sync', { method: 'POST' });
+      const { data: r } = await apiFetch.post('/api/crm/sync');
       setMsg(`Sincronizado — ${r.upserted ?? 0} contactos atualizados`);
       setTimeout(() => setMsg(''), 3000);
       load();
@@ -84,10 +84,7 @@ export default function CrmPage() {
     setSaving(true);
     try {
       const tagsArr = editTags.split(',').map(t => t.trim()).filter(Boolean);
-      const updated = await apiFetch(`/api/crm/${selected.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ notes: editNotes, tags: tagsArr, status: editStatus }),
-      });
+      const { data: updated } = await apiFetch.patch(`/api/crm/${selected.id}`, { notes: editNotes, tags: tagsArr, status: editStatus });
       setContacts(prev => prev.map(c => c.id === updated.id ? updated : c));
       setSelected(updated);
       setMsg('Guardado!');
