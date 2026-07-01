@@ -61,6 +61,7 @@ interface CreateAgentInput {
   // Instagram
   instagramEnabled?: boolean;
   instagramAccountId?: string;
+  instagramToken?: string;
   // Calendar
   calendarEnabled?: boolean;
   calendarId?: string;
@@ -174,11 +175,12 @@ export async function getAgent(tenantId: string, agentId: string) {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { whatsappToken: _omit, ...safeAgent } = agent;
+  const { whatsappToken: _omitWA, instagramToken: _omitIG, ...safeAgent } = agent;
   return {
     ...safeAgent,
     testMode: agent.testMode,
-    whatsappTokenConfigured: !!agent.whatsappToken, // indica se está configurado sem expor o valor
+    whatsappTokenConfigured: !!agent.whatsappToken,
+    instagramTokenConfigured: !!agent.instagramToken,
     skills: {
       handoff: agent.skillHandoff,
       dataCollection: agent.skillDataCollection,
@@ -238,16 +240,23 @@ export async function updateAgent(
     }
   }
 
-  const { skills, whatsappToken, ...updateData } = input;
+  const { skills, whatsappToken, instagramToken, ...updateData } = input;
 
-  // Encriptar token do WhatsApp se fornecido no update
+  // Encriptar tokens se fornecidos no update
   let encryptedWhatsappToken: string | undefined;
-  if (whatsappToken) {
+  let encryptedInstagramToken: string | undefined;
+  if (whatsappToken || instagramToken) {
     const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
     const dataKey = unwrapDataKey(tenantRecord?.encryptionKey);
     if (dataKey) {
-      const { ciphertext, iv } = encrypt(whatsappToken, dataKey);
-      encryptedWhatsappToken = `${iv}:${ciphertext}`;
+      if (whatsappToken) {
+        const { ciphertext, iv } = encrypt(whatsappToken, dataKey);
+        encryptedWhatsappToken = `${iv}:${ciphertext}`;
+      }
+      if (instagramToken) {
+        const { ciphertext, iv } = encrypt(instagramToken, dataKey);
+        encryptedInstagramToken = `${iv}:${ciphertext}`;
+      }
     }
   }
 
@@ -264,7 +273,12 @@ export async function updateAgent(
 
   return prisma.agent.update({
     where: { id: agentId },
-    data: { ...updateData, ...(encryptedWhatsappToken ? { whatsappToken: encryptedWhatsappToken } : {}), ...skillsUpdate },
+    data: {
+      ...updateData,
+      ...(encryptedWhatsappToken ? { whatsappToken: encryptedWhatsappToken } : {}),
+      ...(encryptedInstagramToken ? { instagramToken: encryptedInstagramToken } : {}),
+      ...skillsUpdate,
+    },
   });
 }
 

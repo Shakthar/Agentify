@@ -55,6 +55,7 @@ const createAgentSchema = z.object({
   crmEnabled:          z.boolean().optional(),
   instagramEnabled:    z.boolean().optional(),
   instagramAccountId:  z.string().optional(),
+  instagramToken:      z.string().min(20).max(500).optional(),
   calendarEnabled:     z.boolean().optional(),
   calendarId:          z.string().optional(),
 });

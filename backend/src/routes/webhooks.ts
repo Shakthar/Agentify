@@ -10,6 +10,7 @@ import * as conversationsService from '../services/conversations.service.js';
 import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
+import { sendInstagramDM } from '../lib/instagram.js';
 
 /** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
@@ -315,6 +316,131 @@ interface WhatsAppMessage {
   id: string;
   type: string;
   text?: { body: string };
+}
+
+// ─── GET /api/webhooks/instagram ─────────────────────────────────────────────
+// Meta chama este endpoint para verificar o webhook Instagram (challenge handshake)
+router.get('/instagram', (req: Request, res: Response) => {
+  const mode      = req.query['hub.mode'];
+  const token     = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === process.env.INSTAGRAM_VERIFY_TOKEN) {
+    console.log('[Instagram] Webhook verificado com sucesso');
+    const safeChallenge = String(challenge ?? '').replace(/[^0-9]/g, '').slice(0, 32);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.status(200).send(safeChallenge);
+  } else {
+    res.status(403).send('Forbidden');
+  }
+});
+
+// ─── POST /api/webhooks/instagram ────────────────────────────────────────────
+// Meta envia mensagens DM do Instagram para este endpoint
+router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { rawBody?: Buffer }, res: Response) => {
+  const body = req.body;
+
+  if (body.object !== 'instagram') {
+    console.warn(`[Instagram Webhook] object inesperado: ${body.object} — ignorado`);
+    res.status(200).send('EVENT_RECEIVED');
+    return;
+  }
+
+  // Verificar assinatura HMAC-SHA256 antes de processar qualquer payload
+  if (!verifyMetaSignature(req)) {
+    console.error('[Instagram Webhook] assinatura inválida — a rejeitar com 403');
+    res.status(403).send('Forbidden');
+    return;
+  }
+
+  // Responder 200 imediatamente — Meta retenta se não receber 200 em 20s
+  res.status(200).send('EVENT_RECEIVED');
+
+  for (const entry of (body.entry ?? []) as InstagramEntry[]) {
+    const pageId = entry.id;
+
+    for (const messaging of (entry.messaging ?? [])) {
+      const senderId = messaging.sender?.id;
+      const text = messaging.message?.text;
+
+      // Ignorar echo (mensagens enviadas pela própria página) e mensagens sem texto
+      if (!senderId || !text || messaging.message?.is_echo) continue;
+
+      console.log(`[Instagram] DM de ${senderId} → pageId=${pageId} texto="${text.slice(0, 80)}"`);
+
+      // Encontrar agente pelo Instagram Account ID (page ID do Meta)
+      const agent = await prisma.agent.findFirst({
+        where: { instagramAccountId: pageId, instagramEnabled: true, isActive: true },
+        include: { tenant: { select: { encryptionKey: true } } },
+      });
+
+      if (!agent) {
+        console.warn(`[Instagram] Nenhum agente encontrado para instagramAccountId=${pageId}`);
+        continue;
+      }
+
+      // Token por agente (encriptado) ou fallback para env global
+      let agentToken: string | undefined;
+      if (agent.instagramToken && agent.tenant.encryptionKey) {
+        const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
+        const [iv, ciphertext] = agent.instagramToken.split(':');
+        try { if (dataKey) agentToken = decrypt(ciphertext, iv, dataKey); } catch (decErr) {
+          console.error('[Instagram] Erro ao desencriptar token:', decErr);
+        }
+      }
+      const effectiveToken = agentToken ?? process.env.INSTAGRAM_TOKEN ?? process.env.WHATSAPP_TOKEN;
+
+      // Reutilizar conversa aberta deste contacto ou criar nova
+      let conversation = await prisma.conversation.findFirst({
+        where: {
+          agentId:     agent.id,
+          tenantId:    agent.tenantId,
+          channelType: 'instagram',
+          externalId:  senderId,
+          resolved:    false,
+          closedAt:    null,
+        },
+      });
+
+      if (!conversation) {
+        conversation = await prisma.conversation.create({
+          data: {
+            agentId:     agent.id,
+            tenantId:    agent.tenantId,
+            channelType: 'instagram',
+            externalId:  senderId,
+            visitorId:   senderId,
+          },
+        });
+      }
+
+      // Processar mensagem no LLM
+      let result: { content: string };
+      try {
+        result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
+      } catch (err) {
+        console.error('[Instagram] Erro ao processar mensagem LLM:', err);
+        await sendInstagramDM(senderId, '⚠️ Ocorreu um erro. Por favor, tenta novamente mais tarde.', pageId, effectiveToken);
+        continue;
+      }
+
+      await sendInstagramDM(senderId, result.content, pageId, effectiveToken);
+    }
+  }
+}));
+
+interface InstagramEntry {
+  id: string;
+  messaging: {
+    sender: { id: string };
+    recipient: { id: string };
+    timestamp: number;
+    message?: {
+      mid: string;
+      text?: string;
+      is_echo?: boolean;
+    };
+  }[];
 }
 
 export default router;

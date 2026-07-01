@@ -14,6 +14,7 @@ import { Agent } from '../../types';
 import api from '../../utils/api';
 
 const WEBHOOK_URL = `${API_URL}/api/webhooks/whatsapp`;
+const INSTAGRAM_WEBHOOK_URL = `${API_URL}/api/webhooks/instagram`;
 
 function CopyBox({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -43,7 +44,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'instagram' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations'>('overview');
   const [skillsSaving, setSkillsSaving] = useState(false);
   const [skillsMsg, setSkillsMsg] = useState('');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
@@ -60,6 +61,13 @@ export default function AgentDetailPage() {
   const [tmSaving, setTmSaving] = useState(false);
   const [intSaving, setIntSaving] = useState(false);
   const [intMsg, setIntMsg] = useState('');
+  // Instagram state
+  const [igAccountId, setIgAccountId] = useState('');
+  const [igEnabled, setIgEnabled] = useState(false);
+  const [igToken, setIgToken] = useState('');
+  const [igTokenVisible, setIgTokenVisible] = useState(false);
+  const [igSaving, setIgSaving] = useState(false);
+  const [igMsg, setIgMsg] = useState('');
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
@@ -71,6 +79,9 @@ export default function AgentDetailPage() {
       setNotifyPhone(data.notifyPhone ?? '');
       setWpEnabled(data.whatsappEnabled ?? false);
       // token is write-only — never returned from API, leave blank
+      setIgAccountId(data.instagramAccountId ?? '');
+      setIgEnabled(data.instagramEnabled ?? false);
+      // instagram token is also write-only
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
@@ -110,6 +121,24 @@ export default function AgentDetailPage() {
       setWpMsg('Erro ao guardar.');
     } finally {
       setWpSaving(false);
+    }
+  };
+
+  const handleSaveInstagram = async () => {
+    if (!agent) return;
+    setIgSaving(true);
+    setIgMsg('');
+    try {
+      const payload: Record<string, unknown> = { instagramAccountId: igAccountId, instagramEnabled: igEnabled };
+      if (igToken.trim()) payload.instagramToken = igToken.trim();
+      const updated = await updateAgent(agent.id, payload);
+      setAgent(updated);
+      setIgMsg('Guardado com sucesso!');
+      setTimeout(() => setIgMsg(''), 3000);
+    } catch {
+      setIgMsg('Erro ao guardar.');
+    } finally {
+      setIgSaving(false);
     }
   };
 
@@ -182,7 +211,10 @@ export default function AgentDetailPage() {
               { key: 'orders',     label: '🛒 Pedidos' },
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
-              { key: 'history',    label: '� Histórico' },              { key: 'skills',     label: '⚡ Skills' },              { key: 'edit',       label: '✏️ Editar' },
+              { key: 'instagram',  label: '📸 Instagram' },
+              { key: 'history',    label: '📁 Histórico' },
+              { key: 'skills',     label: '⚡ Skills' },
+              { key: 'edit',       label: '✏️ Editar' },
             ] as { key: typeof activeTab; label: string }[]).map((t) => (
               <button
                 key={t.key}
@@ -1065,6 +1097,89 @@ export default function AgentDetailPage() {
                   )}
                   <button onClick={handleSaveWhatsApp} disabled={wpSaving} className="btn-primary text-sm w-full mt-2">
                     {wpSaving ? 'A guardar...' : '💾 Guardar configuração WhatsApp'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Instagram DM ─── */}
+          {activeTab === 'instagram' && (
+            <div className="space-y-6">
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
+                <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
+                  <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria (ou usa) uma App do tipo <strong>Business</strong>.</li>
+                  <li>Adiciona o produto <strong>Instagram Graph API</strong> à app.</li>
+                  <li>Em <em>Instagram → Basic Display</em>, liga a tua conta <strong>Instagram Business</strong>.</li>
+                  <li>Copia o <strong>Instagram Account ID</strong> (número numérico longo, ex: 17841400008460056).</li>
+                  <li>Gera um <strong>Access Token</strong> permanente via System User — pode ser o mesmo que o WhatsApp se usarem a mesma app Meta.</li>
+                </ol>
+              </div>
+
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 2 — Configurar Webhook no Meta</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Em <em>Instagram → Webhooks</em>:</p>
+                <div className="space-y-3">
+                  <CopyBox value={INSTAGRAM_WEBHOOK_URL} label="Callback URL" />
+                  <CopyBox value="agentify_instagram_verify_2025" label="Verify Token" />
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Subscreve o campo <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">messages</code>.</p>
+                <div className="mt-3 p-3 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg text-xs text-pink-700 dark:text-pink-300">
+                  ⚠️ Para receber DMs, a tua app Meta precisa estar em modo <strong>Live</strong> e ter a permissão <code className="bg-pink-100 dark:bg-pink-900/40 px-1 rounded">instagram_manage_messages</code> aprovada.
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 3 — Ligar este agente</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Instagram Account ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico da página/conta)</span>
+                    </label>
+                    <input className="input" placeholder="ex: 17841400008460056" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Access Token <span className="text-gray-400 dark:text-gray-500 font-normal">(opcional — sobrepõe o token global)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        className="input pr-20"
+                        type={igTokenVisible ? 'text' : 'password'}
+                        placeholder={agent?.instagramTokenConfigured ? '••••••••  (já configurado — deixa vazio para manter)' : 'EAAxxxxxxx... (Access Token do Meta)'}
+                        value={igToken}
+                        onChange={(e) => setIgToken(e.target.value)}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIgTokenVisible(v => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1"
+                      >
+                        {igTokenVisible ? 'Ocultar' : 'Mostrar'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={igEnabled}
+                      onClick={() => setIgEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${igEnabled ? 'bg-pink-500' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${igEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {igEnabled ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  {igMsg && (
+                    <p className={`text-xs mt-1 ${igMsg.includes('Erro') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{igMsg}</p>
+                  )}
+                  <button onClick={handleSaveInstagram} disabled={igSaving} className="btn-primary text-sm w-full mt-2" style={{ background: igEnabled ? '#e1306c' : undefined }}>
+                    {igSaving ? 'A guardar...' : '💾 Guardar configuração Instagram'}
                   </button>
                 </div>
               </div>
