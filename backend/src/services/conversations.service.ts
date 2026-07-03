@@ -271,6 +271,16 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
       + ' Exemplo pós-MBWAY: "Enviei o pedido de pagamento para o teu MB Way! \ud83d\udcf1 Aceita a notificação na app MB Way e o teu pedido fica automaticamente confirmado. \ud83c\udf89"';
   }
 
+  // Injeta skill de handoff para humano
+  if (conversation.agent.skillHandoff) {
+    systemPrompt += '\n\n---\nSKILL: HANDOFF PARA HUMANO'
+      + '\nQuando o cliente estiver claramente frustrado, insistir em falar com uma pessoa, ou a situação estiver fora do teu âmbito:'
+      + '\n1. Informa o cliente de forma simpática que vais transferir a conversa para um colega humano'
+      + '\n2. Na MESMA resposta inclui o marcador: [HANDOFF:resumo breve em português, máx 150 chars]'
+      + '\nExemplo: "Claro, compreendo! Vou transferir agora para a nossa equipa. [HANDOFF:Cliente quer negociar preço personalizado, pede falar com vendedor]"'
+      + '\nNOTA: Usa este marcador APENAS UMA VEZ por conversa, quando tiveres a certeza que o handoff é necessário.';
+  }
+
   // Injeta historial de pedidos anteriores do mesmo visitante (cliente recorrente)
   // e recupera nome do visitante guardado em conversas anteriores
   let knownVisitorName: string | null = conversation.visitorName ?? null;
@@ -375,6 +385,10 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   // Parseia [MBWAY:phone|amount|description] da resposta do LLM
   const mbwayMatch = llmResponse.content.match(/\[MBWAY:([^|\]]+)\|([^|\]]+)\|([^\]]+)\]/i);
 
+  // Parseia [HANDOFF:resumo] — transferência para humano
+  const handoffMatch = llmResponse.content.match(/\[HANDOFF:([^\]]+)\]/i);
+  const handoffSummary = handoffMatch?.[1]?.trim().slice(0, 200) ?? null;
+
   // Parseia [VISITOR_NAME:Nome] — aprende e persiste o nome do visitante
   const visitorNameMatch = llmResponse.content.match(/\[VISITOR_NAME:([^\]]+)\]/i);
   if (visitorNameMatch) {
@@ -391,6 +405,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     .replace(/\[SEND_DOC:[a-z0-9]+\]/gi, '')
     .replace(/\[MBWAY:[^\]]+\]/gi, '')
     .replace(/\[VISITOR_NAME:[^\]]+\]/gi, '')
+    .replace(/\[HANDOFF:[^\]]+\]/gi, '')
     .trim();
 
   let docAttachment: { id: string; name: string; url: string } | null = null;
@@ -471,6 +486,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
         creditsUsed: { increment: llmResponse.creditsUsed },
         modelUsed: llmResponse.model,
         sentiment,
+        ...(handoffSummary ? { handedOffToHuman: true } : {}),
       },
     }),
     // Devolver créditos reservados em excesso (refund ≥ 0 quase sempre)
@@ -513,6 +529,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     timestamp: assistantMsg.timestamp,
     docAttachment,
     mbwayCharge,
+    handoff: handoffSummary ? { triggered: true as const, summary: handoffSummary } : null,
   };
 }
 

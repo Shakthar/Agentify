@@ -129,7 +129,7 @@ export default function AgentDetailPage() {
     setIgSaving(true);
     setIgMsg('');
     try {
-      const payload: Record<string, unknown> = { instagramAccountId: igAccountId, instagramEnabled: igEnabled };
+      const payload: Record<string, unknown> = { instagramAccountId: igAccountId, instagramEnabled: igEnabled, notifyPhone: notifyPhone || undefined };
       if (igToken.trim()) payload.instagramToken = igToken.trim();
       const updated = await updateAgent(agent.id, payload);
       setAgent(updated);
@@ -1160,6 +1160,13 @@ export default function AgentDetailPage() {
                         {igTokenVisible ? 'Ocultar' : 'Mostrar'}
                       </button>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Número de notificação WhatsApp <span className="text-gray-400 dark:text-gray-500 font-normal">(recebe alerta de handoff + pedidos)</span>
+                    </label>
+                    <input className="input" placeholder="ex: 351912345678" value={notifyPhone} onChange={(e) => setNotifyPhone(e.target.value)} />
+                    <p className="text-[11px] text-gray-400 mt-1">Quando o agente transferir para humano, envias uma mensagem WhatsApp para este número com o resumo da conversa.</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
