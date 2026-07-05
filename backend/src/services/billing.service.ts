@@ -40,15 +40,24 @@ export async function getUsageByAgent(tenantId: string) {
     select: {
       id: true,
       name: true,
-      conversations: { select: { creditsUsed: true } },
+      waMsgsSent: true,
+      conversations: { select: { creditsUsed: true, waMsgsSent: true } },
     },
   });
 
-  const usage = agents.map((a) => ({
-    agentId: a.id,
-    agentName: a.name,
-    creditsUsed: a.conversations.reduce((sum, c) => sum + c.creditsUsed, 0),
-  }));
+  const usage = agents.map((a) => {
+    const llmCredits  = a.conversations.reduce((sum, c) => sum + c.creditsUsed, 0);
+    const waMsgs      = a.waMsgsSent; // contador direto no agente (mais rápido)
+    const waCredits   = a.conversations.reduce((sum, c) => sum + c.waMsgsSent, 0); // via conversas para cross-check
+    return {
+      agentId:      a.id,
+      agentName:    a.name,
+      creditsUsed:  llmCredits,
+      waMsgsSent:   waMsgs,
+      waCreditsUsed: waCredits, // créditos gastos apenas em mensagens WA
+      totalCreditsUsed: llmCredits + waCredits,
+    };
+  });
 
   return { usage };
 }
@@ -81,6 +90,10 @@ export async function deductWaMsgCredit(
           creditsUsed: { increment: cost },
           waMsgsSent:  { increment: 1 },
         },
+      }),
+      prisma.agent.update({
+        where: { id: agentId },
+        data: { waMsgsSent: { increment: 1 } },
       }),
       prisma.conversation.update({
         where: { id: conversationId },

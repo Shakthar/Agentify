@@ -140,6 +140,7 @@ model Agent {
   totalConversations    Int        @default(0)
   totalMessages         Int        @default(0)
   averageResolution     Float      @default(0)
+  waMsgsSent            Int        @default(0) // Total de mensagens WA/Instagram enviadas por este agente
   
   // Multi-língua
   languageMode          String     @default("auto") // auto | pt | en | es | fr
