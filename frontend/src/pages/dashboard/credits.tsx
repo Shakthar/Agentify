@@ -21,6 +21,9 @@ interface AgentUsage {
   agentId: string;
   agentName: string;
   creditsUsed: number;
+  waMsgsSent: number;
+  waCreditsUsed: number;
+  totalCreditsUsed: number;
 }
 
 function PieChart({ used, total }: { used: number; total: number }) {
@@ -137,29 +140,44 @@ export default function CreditsPage() {
                     <p className="text-center py-10 text-sm text-gray-400">Sem dados de consumo por agente.</p>
                   ) : (
                     <>
-                      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex justify-between text-xs font-semibold text-gray-500">
-                        <span>Agente</span><span>Créditos consumidos</span>
+                      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 grid grid-cols-4 text-xs font-semibold text-gray-500">
+                        <span className="col-span-2">Agente</span>
+                        <span className="text-right">🤖 LLM</span>
+                        <span className="text-right">💬 WA msgs</span>
                       </div>
-                      {agentUsage.slice().sort((a, b) => b.creditsUsed - a.creditsUsed).map((au) => {
-                        const pct = data.used > 0 ? Math.round((au.creditsUsed / data.used) * 100) : 0;
+                      {agentUsage.slice().sort((a, b) => b.totalCreditsUsed - a.totalCreditsUsed).map((au) => {
+                        const total = agentUsage.reduce((s, x) => s + x.totalCreditsUsed, 0);
+                        const pct = total > 0 ? Math.round((au.totalCreditsUsed / total) * 100) : 0;
                         return (
-                          <div key={au.agentId} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                            <div className="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 font-bold text-sm shrink-0">
-                              {au.agentName[0]}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{au.agentName}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                  <div className="h-full bg-brand-600 rounded-full" style={{ width: `${pct}%` }} />
+                          <div key={au.agentId} className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                            <div className="grid grid-cols-4 items-center gap-2">
+                              <div className="col-span-2 flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 font-bold text-sm shrink-0">
+                                  {au.agentName[0]}
                                 </div>
-                                <span className="text-[10px] text-gray-400">{pct}%</span>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{au.agentName}</p>
+                                  <p className="text-[10px] text-gray-400">{au.totalCreditsUsed.toLocaleString()} créditos total · {pct}%</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-sm font-semibold">{au.creditsUsed.toLocaleString()}</span>
+                                <p className="text-[10px] text-gray-400">créditos</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-sm font-semibold text-green-600 dark:text-green-400">{au.waMsgsSent.toLocaleString()}</span>
+                                <p className="text-[10px] text-gray-400">{au.waCreditsUsed.toLocaleString()} créd.</p>
                               </div>
                             </div>
-                            <span className="text-sm font-semibold">{au.creditsUsed.toLocaleString()}</span>
+                            <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #3b57f0 0%, #10b981 100%)' }} />
+                            </div>
                           </div>
                         );
                       })}
+                      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-xs text-gray-400">
+                        🤖 LLM = créditos gastos em tokens do modelo de IA &nbsp;·&nbsp; 💬 WA msgs = mensagens enviadas via WhatsApp/Instagram (cada msg debita créditos do plano)
+                      </div>
                     </>
                   )}
                 </div>
@@ -169,17 +187,27 @@ export default function CreditsPage() {
                 <div className="card p-0 overflow-hidden">
                   {data.history.length === 0 ? (
                     <p className="text-center py-10 text-sm text-gray-400">Sem histórico ainda.</p>
-                  ) : data.history.map((log) => (
+                  ) : data.history.map((log) => {
+                    const reasonLabel: Record<string, string> = {
+                      'chat':           '🤖 IA (tokens)',
+                      'wamsg':          '💬 Mensagem WA/Instagram',
+                      'signup-bonus':   '🎁 Bónus de registo',
+                      'purchase':       '💳 Compra de créditos',
+                      'refund':         '↩️ Reembolso',
+                      'monthly-reset':  '🔄 Reset mensal',
+                    };
+                    return (
                     <div key={log.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
                       <div>
-                        <span className="text-sm font-medium capitalize">{log.reason}</span>
+                        <span className="text-sm font-medium">{reasonLabel[log.reason] ?? log.reason}</span>
                         <span className="text-gray-400 text-xs ml-2">{new Date(log.createdAt).toLocaleDateString('pt-PT')}</span>
                       </div>
                       <span className={`text-sm font-semibold ${log.amount > 0 ? 'text-green-600' : 'text-red-500'}`}>
                         {log.amount > 0 ? '+' : ''}{log.amount.toLocaleString()}
                       </span>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </>
