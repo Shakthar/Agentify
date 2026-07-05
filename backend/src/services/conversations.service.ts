@@ -229,6 +229,20 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   // Recupera contexto relevante da base de conhecimento (RAG).
   // Falhas aqui não devem impedir a conversa.
   let systemPrompt = conversation.agent.systemPrompt;
+
+  // Instrução global de eficiência — injetada ANTES do prompt do agente.
+  // Em canais pagos (WhatsApp/Instagram), cada mensagem custa dinheiro real;
+  // respostas concisas reduzem custo de API + créditos LLM.
+  const isMessagingChannel = ['whatsapp', 'instagram'].includes(conversation.channelType);
+  const efficiencyPrefix = isMessagingChannel
+    ? '## REGRA DE EFICIÊNCIA (obrigatória):\n'
+      + 'Sê SEMPRE conciso — cada mensagem tem custo direto:\n'
+      + '- Resposta típica: 1-3 frases. Máximo absoluto: 5 frases.\n'
+      + '- NUNCA divides em múltiplas mensagens — tudo de uma vez.\n'
+      + '- Vai direto ao assunto. Evita "Claro!", "Boa pergunta!", "Com certeza!" como intro.\n'
+      + '- Quando precisas de info do cliente: faz só UMA pergunta de cada vez.\n\n---\n\n'
+    : 'Sê conciso e objetivo. Evita texto de enchimento e repetições.\n\n---\n\n';
+  systemPrompt = efficiencyPrefix + systemPrompt;
   try {
     const kbContext = await buildContextForQuery(conversation.agentId, content);
     if (kbContext) systemPrompt += kbContext;

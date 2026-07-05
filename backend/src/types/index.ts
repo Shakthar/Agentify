@@ -70,11 +70,14 @@ export type Plan = 'free' | 'starter' | 'business' | 'enterprise';
  * 1 Agente = 1 Número WhatsApp (relação 1:1)
  * 1 Agente PODE conectar a múltiplas plataformas (Shopify, Menu, etc.)
  */
-export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number; paymentSkillCost: number | null }> = {
-  free:       { agents: 1,  credits: 1000,  conversations: Infinity, paymentSkillCost: null },  // null = bloqueado
-  starter:    { agents: 1,  credits: 5000,  conversations: Infinity, paymentSkillCost: 50  },  // addon €15/mês + 50 créditos/tx
-  business:   { agents: 3,  credits: 15000, conversations: Infinity, paymentSkillCost: 20  },  // incluído, 20 créditos/tx
-  enterprise: { agents: 10, credits: 40000, conversations: Infinity, paymentSkillCost: 10  },  // incluído, 10 créditos/tx
+export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number; paymentSkillCost: number | null; waMsgCreditCost: number }> = {
+  // waMsgCreditCost = créditos debitados por cada mensagem enviada via WhatsApp/Instagram API
+  // Meta cobra ~R$0,035/msg; a plataforma cobra mais para ter margem.
+  // Planos superiores têm custo menor por msg (benefício do plano).
+  free:       { agents: 1,  credits: 1000,  conversations: Infinity, paymentSkillCost: null, waMsgCreditCost: 8  },
+  starter:    { agents: 1,  credits: 5000,  conversations: Infinity, paymentSkillCost: 50,   waMsgCreditCost: 6  },
+  business:   { agents: 3,  credits: 15000, conversations: Infinity, paymentSkillCost: 20,   waMsgCreditCost: 5  },
+  enterprise: { agents: 10, credits: 40000, conversations: Infinity, paymentSkillCost: 10,   waMsgCreditCost: 4  },
 };
 
 export const ALLOWED_MODELS: Record<Plan, string[]> = {

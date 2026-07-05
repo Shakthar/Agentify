@@ -11,6 +11,7 @@ import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
 import { sendInstagramDM } from '../lib/instagram.js';
+import { deductWaMsgCredit } from '../services/billing.service.js';
 
 /** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
@@ -284,6 +285,8 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
         console.log(`[WhatsApp] A chamar sendWhatsAppText para ${from}...`);
         await sendWhatsAppText(phoneId, from, result.content, effectiveToken);
         console.log(`[WhatsApp] sendWhatsAppText concluído para ${from}`);
+        // Debitar crédito WA por mensagem enviada (Meta cobra por msg)
+        deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'whatsapp').catch(() => {});
         // Notificar responsável via WhatsApp quando handoff foi ativado
         if (result.handoff?.triggered && agent.notifyPhone) {
           const notifMsg = `🤝 *Handoff WhatsApp — ${agent.name}*\n\n📱 Cliente: +${from}\n📝 Resumo: ${result.handoff.summary}\n\n💬 Responde diretamente no WhatsApp a este número.`;
@@ -444,6 +447,8 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
       }
 
       await sendInstagramDM(senderId, result.content, pageId, effectiveToken);
+      // Debitar crédito WA por mensagem Instagram enviada
+      deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'instagram').catch(() => {});
       // Notificar responsável via WhatsApp quando handoff foi ativado no Instagram
       if (result.handoff?.triggered && agent.notifyPhone) {
         const phoneIdForNotif = agent.whatsappNumber ?? process.env.WHATSAPP_PHONE_ID;
