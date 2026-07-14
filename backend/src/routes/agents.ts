@@ -146,6 +146,37 @@ router.post('/:id/conversations/:convId/rate', asyncHandler(async (req: Authenti
   res.json(updated);
 }));
 
+// POST /api/agents/:id/whatsapp/register
+// Chama o endpoint da Meta Graph API para activar o número (passo 3 obrigatório)
+router.post('/:id/whatsapp/register', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { pin } = req.body as { pin?: string };
+  if (!pin || !/^\d{6}$/.test(pin)) {
+    throw new BadRequestError('PIN deve ter exactamente 6 dígitos numéricos');
+  }
+  const prismaD = await import('../lib/prisma.js');
+  const agent = await prismaD.default.agent.findFirst({
+    where: { id: req.params.id, tenantId: req.tenant!.id },
+  });
+  if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
+  const phoneNumberId = (agent as any).whatsappNumber;
+  if (!phoneNumberId) throw new BadRequestError('Phone Number ID não configurado neste agente');
+  const token: string | undefined = (agent as any).whatsappToken ?? process.env.WHATSAPP_TOKEN;
+  if (!token) throw new BadRequestError('Token WhatsApp não configurado');
+
+  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+  const metaRes = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/register`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', pin }),
+  });
+  const metaBody = await metaRes.json() as Record<string, unknown>;
+  if (!metaRes.ok) {
+    res.status(400).json({ error: 'Erro da Meta API', details: metaBody });
+    return;
+  }
+  res.json({ success: true, meta: metaBody });
+}));
+
 // GET /api/agents/:id/observe
 router.get('/:id/observe', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const prismaD = await import('../lib/prisma.js');

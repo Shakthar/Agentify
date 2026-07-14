@@ -58,6 +58,9 @@ export default function AgentDetailPage() {
   const [wpSaving, setWpSaving] = useState(false);
   const [wpMsg, setWpMsg] = useState('');
   const [wpTokenOk, setWpTokenOk] = useState(true);
+  const [wpRegPin, setWpRegPin] = useState('');
+  const [wpRegSaving, setWpRegSaving] = useState(false);
+  const [wpRegMsg, setWpRegMsg] = useState('');
   const [tmSaving, setTmSaving] = useState(false);
   const [intSaving, setIntSaving] = useState(false);
   const [intMsg, setIntMsg] = useState('');
@@ -105,6 +108,22 @@ export default function AgentDetailPage() {
     if (!agent) return;
     await toggleAgent(agent.id);
     setAgent((prev) => prev ? { ...prev, isActive: !prev.isActive } : null);
+  };
+
+  const handleRegisterWhatsApp = async () => {
+    if (!agent) return;
+    if (!/^\d{6}$/.test(wpRegPin)) { setWpRegMsg('PIN deve ter exactamente 6 dígitos numéricos.'); return; }
+    setWpRegSaving(true); setWpRegMsg('');
+    try {
+      await api.post(`/api/agents/${agent.id}/whatsapp/register`, { pin: wpRegPin });
+      setWpRegMsg('✅ Número registado com sucesso! Já pode receber e enviar mensagens.');
+      setWpRegPin('');
+    } catch (err: unknown) {
+      const details = (err as { response?: { data?: { details?: { error?: { message?: string } } } } })?.response?.data?.details;
+      setWpRegMsg(`Erro: ${details?.error?.message ?? 'Falha ao registar na Meta API'}`);
+    } finally {
+      setWpRegSaving(false);
+    }
   };
 
   const handleSaveWhatsApp = async () => {
@@ -1099,6 +1118,40 @@ export default function AgentDetailPage() {
                     {wpSaving ? 'A guardar...' : '💾 Guardar configuração WhatsApp'}
                   </button>
                 </div>
+              </div>
+
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Passo 4 — Activar número na Meta API</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Após adicionar e verificar o número no WhatsApp Manager, é obrigatório fazer este passo via API.
+                  Sem ele, o número fica em estado <em>"pending"</em> para sempre.
+                </p>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      PIN de 6 dígitos <span className="text-gray-400 font-normal">(escolhe livremente — será o 2FA do número)</span>
+                    </label>
+                    <input
+                      className="input"
+                      type="password"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={wpRegPin}
+                      onChange={(e) => setWpRegPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <button
+                    onClick={handleRegisterWhatsApp}
+                    disabled={wpRegSaving || wpRegPin.length !== 6}
+                    className="btn-primary text-sm px-4 py-2 whitespace-nowrap"
+                  >
+                    {wpRegSaving ? 'A registar...' : '📲 Registar número'}
+                  </button>
+                </div>
+                {wpRegMsg && (
+                  <p className={`text-xs mt-2 ${wpRegMsg.startsWith('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{wpRegMsg}</p>
+                )}
               </div>
             </div>
           )}
