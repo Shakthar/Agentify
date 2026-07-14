@@ -125,9 +125,9 @@ router.get('/facebook/auth', authenticate, asyncHandler(async (req: Authenticate
   const { agentId } = req.query as { agentId?: string };
   if (!agentId) { res.status(400).json({ error: 'agentId obrigatório' }); return; }
 
-  const appId = process.env.META_APP_ID ?? process.env.FACEBOOK_APP_ID;
+  const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
   if (!appId) {
-    res.status(503).json({ error: 'META_APP_ID não configurado nas variáveis de ambiente' });
+    res.status(503).json({ error: 'FACEBOOK_APP_ID não configurado nas variáveis de ambiente' });
     return;
   }
 
@@ -171,8 +171,8 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     return res.redirect(`${frontendUrl}/dashboard?fb=error&reason=invalid_state`);
   }
 
-  const appId     = process.env.META_APP_ID ?? process.env.FACEBOOK_APP_ID ?? '';
-  const appSecret = process.env.META_APP_SECRET ?? '';
+  const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
+  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI
     ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
 
