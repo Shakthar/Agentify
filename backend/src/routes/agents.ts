@@ -194,7 +194,7 @@ router.post('/:id/briefing', asyncHandler(async (req: AuthenticatedRequest, res:
 
   // Últimas 48h de conversas
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
-  const [conversations, leads] = await Promise.all([
+  const [conversations, leads, flagged] = await Promise.all([
     prismaD.default.conversation.findMany({
       where: { agentId: agent.id, tenantId: req.tenant!.id, createdAt: { gte: since } },
       include: { messages: { orderBy: { createdAt: 'desc' } as any, take: 2 } },
@@ -206,12 +206,22 @@ router.post('/:id/briefing', asyncHandler(async (req: AuthenticatedRequest, res:
       orderBy: { lastSeenAt: 'desc' },
       take: 20,
     }),
+    prismaD.default.conversation.findMany({
+      where: { agentId: agent.id, tenantId: req.tenant!.id, flaggedForOwner: true, resolved: false } as any,
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+      select: { id: true, visitorName: true, visitorId: true, channelType: true, createdAt: true, urgency: true } as any,
+    }),
   ]);
 
   const pending   = conversations.filter((c: any) => !c.resolved);
   const handedOff = conversations.filter((c: any) => c.handedOffToHuman);
 
-  const convLines = conversations.slice(0, 20).map((c: any) => {
+  const flaggedLines = (flagged as any[]).slice(0, 5).map((c: any) =>
+    `• 🔴 LEAD/ALERTA: ${c.visitorName ?? c.visitorId ?? 'Anónimo'} via ${c.channelType} (${new Date(c.createdAt).toLocaleDateString('pt-PT')})`
+  ).join('\n');
+
+  const convLines = conversations.slice(0, 15).map((c: any) => {
     const lastMsg = (c.messages?.[0]?.content as string | undefined)?.slice(0, 80) ?? '';
     const status  = c.resolved ? 'resolvida' : (c.handedOffToHuman ? 'HANDOFF' : 'PENDENTE');
     const visitor = c.visitorName ?? c.visitorId ?? 'anónimo';
@@ -226,15 +236,17 @@ router.post('/:id/briefing', asyncHandler(async (req: AuthenticatedRequest, res:
 
 RESUMO DAS ÚLTIMAS 48H:
 - Total de conversas: ${conversations.length} | Pendentes: ${pending.length} | Handoffs: ${handedOff.length}
+- Leads sinalizados a aguardar ação: ${(flagged as any[]).length}
 - Leads no CRM: ${leads.length}
 
+${(flagged as any[]).length > 0 ? `🔴 LEADS/ALERTAS QUE PRECISAM DE AÇÃO IMEDIATA:\n${flaggedLines}\n` : ''}
 CONVERSAS RECENTES:
 ${convLines || 'Nenhuma conversa nas últimas 48 horas.'}
 
 LEADS NO CRM:
 ${leadLines || 'Nenhum lead registado.'}
 
-Responde de forma directa, concisa e útil ao teu dono. Destaca o que precisa de atenção urgente. Usa bullet points quando faz sentido. Responde sempre em português. Não inventes informação além do que tens acima.`;
+Responde de forma directa, concisa e útil ao teu dono. Começa sempre pelos itens urgentes/flagged se existirem. Usa bullet points quando faz sentido. Responde sempre em português. Não inventes informação além do que tens acima.`;
 
   const { callLLM } = await import('../lib/llm.js');
   const msgs: Array<{ role: 'user' | 'assistant'; content: string }> = [
@@ -251,8 +263,29 @@ Responde de forma directa, concisa e útil ao teu dono. Destaca o que precisa de
       pending: pending.length,
       handoffs: handedOff.length,
       leads: leads.length,
+      flagged: (flagged as any[]).length,
     },
+    flagged: (flagged as any[]).map((c: any) => ({
+      id: c.id,
+      visitor: c.visitorName ?? c.visitorId ?? 'Anónimo',
+      channel: c.channelType,
+      date: c.createdAt,
+    })),
   });
+}));
+
+// PATCH /api/agents/:id/conversations/:convId/unflag — dono marca como visto
+router.patch('/:id/conversations/:convId/unflag', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const prismaD = await import('../lib/prisma.js');
+  const conv = await prismaD.default.conversation.findFirst({
+    where: { id: req.params.convId, tenantId: req.tenant!.id, agentId: req.params.id },
+  });
+  if (!conv) { res.status(404).json({ error: 'Not found' }); return; }
+  await (prismaD.default.conversation as any).update({
+    where: { id: req.params.convId },
+    data: { flaggedForOwner: false },
+  });
+  res.json({ success: true });
 }));
 
 // GET /api/agents/:id/observe

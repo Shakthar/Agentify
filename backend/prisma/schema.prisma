@@ -257,6 +257,7 @@ model Conversation {
   tokensUsed            Int        @default(0)
   creditsUsed           Int        @default(0)
   waMsgsSent            Int        @default(0) // Mensagens WA/Instagram enviadas nesta conversa
+  flaggedForOwner       Boolean    @default(false) // Lead/alerta sinalizado para o dono
   
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt

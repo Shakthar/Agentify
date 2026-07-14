@@ -75,7 +75,8 @@ export default function AgentDetailPage() {
   const [briefingHistory, setBriefingHistory] = useState<Array<{role: 'user' | 'assistant'; content: string}>>([]);
   const [briefingInput, setBriefingInput] = useState('');
   const [briefingLoading, setBriefingLoading] = useState(false);
-  const [briefingStats, setBriefingStats] = useState<{conversations: number; pending: number; handoffs: number; leads: number} | null>(null);
+  const [briefingStats, setBriefingStats] = useState<{conversations: number; pending: number; handoffs: number; leads: number; flagged: number} | null>(null);
+  const [briefingFlagged, setBriefingFlagged] = useState<Array<{id: string; visitor: string; channel: string; date: string}>>([]);
   // Google Calendar state
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalEmail, setGcalEmail] = useState('');
@@ -169,6 +170,7 @@ export default function AgentDetailPage() {
       });
       setBriefingHistory(h => [...(userMsg ? [] : h.filter(m => m.content !== message || m.role !== 'user')), ...(message && !userMsg ? [{ role: 'user' as const, content: message }] : []), { role: 'assistant' as const, content: data.reply }]);
       if (data.stats) setBriefingStats(data.stats);
+      if (data.flagged) setBriefingFlagged(data.flagged);
     } catch {
       setBriefingHistory(h => [...h, { role: 'assistant' as const, content: '❌ Erro ao obter briefing. Tenta novamente.' }]);
     } finally {
@@ -833,8 +835,14 @@ export default function AgentDetailPage() {
           {activeTab === 'leads' && agent && (
             <div className="space-y-4">
               {briefingStats && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[{label:'Conversas 48h', value: briefingStats.conversations, color:'brand'}, {label:'Pendentes', value: briefingStats.pending, color:'yellow'}, {label:'Handoffs', value: briefingStats.handoffs, color:'red'}, {label:'Leads CRM', value: briefingStats.leads, color:'green'}].map(s => (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {[
+                    {label:'Conversas 48h', value: briefingStats.conversations, color:'brand'},
+                    {label:'Pendentes',     value: briefingStats.pending,       color:'yellow'},
+                    {label:'Handoffs',      value: briefingStats.handoffs,      color:'red'},
+                    {label:'Leads CRM',     value: briefingStats.leads,         color:'green'},
+                    {label:'🔴 A aguardar', value: briefingStats.flagged ?? 0,  color:'red'},
+                  ].map(s => (
                     <div key={s.label} className="card text-center py-3">
                       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{s.label}</p>
@@ -842,11 +850,40 @@ export default function AgentDetailPage() {
                   ))}
                 </div>
               )}
+
+              {/* Leads flagged — precisam de ação do dono */}
+              {briefingFlagged.length > 0 && (
+                <div className="card border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10">
+                  <h3 className="font-semibold text-red-700 dark:text-red-400 mb-2 text-sm">🔴 Leads a aguardar a tua ação</h3>
+                  <div className="space-y-2">
+                    {briefingFlagged.map(f => (
+                      <div key={f.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{f.visitor}</span>
+                          <span className="ml-2 text-xs text-gray-400">via {f.channel} · {new Date(f.date).toLocaleDateString('pt-PT')}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setActiveTab('history')} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">Ver conversa</button>
+                          <button
+                            onClick={async () => {
+                              await api.patch(`/api/agents/${agent.id}/conversations/${f.id}/unflag`);
+                              setBriefingFlagged(prev => prev.filter(x => x.id !== f.id));
+                              setBriefingStats(prev => prev ? {...prev, flagged: Math.max(0, (prev.flagged ?? 1) - 1)} : prev);
+                            }}
+                            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          >✓ Visto</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="card">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-semibold text-gray-900 dark:text-gray-100">🎯 Briefing do agente</h2>
                   <button
-                    onClick={() => { setBriefingHistory([]); setBriefingStats(null); handleBriefingSend(); }}
+                    onClick={() => { setBriefingHistory([]); setBriefingStats(null); setBriefingFlagged([]); handleBriefingSend(); }}
                     disabled={briefingLoading}
                     className="text-xs text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
                   >

@@ -295,6 +295,18 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
       + '\nNOTA: Usa este marcador APENAS UMA VEZ por conversa, quando tiveres a certeza que o handoff é necessário.';
   }
 
+  // Injeta skill de captura de leads (dataCollection)
+  if ((conversation.agent as any).skillDataCollection && !(conversation as any).flaggedForOwner) {
+    systemPrompt += '\n\n---\nSKILL: CAPTURA DE LEADS'
+      + '\nO teu objectivo também é identificar e capturar leads qualificados para o dono do negócio.'
+      + '\nQuando o utilizador mostrar interesse claro (pedir proposta, pedir preço, deixar dados de contacto, querer marcar, etc.):'
+      + '\n1. Recolhe naturalmente: nome, número de telefone, email e necessidade principal'
+      + '\n2. Quando tiveres pelo menos nome + telefone, inclui este marcador invisível EXACTAMENTE UMA VEZ na tua resposta: [LEAD:nome|telefone|email|necessidade]'
+      + '\n   Exemplo: [LEAD:Ana Silva|351912345678|ana@email.com|Quer proposta para website]'
+      + '\n   Se não tiveres email, usa "-": [LEAD:Ana Silva|351912345678|-|Interesse em consultoria]'
+      + '\nNOTA: Usa o marcador [LEAD:...] apenas uma vez, quando tiveres dados suficientes. O dono será notificado automaticamente.';
+  }
+
   // Injeta historial de pedidos anteriores do mesmo visitante (cliente recorrente)
   // e recupera nome do visitante guardado em conversas anteriores
   let knownVisitorName: string | null = conversation.visitorName ?? null;
@@ -403,6 +415,43 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   const handoffMatch = llmResponse.content.match(/\[HANDOFF:([^\]]+)\]/i);
   const handoffSummary = handoffMatch?.[1]?.trim().slice(0, 200) ?? null;
 
+  // Parseia [LEAD:nome|telefone|email|necessidade] — captura de lead para o dono
+  const leadMatch = llmResponse.content.match(/\[LEAD:([^\]]+)\]/i);
+  if (leadMatch) {
+    const parts = leadMatch[1].split('|').map(s => s.trim());
+    const [leadName, leadPhone, leadEmail, leadNeed] = parts;
+    // Sinaliza a conversa para o dono
+    prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { flaggedForOwner: true } as any,
+    }).catch(() => {});
+    // Cria/actualiza contacto CRM automaticamente
+    if (leadPhone && leadPhone !== '-') {
+      (prisma as any).crmContact.upsert({
+        where: { tenantId_phone: { tenantId, phone: leadPhone } } as any,
+        update: {
+          name: leadName !== '-' ? leadName : undefined,
+          email: leadEmail && leadEmail !== '-' ? leadEmail : undefined,
+          notes: leadNeed && leadNeed !== '-' ? `Lead via agente: ${leadNeed}` : undefined,
+          lastSeenAt: new Date(),
+          agentId: conversation.agentId,
+        },
+        create: {
+          tenantId,
+          agentId: conversation.agentId,
+          phone: leadPhone,
+          name: leadName !== '-' ? leadName : null,
+          email: leadEmail && leadEmail !== '-' ? leadEmail : null,
+          notes: leadNeed && leadNeed !== '-' ? `Lead via agente: ${leadNeed}` : null,
+          status: 'lead',
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date(),
+        },
+      }).catch((e: unknown) => console.error('[Lead] Falha ao criar CRM contact:', e));
+    }
+    console.log(`[Lead] Capturado: ${leadName} | ${leadPhone} | conv=${conversation.id}`);
+  }
+
   // Parseia [VISITOR_NAME:Nome] — aprende e persiste o nome do visitante
   const visitorNameMatch = llmResponse.content.match(/\[VISITOR_NAME:([^\]]+)\]/i);
   if (visitorNameMatch) {
@@ -420,6 +469,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     .replace(/\[MBWAY:[^\]]+\]/gi, '')
     .replace(/\[VISITOR_NAME:[^\]]+\]/gi, '')
     .replace(/\[HANDOFF:[^\]]+\]/gi, '')
+    .replace(/\[LEAD:[^\]]+\]/gi, '')
     .trim();
 
   let docAttachment: { id: string; name: string; url: string } | null = null;
