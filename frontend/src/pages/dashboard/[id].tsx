@@ -81,6 +81,8 @@ export default function AgentDetailPage() {
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalEmail, setGcalEmail] = useState('');
   const [gcalLoading, setGcalLoading] = useState(false);
+  // Facebook Login (Instagram OAuth)
+  const [fbConnecting, setFbConnecting] = useState(false);
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
@@ -115,6 +117,24 @@ export default function AgentDetailPage() {
       setActiveTab('integrations');
       const q = { ...router.query };
       delete q.gcal;
+      router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+    }
+    // Facebook OAuth callback
+    const { fb, igId, name: fbName } = router.query as { fb?: string; igId?: string; name?: string };
+    if (fb === 'success' && igId) {
+      setIgAccountId(igId);
+      setIgEnabled(true);
+      setIgMsg(`✅ Conta Instagram ligada${fbName ? ` (${decodeURIComponent(fbName)})` : ''}! Verifica e guarda.`);
+      setActiveTab('instagram');
+      const q = { ...router.query };
+      delete q.fb; delete q.igId; delete q.name;
+      router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+    }
+    if (fb === 'error') {
+      setIgMsg('❌ Erro ao ligar conta Facebook/Instagram. Tenta novamente ou introduz os dados manualmente.');
+      setActiveTab('instagram');
+      const q = { ...router.query };
+      delete q.fb;
       router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
     }
   }, [router.isReady, router.query]);
@@ -175,6 +195,19 @@ export default function AgentDetailPage() {
       setBriefingHistory(h => [...h, { role: 'assistant' as const, content: '❌ Erro ao obter briefing. Tenta novamente.' }]);
     } finally {
       setBriefingLoading(false);
+    }
+  };
+
+  const handleFbConnect = async () => {
+    if (!agent) return;
+    setFbConnecting(true);
+    try {
+      const { data } = await api.get(`/api/integrations/facebook/auth?agentId=${agent.id}`);
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao iniciar OAuth';
+      alert(msg);
+      setFbConnecting(false);
     }
   };
 
@@ -1360,6 +1393,29 @@ export default function AgentDetailPage() {
           {/* ─── Instagram DM ─── */}
           {activeTab === 'instagram' && (
             <div className="space-y-6">
+              {/* Opção 1: OAuth automático */}
+              <div className="card border border-pink-200 dark:border-pink-800 bg-pink-50 dark:bg-pink-900/10">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">⚡ Ligar Instagram automaticamente</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Autentica com a tua conta Facebook e o agente fica ligado ao teu Instagram Business automaticamente — sem copiar tokens.</p>
+                {igMsg && (
+                  <p className={`text-xs mb-3 ${igMsg.startsWith('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{igMsg}</p>
+                )}
+                <button
+                  onClick={handleFbConnect}
+                  disabled={fbConnecting}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm text-white transition-colors"
+                  style={{ background: fbConnecting ? '#888' : '#1877F2' }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  {fbConnecting ? 'A redirecionar...' : 'Continuar com Facebook'}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                <span className="text-xs text-gray-400">ou configura manualmente</span>
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+              </div>
               <div className="card">
                 <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
                 <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
