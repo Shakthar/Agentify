@@ -177,6 +177,84 @@ router.post('/:id/whatsapp/register', asyncHandler(async (req: AuthenticatedRequ
   res.json({ success: true, meta: metaBody });
 }));
 
+// POST /api/agents/:id/briefing
+// IA analisa as conversas recentes e responde ao dono sobre o que precisa de atenção.
+// Suporta conversa contínua: o owner envia mensagens, o agente responde com contexto das suas conversas.
+router.post('/:id/briefing', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { message, history } = req.body as {
+    message?: string;
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  };
+
+  const prismaD = await import('../lib/prisma.js');
+  const agent = await prismaD.default.agent.findFirst({
+    where: { id: req.params.id, tenantId: req.tenant!.id },
+  });
+  if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
+
+  // Últimas 48h de conversas
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const [conversations, leads] = await Promise.all([
+    prismaD.default.conversation.findMany({
+      where: { agentId: agent.id, tenantId: req.tenant!.id, createdAt: { gte: since } },
+      include: { messages: { orderBy: { createdAt: 'desc' } as any, take: 2 } },
+      orderBy: { createdAt: 'desc' },
+      take: 40,
+    }),
+    (prismaD.default as any).crmContact.findMany({
+      where: { agentId: agent.id, tenantId: req.tenant!.id, status: 'lead' },
+      orderBy: { lastSeenAt: 'desc' },
+      take: 20,
+    }),
+  ]);
+
+  const pending   = conversations.filter((c: any) => !c.resolved);
+  const handedOff = conversations.filter((c: any) => c.handedOffToHuman);
+
+  const convLines = conversations.slice(0, 20).map((c: any) => {
+    const lastMsg = (c.messages?.[0]?.content as string | undefined)?.slice(0, 80) ?? '';
+    const status  = c.resolved ? 'resolvida' : (c.handedOffToHuman ? 'HANDOFF' : 'PENDENTE');
+    const visitor = c.visitorName ?? c.visitorId ?? 'anónimo';
+    return `• [${status}] ${visitor} via ${c.channelType} — "${lastMsg}"`;
+  }).join('\n');
+
+  const leadLines = leads.slice(0, 10).map((l: any) =>
+    `• ${l.name ?? 'Sem nome'} | ${l.phone ?? '-'} | ${l.email ?? '-'} | última interação: ${l.lastSeenAt?.toISOString().slice(0, 10) ?? '-'}`,
+  ).join('\n');
+
+  const systemPrompt = `És o agente de IA "${agent.name}" da plataforma Agentfy. O teu dono está a falar contigo sobre o estado das conversas e leads.
+
+RESUMO DAS ÚLTIMAS 48H:
+- Total de conversas: ${conversations.length} | Pendentes: ${pending.length} | Handoffs: ${handedOff.length}
+- Leads no CRM: ${leads.length}
+
+CONVERSAS RECENTES:
+${convLines || 'Nenhuma conversa nas últimas 48 horas.'}
+
+LEADS NO CRM:
+${leadLines || 'Nenhum lead registado.'}
+
+Responde de forma directa, concisa e útil ao teu dono. Destaca o que precisa de atenção urgente. Usa bullet points quando faz sentido. Responde sempre em português. Não inventes informação além do que tens acima.`;
+
+  const { callLLM } = await import('../lib/llm.js');
+  const msgs: Array<{ role: 'user' | 'assistant'; content: string }> = [
+    ...(history ?? []),
+    { role: 'user', content: message ?? 'O que está a acontecer? O que precisa da minha atenção?' },
+  ];
+
+  const response = await callLLM('claude-haiku-4-5-20251001', systemPrompt, msgs, 800, 0.6);
+
+  res.json({
+    reply: response.content,
+    stats: {
+      conversations: conversations.length,
+      pending: pending.length,
+      handoffs: handedOff.length,
+      leads: leads.length,
+    },
+  });
+}));
+
 // GET /api/agents/:id/observe
 router.get('/:id/observe', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const prismaD = await import('../lib/prisma.js');

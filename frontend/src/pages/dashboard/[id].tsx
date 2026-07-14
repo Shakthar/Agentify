@@ -44,7 +44,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'instagram' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'instagram' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations' | 'leads'>('overview');
   const [skillsSaving, setSkillsSaving] = useState(false);
   const [skillsMsg, setSkillsMsg] = useState('');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
@@ -71,6 +71,15 @@ export default function AgentDetailPage() {
   const [igTokenVisible, setIgTokenVisible] = useState(false);
   const [igSaving, setIgSaving] = useState(false);
   const [igMsg, setIgMsg] = useState('');
+  // Leads / briefing state
+  const [briefingHistory, setBriefingHistory] = useState<Array<{role: 'user' | 'assistant'; content: string}>>([]);
+  const [briefingInput, setBriefingInput] = useState('');
+  const [briefingLoading, setBriefingLoading] = useState(false);
+  const [briefingStats, setBriefingStats] = useState<{conversations: number; pending: number; handoffs: number; leads: number} | null>(null);
+  // Google Calendar state
+  const [gcalConnected, setGcalConnected] = useState(false);
+  const [gcalEmail, setGcalEmail] = useState('');
+  const [gcalLoading, setGcalLoading] = useState(false);
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
@@ -88,6 +97,40 @@ export default function AgentDetailPage() {
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
+
+  // Handle ?gcal=success redirect from Google OAuth callback
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { gcal, email } = router.query as { gcal?: string; email?: string };
+    if (gcal === 'success' && email) {
+      setGcalConnected(true);
+      setGcalEmail(decodeURIComponent(email));
+      setActiveTab('integrations');
+      const q = { ...router.query };
+      delete q.gcal; delete q.email;
+      router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+    }
+    if (gcal === 'error') {
+      setActiveTab('integrations');
+      const q = { ...router.query };
+      delete q.gcal;
+      router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query]);
+
+  // Load Google Calendar connection status when integrations tab opens
+  useEffect(() => {
+    if (activeTab !== 'integrations' || !agent) return;
+    api.get(`/api/integrations/google/status?agentId=${agent.id}`)
+      .then(({ data }) => { if (data.connected) { setGcalConnected(true); setGcalEmail(data.email ?? ''); } })
+      .catch(() => {});
+  }, [activeTab, agent?.id]);
+
+  // Load briefing when Leads tab opens (first time only)
+  useEffect(() => {
+    if (activeTab !== 'leads' || !agent || briefingHistory.length > 0) return;
+    handleBriefingSend();
+  }, [activeTab, agent?.id]);
 
   const handleSave = async () => {
     if (!agent) return;
@@ -108,6 +151,49 @@ export default function AgentDetailPage() {
     if (!agent) return;
     await toggleAgent(agent.id);
     setAgent((prev) => prev ? { ...prev, isActive: !prev.isActive } : null);
+  };
+
+  const handleBriefingSend = async (userMsg?: string) => {
+    if (!agent || briefingLoading) return;
+    const message = userMsg ?? briefingInput.trim();
+    setBriefingLoading(true);
+    const newHistory: Array<{role: 'user' | 'assistant'; content: string}> = userMsg
+      ? briefingHistory
+      : [...briefingHistory, { role: 'user', content: message }];
+    if (!userMsg && message) setBriefingHistory(newHistory);
+    setBriefingInput('');
+    try {
+      const { data } = await api.post(`/api/agents/${agent.id}/briefing`, {
+        message: message || undefined,
+        history: userMsg ? [] : briefingHistory,
+      });
+      setBriefingHistory(h => [...(userMsg ? [] : h.filter(m => m.content !== message || m.role !== 'user')), ...(message && !userMsg ? [{ role: 'user' as const, content: message }] : []), { role: 'assistant' as const, content: data.reply }]);
+      if (data.stats) setBriefingStats(data.stats);
+    } catch {
+      setBriefingHistory(h => [...h, { role: 'assistant' as const, content: '❌ Erro ao obter briefing. Tenta novamente.' }]);
+    } finally {
+      setBriefingLoading(false);
+    }
+  };
+
+  const handleGcalConnect = async () => {
+    if (!agent) return;
+    setGcalLoading(true);
+    try {
+      const { data } = await api.get(`/api/integrations/google/auth?agentId=${agent.id}`);
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao iniciar OAuth';
+      alert(msg);
+      setGcalLoading(false);
+    }
+  };
+
+  const handleGcalDisconnect = async () => {
+    if (!agent || !confirm('Desligar conta Google deste agente?')) return;
+    await api.delete(`/api/integrations/google?agentId=${agent.id}`);
+    setGcalConnected(false);
+    setGcalEmail('');
   };
 
   const handleRegisterWhatsApp = async () => {
@@ -231,6 +317,7 @@ export default function AgentDetailPage() {
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
               { key: 'instagram',  label: '📸 Instagram' },
+              { key: 'leads',      label: '🎯 Leads' },
               { key: 'history',    label: '📁 Histórico' },
               { key: 'skills',     label: '⚡ Skills' },
               { key: 'edit',       label: '✏️ Editar' },
@@ -742,6 +829,72 @@ export default function AgentDetailPage() {
           })()}
 
           {/* ─── Histórico de conversas ─── */}
+          {/* 🎯 Leads */}
+          {activeTab === 'leads' && agent && (
+            <div className="space-y-4">
+              {briefingStats && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[{label:'Conversas 48h', value: briefingStats.conversations, color:'brand'}, {label:'Pendentes', value: briefingStats.pending, color:'yellow'}, {label:'Handoffs', value: briefingStats.handoffs, color:'red'}, {label:'Leads CRM', value: briefingStats.leads, color:'green'}].map(s => (
+                    <div key={s.label} className="card text-center py-3">
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="card">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100">🎯 Briefing do agente</h2>
+                  <button
+                    onClick={() => { setBriefingHistory([]); setBriefingStats(null); handleBriefingSend(); }}
+                    disabled={briefingLoading}
+                    className="text-xs text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
+                  >
+                    ↺ Actualizar
+                  </button>
+                </div>
+                <div className="space-y-3 max-h-96 overflow-y-auto mb-4 pr-1">
+                  {briefingHistory.length === 0 && briefingLoading && (
+                    <p className="text-sm text-gray-400 dark:text-gray-500 animate-pulse">A analisar conversas...</p>
+                  )}
+                  {briefingHistory.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+                        msg.role === 'user'
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                      }`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {briefingLoading && briefingHistory.length > 0 && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-xl px-4 py-2.5 text-sm text-gray-400 animate-pulse">A pensar...</div>
+                    </div>
+                  )}
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); handleBriefingSend(); }} className="flex gap-2">
+                  <input
+                    className="input flex-1 text-sm"
+                    placeholder="Pergunta algo ao agente... ex: Há leads quentes hoje?"
+                    value={briefingInput}
+                    onChange={(e) => setBriefingInput(e.target.value)}
+                    disabled={briefingLoading}
+                  />
+                  <button type="submit" disabled={briefingLoading || !briefingInput.trim()} className="btn-primary text-sm px-4">
+                    Enviar
+                  </button>
+                </form>
+              </div>
+              <div className="text-center">
+                <button onClick={() => setActiveTab('history')} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">Ver histórico completo →</button>
+                {' · '}
+                <button onClick={() => router.push('/dashboard/crm')} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">Abrir CRM →</button>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'history' && agent && (
             <div>
               <div className="flex justify-end mb-3">
@@ -989,9 +1142,20 @@ export default function AgentDetailPage() {
                           onBlur={(e) => handleSaveIntegrations({ calendarId: e.target.value || undefined })}
                         />
                       </div>
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
-                        🔗 Para ligar a conta Google, vai às <strong>Definições da plataforma → Integrações → Google Calendar</strong> e completa o OAuth. Depois volta aqui e introduz o Calendar ID.
-                      </div>
+                      {gcalConnected ? (
+                        <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded">
+                          <span className="text-xs text-green-700 dark:text-green-300">✅ Conectado como <strong>{gcalEmail}</strong></span>
+                          <button onClick={handleGcalDisconnect} className="text-xs text-red-500 hover:underline ml-3">Desligar</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleGcalConnect}
+                          disabled={gcalLoading}
+                          className="btn-secondary text-xs w-full flex items-center justify-center gap-2"
+                        >
+                          {gcalLoading ? 'A redirecionar...' : '🔗 Ligar conta Google'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
