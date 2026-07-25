@@ -266,23 +266,22 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
 
         console.log(`[WhatsApp] Conversa existente: ${conversation ? conversation.id : 'nenhuma, a criar nova'}`);
         if (!conversation) {
-          conversation = await (prisma.conversation as any).create({
+          conversation = await prisma.conversation.create({
             data: {
               agentId:     agent.id,
               tenantId:    agent.tenantId,
               channelType: 'whatsapp',
               externalId:  from,
               visitorId:   from,
-              customerId:  customer?.id ?? null,
-              channels:    ['whatsapp'],
-            },
+              ...(customer?.id ? { customerId: customer.id } : {}),
+            } as any,
           });
           console.log(`[WhatsApp] Conversa criada: ${conversation.id} customer=${customer?.id ?? 'none'}`);
         } else if (customer?.id && !(conversation as any).customerId) {
           // Vincular customer a conversa existente que não tinha
-          await (prisma.conversation as any).update({
+          await prisma.conversation.update({
             where: { id: conversation.id },
-            data: { customerId: customer.id },
+            data: { customerId: customer.id } as any,
           });
         }
 
@@ -462,26 +461,23 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
       });
 
       if (!conversation) {
-        conversation = await (prisma.conversation as any).create({
+        conversation = await prisma.conversation.create({
           data: {
             agentId:     agent.id,
             tenantId:    agent.tenantId,
             channelType: 'instagram',
             externalId:  senderId,
             visitorId:   senderId,
-            customerId:  igCustomer?.id ?? null,
-            channels:    ['instagram'],
-          },
+            ...(igCustomer?.id ? { customerId: igCustomer.id } : {}),
+          } as any,
         });
       } else if (igCustomer?.id && !(conversation as any).customerId) {
-        await (prisma.conversation as any).update({
+        await prisma.conversation.update({
           where: { id: conversation.id },
-          data: { customerId: igCustomer.id },
+          data: { customerId: igCustomer.id } as any,
         });
       }
 
-      // Se em handoff humano, não responder automaticamente
-      if (conversation?.handedOffToHuman) {
       // Se em handoff humano, não responder automaticamente
       if (conversation?.handedOffToHuman) {
         console.log(`[Instagram] Conversa ${conversation.id} em handoff humano — a ignorar resposta automática para ${senderId}`);
