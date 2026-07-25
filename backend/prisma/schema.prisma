@@ -78,6 +78,7 @@ model Tenant {
 
   agents                Agent[]
   crmContacts           CrmContact[]
+  customers             Customer[]
   conversations         Conversation[]
   creditHistory         CreditLog[]
   refreshTokens         RefreshToken[]
@@ -263,13 +264,19 @@ model Conversation {
   updatedAt             DateTime   @updatedAt
   closedAt              DateTime?
 
+  // Customer identity (unified across channels)
+  customerId            String?
+  channels              String[]   @default([]) // Canais usados: whatsapp, instagram, webchat
+
   // Relations
   tenant                Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   agent                 Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  customer              Customer?  @relation(fields: [customerId], references: [id])
 
   @@index([tenantId])
   @@index([agentId])
   @@index([visitorId])
+  @@index([customerId])
 }
 
 // ===== MESSAGES =====
@@ -284,11 +291,13 @@ model Message {
   tokens                Int        @default(0)
   model                 String?
   timestamp             DateTime   @default(now())
+  channelMessageId      String?    // ID único da mensagem no canal (dedup)
 
   // Relations
   conversation          Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+  @@index([channelMessageId])
 }
 
 // ===== CREDITS =====
@@ -496,6 +505,29 @@ model PlatformInvoice {
 
   @@index([tenantId])
   @@index([status])
+}
+
+// ===== CUSTOMERS (identidade unificada cross-channel) =====
+model Customer {
+  id          String   @id @default(cuid())
+  tenantId    String
+  phone       String?  // normalizado E.164 sem +
+  email       String?
+  name        String?
+  externalIds Json?    // { "instagram": "senderId", "whatsapp": "phone", "shopify": "id" }
+  metadata    Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([tenantId, phone])
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([phone])
+  @@index([email])
 }
 
 // ===== PLATFORM CONFIG (pricing & feature flags — editable by superadmin) =====

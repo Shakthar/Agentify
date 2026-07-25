@@ -7,6 +7,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import prisma from '../lib/prisma.js';
 import * as conversationsService from '../services/conversations.service.js';
+import { identifyCustomer } from '../services/customer.service.js';
 import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
@@ -199,6 +200,15 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
           continue;
         }
 
+        // Deduplicação: ignorar mensagem já processada
+        if (msg.id) {
+          const dup = await (prisma.message as any).findFirst({ where: { channelMessageId: msg.id } });
+          if (dup) {
+            console.log(`[WhatsApp] Mensagem duplicada ignorada: ${msg.id}`);
+            continue;
+          }
+        }
+
         const text = msg.text?.body ?? '';
         console.log(`[WhatsApp] Mensagem de ${from} → phoneId=${phoneId} tipo=${msg.type} texto="${text.slice(0, 80)}"`);
         if (!text) continue;
@@ -228,6 +238,14 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
         const effectiveToken = agentToken ?? process.env.WHATSAPP_TOKEN;
         console.log(`[WhatsApp] Token: agente=${agentToken ? 'sim' : 'não'} env=${process.env.WHATSAPP_TOKEN ? 'sim' : 'não'} effectiveToken=${effectiveToken ? 'presente' : 'AUSENTE!'}`);
 
+        // Identificar/criar Customer unificado
+        const customer = await identifyCustomer({
+          tenantId: agent.tenantId,
+          phone: from,
+          channel: 'whatsapp',
+          channelId: from,
+        }).catch(err => { console.error('[WhatsApp] Erro ao identificar customer:', err); return null; });
+
         // Reutilizar conversa aberta deste contacto ou criar nova
         let conversation = await prisma.conversation.findFirst({
           where: {
@@ -248,16 +266,24 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
 
         console.log(`[WhatsApp] Conversa existente: ${conversation ? conversation.id : 'nenhuma, a criar nova'}`);
         if (!conversation) {
-          conversation = await prisma.conversation.create({
+          conversation = await (prisma.conversation as any).create({
             data: {
               agentId:     agent.id,
               tenantId:    agent.tenantId,
               channelType: 'whatsapp',
               externalId:  from,
               visitorId:   from,
+              customerId:  customer?.id ?? null,
+              channels:    ['whatsapp'],
             },
           });
-          console.log(`[WhatsApp] Conversa criada: ${conversation.id}`);
+          console.log(`[WhatsApp] Conversa criada: ${conversation.id} customer=${customer?.id ?? 'none'}`);
+        } else if (customer?.id && !(conversation as any).customerId) {
+          // Vincular customer a conversa existente que não tinha
+          await (prisma.conversation as any).update({
+            where: { id: conversation.id },
+            data: { customerId: customer.id },
+          });
         }
 
         // Processar mensagem no LLM
@@ -382,6 +408,16 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
       // Ignorar echo (mensagens enviadas pela própria página) e mensagens sem texto
       if (!senderId || !text || messaging.message?.is_echo) continue;
 
+      // Deduplicação: ignorar mensagem já processada
+      const msgMid = messaging.message?.mid;
+      if (msgMid) {
+        const dup = await (prisma.message as any).findFirst({ where: { channelMessageId: msgMid } });
+        if (dup) {
+          console.log(`[Instagram] Mensagem duplicada ignorada: ${msgMid}`);
+          continue;
+        }
+      }
+
       console.log(`[Instagram] DM de ${senderId} → pageId=${pageId} texto="${text.slice(0, 80)}"`);
 
       // Encontrar agente pelo Instagram Account ID (page ID do Meta)
@@ -406,6 +442,13 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
       }
       const effectiveToken = agentToken ?? process.env.INSTAGRAM_TOKEN ?? process.env.WHATSAPP_TOKEN;
 
+      // Identificar/criar Customer unificado
+      const igCustomer = await identifyCustomer({
+        tenantId: agent.tenantId,
+        channel: 'instagram',
+        channelId: senderId,
+      }).catch(err => { console.error('[Instagram] Erro ao identificar customer:', err); return null; });
+
       // Reutilizar conversa aberta deste contacto ou criar nova
       let conversation = await prisma.conversation.findFirst({
         where: {
@@ -419,66 +462,24 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
       });
 
       if (!conversation) {
-        conversation = await prisma.conversation.create({
+        conversation = await (prisma.conversation as any).create({
           data: {
             agentId:     agent.id,
             tenantId:    agent.tenantId,
             channelType: 'instagram',
             externalId:  senderId,
             visitorId:   senderId,
+            customerId:  igCustomer?.id ?? null,
+            channels:    ['instagram'],
           },
+        });
+      } else if (igCustomer?.id && !(conversation as any).customerId) {
+        await (prisma.conversation as any).update({
+          where: { id: conversation.id },
+          data: { customerId: igCustomer.id },
         });
       }
 
       // Se em handoff humano, não responder automaticamente
       if (conversation?.handedOffToHuman) {
-        console.log(`[Instagram] Conversa ${conversation.id} em handoff humano — a ignorar resposta automática para ${senderId}`);
-        continue;
-      }
-
-      // Processar mensagem no LLM
-      let result: { content: string; handoff?: { triggered: true; summary: string } | null };
-      try {
-        result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
-      } catch (err) {
-        console.error('[Instagram] Erro ao processar mensagem LLM:', err);
-        await sendInstagramDM(senderId, '⚠️ Ocorreu um erro. Por favor, tenta novamente mais tarde.', pageId, effectiveToken);
-        continue;
-      }
-
-      await sendInstagramDM(senderId, result.content, pageId, effectiveToken);
-      // Debitar crédito WA por mensagem Instagram enviada
-      deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'instagram').catch(() => {});
-      // Notificar responsável via WhatsApp quando handoff foi ativado no Instagram
-      if (result.handoff?.triggered && agent.notifyPhone) {
-        const phoneIdForNotif = agent.whatsappNumber ?? process.env.WHATSAPP_PHONE_ID;
-        const tokenForNotif = effectiveToken ?? process.env.WHATSAPP_TOKEN;
-        if (phoneIdForNotif) {
-          const notifMsg = `🤝 *Handoff Instagram — ${agent.name}*\n\n📸 Cliente IG ID: ${senderId}\n📝 Resumo: ${result.handoff.summary}\n\n💬 Abre o Instagram e responde diretamente à conversa com este utilizador.`;
-          await sendWhatsAppText(phoneIdForNotif, agent.notifyPhone, notifMsg, tokenForNotif)
-            .catch(err => console.error('[Instagram] Falha ao enviar notificação WA de handoff:', err));
-          console.log(`[Instagram] Notificação de handoff enviada para ${agent.notifyPhone}`);
-        } else {
-          console.warn('[Instagram] Handoff ativado mas sem whatsappNumber/WHATSAPP_PHONE_ID — notificação WA não enviada');
-        }
-      }
-    }
-  }
-}));
-
-interface InstagramEntry {
-  id: string;
-  messaging: {
-    sender: { id: string };
-    recipient: { id: string };
-    timestamp: number;
-    message?: {
-      mid: string;
-      text?: string;
-      is_echo?: boolean;
-    };
-  }[];
-}
-
-export default router;
-
+        console.log(`[Instagram] Conversa ${conversation.id} em ha
