@@ -482,4 +482,54 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
 
       // Se em handoff humano, não responder automaticamente
       if (conversation?.handedOffToHuman) {
-        console.log(`[Instagram] Conversa ${conversation.id} em ha
+      // Se em handoff humano, não responder automaticamente
+      if (conversation?.handedOffToHuman) {
+        console.log(`[Instagram] Conversa ${conversation.id} em handoff humano — a ignorar resposta automática para ${senderId}`);
+        continue;
+      }
+
+      // Processar mensagem no LLM
+      let result: { content: string; handoff?: { triggered: true; summary: string } | null };
+      try {
+        result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
+      } catch (err) {
+        console.error('[Instagram] Erro ao processar mensagem LLM:', err);
+        await sendInstagramDM(senderId, '⚠️ Ocorreu um erro. Por favor, tenta novamente mais tarde.', pageId, effectiveToken);
+        continue;
+      }
+
+      await sendInstagramDM(senderId, result.content, pageId, effectiveToken);
+      // Debitar crédito WA por mensagem Instagram enviada
+      deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'instagram').catch(() => {});
+      // Notificar responsável via WhatsApp quando handoff foi ativado no Instagram
+      if (result.handoff?.triggered && agent.notifyPhone) {
+        const phoneIdForNotif = agent.whatsappNumber ?? process.env.WHATSAPP_PHONE_ID;
+        const tokenForNotif = effectiveToken ?? process.env.WHATSAPP_TOKEN;
+        if (phoneIdForNotif) {
+          const notifMsg = `🤝 *Handoff Instagram — ${agent.name}*\n\n📸 Cliente IG ID: ${senderId}\n📝 Resumo: ${result.handoff.summary}\n\n💬 Abre o Instagram e responde diretamente à conversa com este utilizador.`;
+          await sendWhatsAppText(phoneIdForNotif, agent.notifyPhone, notifMsg, tokenForNotif)
+            .catch(err => console.error('[Instagram] Falha ao enviar notificação WA de handoff:', err));
+          console.log(`[Instagram] Notificação de handoff enviada para ${agent.notifyPhone}`);
+        } else {
+          console.warn('[Instagram] Handoff ativado mas sem whatsappNumber/WHATSAPP_PHONE_ID — notificação WA não enviada');
+        }
+      }
+    }
+  }
+}));
+
+interface InstagramEntry {
+  id: string;
+  messaging: {
+    sender: { id: string };
+    recipient: { id: string };
+    timestamp: number;
+    message?: {
+      mid: string;
+      text?: string;
+      is_echo?: boolean;
+    };
+  }[];
+}
+
+export default router;
