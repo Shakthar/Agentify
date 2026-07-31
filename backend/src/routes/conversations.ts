@@ -52,4 +52,11 @@ router.patch('/:id/close', asyncHandler(async (req: AuthenticatedRequest, res: R
   res.json(conversation);
 }));
 
+// PATCH /api/conversations/:id/handoff
+// Devolve o controlo ao agente (reset handedOffToHuman = false)
+router.patch('/:id/handoff', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const conversation = await conversationsService.returnToAgent(req.tenant!.id, req.params.id);
+  res.json(conversation);
+}));
+
 export default router;

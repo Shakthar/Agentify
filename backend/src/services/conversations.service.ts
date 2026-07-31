@@ -618,3 +618,20 @@ export async function closeConversation(tenantId: string, conversationId: string
   writeAuditLog(tenantId, 'conversation_closed', 'conversation', conversationId);
   return conversation;
 }
+
+export async function returnToAgent(tenantId: string, conversationId: string) {
+  const existing = await prisma.conversation.findFirst({
+    where: { id: conversationId, tenantId },
+  });
+  if (!existing) {
+    throw new NotFoundError('Conversation not found');
+  }
+
+  const conversation = await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { handedOffToHuman: false },
+  });
+
+  writeAuditLog(tenantId, 'conversation_returned_to_agent', 'conversation', conversationId);
+  return conversation;
+}

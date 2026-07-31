@@ -63,7 +63,8 @@ export default function ConversationHistory({ agentId }: Props) {
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState<ConversationWithMessages | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'web'>('all');
+  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'web' | 'handoff'>('all');
+  const [returningHandoff, setReturningHandoff] = useState(false);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -115,10 +116,24 @@ export default function ConversationHistory({ agentId }: Props) {
   }
 
   const displayed = conversations.filter((c) => {
+    if (filter === 'handoff') return c.handedOffToHuman;
     if (!search) return true;
     const phone = c.visitorId ?? '';
     return phone.includes(search);
   });
+
+  async function returnToAgent(conv: ConversationWithMessages) {
+    setReturningHandoff(true);
+    try {
+      await api.patch(`/api/conversations/${conv.id}/handoff`);
+      setSelected((prev) => prev ? { ...prev, handedOffToHuman: false } : prev);
+      setConversations((prev) => prev.map((c) => c.id === conv.id ? { ...c, handedOffToHuman: false } : c));
+    } catch {
+      /* ignore */
+    } finally {
+      setReturningHandoff(false);
+    }
+  }
 
   return (
     <div className="flex h-[600px] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -137,17 +152,17 @@ export default function ConversationHistory({ agentId }: Props) {
             className="w-full text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-2.5 py-1.5 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-600"
           />
           <div className="flex gap-1 mt-2">
-            {(['whatsapp', 'web', 'all'] as const).map((f) => (
+            {(['whatsapp', 'web', 'handoff', 'all'] as const).map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); loadConversations(0, true); }}
                 className={`flex-1 text-[10px] py-1 rounded font-medium transition-colors ${
                   filter === f
-                    ? 'bg-brand-600 text-white'
+                    ? f === 'handoff' ? 'bg-orange-500 text-white' : 'bg-brand-600 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                {f === 'whatsapp' ? 'WA' : f === 'web' ? 'Web' : 'Todas'}
+                {f === 'whatsapp' ? 'WA' : f === 'web' ? 'Web' : f === 'handoff' ? '🤝' : 'Todas'}
               </button>
             ))}
           </div>
@@ -189,6 +204,9 @@ export default function ConversationHistory({ agentId }: Props) {
                   {urgencyBadge(conv.urgency)}
                   {conv.resolved && (
                     <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">ok</span>
+                  )}
+                  {conv.handedOffToHuman && (
+                    <span className="text-[10px] bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">🤝 handoff</span>
                   )}
                   <span className="ml-auto text-[10px] text-gray-400">
                     {(conv._count?.messages ?? 0)} msg
@@ -237,6 +255,15 @@ export default function ConversationHistory({ agentId }: Props) {
                 </span>
                 {selected.resolved && (
                   <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Resolvida</span>
+                )}
+                {selected.handedOffToHuman && (
+                  <button
+                    onClick={() => returnToAgent(selected)}
+                    disabled={returningHandoff}
+                    className="text-xs bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white px-3 py-1 rounded-full font-medium transition-colors"
+                  >
+                    {returningHandoff ? 'A devolver...' : '🤖 Devolver ao Agente'}
+                  </button>
                 )}
               </div>
             </div>
