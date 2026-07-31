@@ -53,7 +53,7 @@ router.get('/whatsapp/debug', authenticate, asyncHandler(async (req: Authenticat
       WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN ? `${process.env.WHATSAPP_TOKEN.slice(0, 12)}…` : null,
       META_APP_SECRET: process.env.META_APP_SECRET ? '***configured***' : null,
       WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN ? '***configured***' : null,
-      WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION ?? 'v20.0',
+      WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION ?? 'v22.0',
     },
     whatsappAgents: allAgents,
     hint: 'whatsappNumber deve ser o Phone Number ID do Meta (não o Business Account ID nem o número de telefone)',

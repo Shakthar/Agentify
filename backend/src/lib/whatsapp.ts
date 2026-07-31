@@ -35,7 +35,7 @@ export async function sendWhatsAppText(
   text: string,
   token: string | undefined,
 ): Promise<void> {
-  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+  const version = process.env.WHATSAPP_API_VERSION ?? 'v22.0';
   if (!token) {
     console.warn('[WhatsApp] Token em falta — mensagem não enviada para', to);
     return;
@@ -65,7 +65,7 @@ export async function sendWhatsAppDocument(
   filename: string,
   token: string | undefined,
 ): Promise<void> {
-  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+  const version = process.env.WHATSAPP_API_VERSION ?? 'v22.0';
   if (!token) return;
   const normalizedTo = normalizeWhatsAppNumber(to);
   try {
