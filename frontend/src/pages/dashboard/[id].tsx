@@ -83,6 +83,9 @@ export default function AgentDetailPage() {
   const [gcalLoading, setGcalLoading] = useState(false);
   // Facebook Login (Instagram OAuth)
   const [fbConnecting, setFbConnecting] = useState(false);
+  // WhatsApp Embedded Signup
+  const [esConnecting, setEsConnecting] = useState(false);
+  const [esMsg, setEsMsg] = useState('');
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
@@ -147,6 +150,27 @@ export default function AgentDetailPage() {
       .catch(() => {});
   }, [activeTab, agent?.id]);
 
+  // Listener persistente para Embedded Signup session logging
+  useEffect(() => {
+    const onFbMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com') return;
+      try {
+        const d = JSON.parse(String(event.data));
+        if (d.type === 'WA_EMBEDDED_SIGNUP') {
+          if (d.event === 'CANCEL') {
+            console.log('[EmbeddedSignup] Cancelado no passo:', d.data?.current_step);
+          } else {
+            // Dados do flow: phone_number_id, waba_id, business_id
+            console.log('[EmbeddedSignup] Dados da sessão:', d.data);
+            if (d.data?.phone_number_id) setPhoneId(d.data.phone_number_id);
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener('message', onFbMessage);
+    return () => window.removeEventListener('message', onFbMessage);
+  }, []);
+
   // Load briefing when Leads tab opens (first time only)
   useEffect(() => {
     if (activeTab !== 'leads' || !agent || briefingHistory.length > 0) return;
@@ -209,6 +233,38 @@ export default function AgentDetailPage() {
       alert(msg);
       setFbConnecting(false);
     }
+  };
+
+  const launchWhatsAppSignup = () => {
+    if (!agent) return;
+    const win = window as unknown as { FB?: { login: (cb: (r: { authResponse?: { code: string } }) => void, opts: object) => void } };
+    if (!win.FB) { setEsMsg('❌ SDK do Facebook ainda não carregou. Aguarda e tenta de novo.'); return; }
+    setEsConnecting(true);
+    setEsMsg('');
+    win.FB!.login((response) => {
+      if (response.authResponse) {
+        const code = response.authResponse.code;
+        api.post(`/api/agents/${agent.id}/whatsapp/embedded-signup`, { code })
+          .then(({ data: result }) => {
+            setEsMsg('✅ WhatsApp ligado! Token guardado. Confirma o Phone Number ID e guarda.');
+            if (result.phoneNumberId) setPhoneId(result.phoneNumberId);
+            setWpEnabled(true);
+          })
+          .catch((err: unknown) => {
+            const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao trocar token';
+            setEsMsg(`❌ ${msg}`);
+          })
+          .finally(() => setEsConnecting(false));
+      } else {
+        setEsMsg('');
+        setEsConnecting(false);
+      }
+    }, {
+      config_id: '1419060285727528',
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: { setup: {} },
+    });
   };
 
   const handleGcalConnect = async () => {
@@ -1271,6 +1327,32 @@ export default function AgentDetailPage() {
           {/* ─── WhatsApp ─── */}
           {activeTab === 'whatsapp' && (
             <div className="space-y-6">
+              {/* Embedded Signup */}
+              <div className="card border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">⚡ Ligar WhatsApp automaticamente</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Autentica com a tua conta Meta e o agente fica ligado ao teu número WhatsApp Business — sem copiar tokens.
+                </p>
+                {esMsg && (
+                  <p className={`text-xs mb-3 ${esMsg.startsWith('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{esMsg}</p>
+                )}
+                <button
+                  onClick={launchWhatsAppSignup}
+                  disabled={esConnecting}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm text-white transition-colors"
+                  style={{ background: esConnecting ? '#888' : '#1877F2' }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  {esConnecting ? 'A ligar...' : 'Continuar com Facebook / Meta'}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                <span className="text-xs text-gray-400">ou configura manualmente</span>
+                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+              </div>
+
               <div className="card">
                 <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
                 <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">

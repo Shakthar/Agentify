@@ -177,6 +177,50 @@ router.post('/:id/whatsapp/register', asyncHandler(async (req: AuthenticatedRequ
   res.json({ success: true, meta: metaBody });
 }));
 
+// POST /api/agents/:id/whatsapp/embedded-signup
+// Troca o code do Embedded Signup por um access token permanente e guarda no agente.
+router.post('/:id/whatsapp/embedded-signup', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { code } = req.body as { code?: string };
+  if (!code) throw new BadRequestError('code em falta');
+  const prismaD = await import('../lib/prisma.js');
+  const agent = await prismaD.default.agent.findFirst({
+    where: { id: req.params.id, tenantId: req.tenant!.id },
+  });
+  if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
+
+  const appId = process.env.META_APP_ID ?? '4098020310452947';
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appSecret) throw new Error('META_APP_SECRET não configurado');
+
+  // Trocar code por access token
+  const tokenRes = await fetch(
+    `https://graph.facebook.com/v26.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${encodeURIComponent(code)}`
+  );
+  const tokenBody = await tokenRes.json() as { access_token?: string; error?: { message?: string } };
+  if (!tokenRes.ok || !tokenBody.access_token) {
+    const errMsg = tokenBody.error?.message ?? 'Erro ao trocar token com a Meta';
+    res.status(400).json({ error: errMsg }); return;
+  }
+  const accessToken = tokenBody.access_token;
+
+  // Guardar token no agente
+  await (prismaD.default.agent as any).update({
+    where: { id: agent.id },
+    data: { whatsappToken: accessToken, whatsappEnabled: true },
+  });
+
+  // Devolver phoneNumberId se conhecido (pode vir no body do frontend)
+  const { phoneNumberId } = req.body as { phoneNumberId?: string };
+  if (phoneNumberId) {
+    await (prismaD.default.agent as any).update({
+      where: { id: agent.id },
+      data: { whatsappNumber: phoneNumberId },
+    });
+  }
+
+  res.json({ success: true, phoneNumberId: phoneNumberId ?? null });
+}));
+
 // POST /api/agents/:id/briefing
 // IA analisa as conversas recentes e responde ao dono sobre o que precisa de atenção.
 // Suporta conversa contínua: o owner envia mensagens, o agente responde com contexto das suas conversas.
