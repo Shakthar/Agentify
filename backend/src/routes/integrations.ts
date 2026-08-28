@@ -178,6 +178,8 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI
     ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
 
+  console.log(`[Facebook OAuth] appId=${appId} secretPrefix=${appSecret.slice(0, 6)}*** redirectUri=${redirectUri}`);
+
   try {
     // 1. Troca code por short-lived token
     const tokenResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
