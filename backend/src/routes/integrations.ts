@@ -150,7 +150,7 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
       grant_type: 'fb_exchange_token',
       client_id: appId,
       client_secret: appSecret,
-      fb_exchange_token: accessToken,
+      fb_exchange_token: token,
     }));
     const longData = await longResp.json() as Record<string, unknown>;
     if (longData.access_token) longToken = longData.access_token as string;
