@@ -260,10 +260,10 @@ export default function AgentDetailPage() {
         setEsConnecting(false);
       }
     }, {
-      config_id: '1419060285727528',
+      config_id: '1759697078405304',
       response_type: 'code',
       override_default_response_type: true,
-      extras: { setup: {} },
+      extras: { version: 'v4' },
     });
   };
 
