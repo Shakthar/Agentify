@@ -142,7 +142,7 @@ router.get('/facebook/auth', authenticate, asyncHandler(async (req: Authenticate
   const params = new URLSearchParams({
     client_id: appId,
     redirect_uri: redirectUri,
-    scope: 'instagram_manage_messages,pages_messaging,pages_read_engagement,instagram_basic,business_management',
+    scope: 'instagram_manage_messages,pages_messaging,pages_read_engagement,pages_show_list,business_management',
     response_type: 'code',
     state,
   });
