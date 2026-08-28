@@ -15,7 +15,9 @@ export async function sendInstagramDM(
     return;
   }
   try {
-    const resp = await fetch(`https://graph.facebook.com/${version}/${pageId}/messages`, {
+    // Nova Instagram API (Instagram Login for Business): envia via /{ig-user-id}/messages
+  // O pageId aqui é o Instagram User ID da conta Business (instagramAccountId)
+  const resp = await fetch(`https://graph.facebook.com/${version}/${pageId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -200,37 +200,24 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     const longData = await longResp.json() as Record<string, unknown>;
     const longToken = (longData.access_token as string) ?? shortToken;
 
-    // 3. Obtém páginas ligadas à conta para encontrar o Page ID do Instagram
-    const pagesResp = await fetch(`${FB_GRAPH}/me/accounts?access_token=${longToken}&fields=id,name,instagram_business_account`);
-    const pagesData = await pagesResp.json() as { data?: Array<Record<string, unknown>> };
-    const pages = pagesData.data ?? [];
+    // 3. Obtém o Instagram User ID via /me (nova Instagram API com Instagram Login)
+    const meResp = await fetch(`${FB_GRAPH}/me?fields=id,name&access_token=${longToken}`);
+    const meData = await meResp.json() as Record<string, string>;
+    const igAccountId = meData.id ?? '';
+    const igName = meData.name ?? '';
 
-    // Encontra a primeira página com conta Instagram Business
-    const pageWithIg = pages.find(p => p.instagram_business_account);
-    const igAccount  = pageWithIg?.instagram_business_account as Record<string, string> | undefined;
-    const igAccountId = igAccount?.id ?? '';
-
-    // Obtém o token permanente da página (não expira)
-    let pageToken = longToken;
-    if (pageWithIg?.id) {
-      const pageTokenResp = await fetch(`${FB_GRAPH}/${pageWithIg.id}?fields=access_token&access_token=${longToken}`);
-      const ptData = await pageTokenResp.json() as Record<string, unknown>;
-      if (ptData.access_token) pageToken = ptData.access_token as string;
-    }
-
-    // 4. Guarda no agente
+    // 4. Guarda no agente (token long-lived do utilizador, ID da conta Instagram)
     await (prisma.agent as any).update({
       where: { id: agentId, tenantId },
       data: {
-        instagramToken: pageToken,
+        instagramToken: longToken,
         instagramAccountId: igAccountId || undefined,
         instagramEnabled: !!igAccountId,
       },
     });
 
-    const name = (pageWithIg?.name as string) ?? '';
     return res.redirect(
-      `${frontendUrl}/dashboard/${agentId}?fb=success&igId=${igAccountId}&name=${encodeURIComponent(name)}`,
+      `${frontendUrl}/dashboard/${agentId}?fb=success&igId=${igAccountId}&name=${encodeURIComponent(igName)}`,
     );
   } catch (err) {
     console.error('[Facebook OAuth] callback error:', err);
