@@ -139,10 +139,12 @@ router.get('/facebook/auth', authenticate, asyncHandler(async (req: Authenticate
 
   const state = Buffer.from(JSON.stringify({ tenantId: req.tenant!.id, agentId })).toString('base64url');
 
+  const igConfigId = process.env.INSTAGRAM_CONFIG_ID ?? '1334200631878203';
+
   const params = new URLSearchParams({
     client_id: appId,
+    config_id: igConfigId,
     redirect_uri: redirectUri,
-    scope: 'instagram_manage_messages,pages_messaging,pages_read_engagement,pages_show_list,business_management',
     response_type: 'code',
     state,
   });
