@@ -229,9 +229,9 @@ export default function AgentDetailPage() {
     setFbConnecting(true);
     setIgMsg('');
     win.FB!.login((response) => {
-      if (response.authResponse?.accessToken) {
-        const token = response.authResponse.accessToken;
-        api.post(`/api/integrations/instagram/connect`, { token, agentId: agent.id })
+      if (response.authResponse?.code) {
+        const code = response.authResponse.code;
+        api.post(`/api/integrations/instagram/connect`, { code, agentId: agent.id })
           .then(({ data }) => {
             setIgAccountId(data.igAccountId ?? '');
             setIgEnabled(true);
@@ -245,7 +245,7 @@ export default function AgentDetailPage() {
       }
     }, {
       config_id: '1334200631878203',
-      response_type: 'token',
+      response_type: 'code',
       override_default_response_type: true,
     });
   };
@@ -1493,7 +1493,7 @@ export default function AgentDetailPage() {
               {/* Opção 1: OAuth automático */}
               <div className="card border border-pink-200 dark:border-pink-800 bg-pink-50 dark:bg-pink-900/10">
                 <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">⚡ Ligar Instagram automaticamente</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Autentica com a tua conta Facebook e o agente fica ligado ao teu Instagram Business automaticamente — sem copiar tokens.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Um popup abre para autenticares com o Facebook. Após aceitar, o agente fica ligado ao teu Instagram Business automaticamente — sem copiar tokens.</p>
                 {igMsg && (
                   <p className={`text-xs mb-3 ${igMsg.startsWith('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{igMsg}</p>
                 )}
@@ -1504,7 +1504,7 @@ export default function AgentDetailPage() {
                   style={{ background: fbConnecting ? '#888' : '#1877F2' }}
                 >
                   <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                  {fbConnecting ? 'A redirecionar...' : 'Continuar com Facebook'}
+                  {fbConnecting ? 'A ligar...' : 'Continuar com Facebook'}
                 </button>
               </div>
 

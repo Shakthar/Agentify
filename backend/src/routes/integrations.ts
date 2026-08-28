@@ -122,15 +122,38 @@ const FB_GRAPH = 'https://graph.facebook.com';
 // POST /api/integrations/instagram/connect
 // Recebe o accessToken do FB SDK, obtém o IG User ID e guarda no agente
 router.post('/instagram/connect', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { token, agentId } = req.body as { token?: string; agentId?: string };
-  if (!token || !agentId) { res.status(400).json({ error: 'token e agentId obrigatórios' }); return; }
+  const { code, agentId } = req.body as { code?: string; agentId?: string };
+  if (!code || !agentId) { res.status(400).json({ error: 'code e agentId obrigatórios' }); return; }
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId: req.tenant!.id } });
   if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
 
+  const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
+  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
+  const redirectUri = process.env.FACEBOOK_REDIRECT_URI
+    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
+
+  // Troca code por access token
+  // Para apps desktop, tentar primeiro sem client_secret, depois com
+  let accessToken: string | undefined;
+  const exchangeParams = new URLSearchParams({ client_id: appId, redirect_uri: redirectUri, code });
+  if (appSecret) exchangeParams.set('client_secret', appSecret);
+
+  const tokenResp = await fetch(`${FB_GRAPH}/oauth/access_token?${exchangeParams}`);
+  const tokenData = await tokenResp.json() as Record<string, unknown>;
+  console.log(`[Instagram Connect] token exchange status=${tokenResp.status}:`, JSON.stringify(tokenData).slice(0, 200));
+
+  if (tokenData.access_token) {
+    accessToken = tokenData.access_token as string;
+  } else {
+    res.status(400).json({ error: 'Falha ao trocar code por token', detail: tokenData });
+    return;
+  }
+
   // Obtém o Instagram User ID via /me
-  const meResp = await fetch(`${FB_GRAPH}/me?fields=id,name&access_token=${token}`);
+  const meResp = await fetch(`${FB_GRAPH}/me?fields=id,name&access_token=${accessToken}`);
   const meData = await meResp.json() as Record<string, string>;
+  console.log(`[Instagram Connect] /me response:`, JSON.stringify(meData).slice(0, 200));
   if (!meResp.ok || !meData.id) {
     res.status(400).json({ error: 'Token inválido ou sem permissão para obter perfil Instagram' });
     return;
@@ -140,19 +163,17 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   const igName = meData.name ?? '';
 
   // Troca por long-lived token (60 dias)
-  const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
-  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
-  let longToken = token;
+  let longToken = accessToken;
   if (appId && appSecret) {
     const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
       grant_type: 'fb_exchange_token',
       client_id: appId,
       client_secret: appSecret,
-      fb_exchange_token: token,
+      fb_exchange_token: accessToken,
     }));
     const longData = await longResp.json() as Record<string, unknown>;
     if (longData.access_token) longToken = longData.access_token as string;
-    else console.warn('[Instagram] Não foi possível trocar por long-lived token:', longData);
+    else console.warn('[Instagram] Long-lived token exchange:', longData);
   }
 
   await (prisma.agent as any).update({

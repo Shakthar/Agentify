@@ -1,4 +1,4 @@
-# FAQ — Onboarding WhatsApp no Agentify
+# FAQ — Onboarding Agentify (WhatsApp & Instagram)
 
 ## "Quero um agente para atender a minha loja. Tenho um número que já está no WhatsApp. O que faço?"
 
@@ -120,3 +120,99 @@ Sim. A Meta fornece um número de teste gratuito em Meta for Developers → What
 | Popup da Meta fecha sem completar | Verifica se o teu browser bloqueia popups — permite para agentfy.shaklabs.tech |
 | Token inválido após ligar | Tenta de novo o botão "Continuar com Facebook / Meta" — o token anterior pode ter expirado |
 | Conta Meta não verificada — não consigo enviar | Faz a verificação de empresa em business.facebook.com/settings → Informações da empresa |
+
+---
+
+---
+
+# FAQ — Onboarding Instagram no Agentify
+
+## "Quero que o agente responda automaticamente às mensagens diretas e comentários do meu Instagram. O que faço?"
+
+### ⚠️ Antes de começar — requisitos
+
+Para ligar o Instagram ao Agentify precisas de:
+
+- Uma conta **Instagram Business** ou **Creator** (não funciona com conta pessoal)
+- Essa conta ligada a uma **Página do Facebook** (obrigatório pela Meta)
+- Ser **Administrador** dessa Página do Facebook
+
+Se a tua conta for pessoal: Instagram app → Definições → Conta → Mudar para conta profissional → Empresa.
+
+---
+
+### Passo a passo completo
+
+**1. Liga o Instagram à tua Página do Facebook**
+No Instagram: Definições → Conta → Contas vinculadas → Facebook → seleciona a tua Página.
+Se não tens Página, cria uma gratuita em [facebook.com/pages/create](https://facebook.com/pages/create).
+
+**2. Vai ao tab Instagram do agente**
+Em [agentfy.shaklabs.tech](https://agentfy.shaklabs.tech), abre o teu agente → tab **📸 Instagram**.
+
+**3. Clica em "Continuar com Facebook"**
+Um popup abre. Segue os passos:
+- Faz login com a tua conta do Facebook
+- Seleciona a Página ligada ao teu Instagram Business
+- Aceita as permissões de mensagens e comentários
+
+**4. Ligação automática**
+Após fechar o popup, o token é guardado automaticamente. O Instagram Account ID é preenchido.
+Confirma que o toggle está **Ativo** e clica em **"💾 Guardar configuração Instagram"**.
+
+**5. Configura o Webhook na Meta (uma vez)**
+Para receber DMs e comentários, a Meta precisa de saber onde enviar as notificações:
+- Vai a [developers.facebook.com](https://developers.facebook.com) → a tua app → Instagram → Webhooks
+- Callback URL: `https://agentify-production-8d3a.up.railway.app/api/webhooks/instagram`
+- Verify Token: `agentify_instagram_verify_2025`
+- Subscreve os campos: `messages` e `comments`
+
+**6. Pronto — o agente já responde!**
+Envia uma DM de teste para o teu Instagram Business e verifica que o agente responde automaticamente.
+
+---
+
+### O que o agente faz no Instagram
+
+| Funcionalidade | Descrição |
+|---|---|
+| **DMs automáticas** | Responde a mensagens diretas dentro de segundos |
+| **Comentários automáticos** | Responde a comentários em posts do negócio |
+| **Handoff humano** | Quando não consegue resolver, notifica o responsável |
+| **Publicação de conteúdo** | Pode publicar posts/imagens quando instruído via chat |
+| **Relatórios de insights** | Analisa métricas da conta e gera relatórios de desempenho |
+
+---
+
+### Perguntas frequentes
+
+**Preciso de pagar à Meta para usar o Instagram?**
+Não. A API de mensagens do Instagram é **gratuita** — ao contrário do WhatsApp, a Meta não cobra por mensagem no Instagram.
+
+**A minha conta Instagram pessoal vai ser afetada?**
+Não. O Agentify só acede à conta Instagram Business/Creator — nunca a contas pessoais.
+
+**O agente responde a todos os comentários?**
+Sim, a todos os comentários em posts da conta Business, exceto os enviados pela própria conta (ignora os próprios replies).
+
+**E se o cliente escrever em inglês ou outra língua?**
+O agente responde no mesmo idioma da mensagem recebida — adapta-se automaticamente ao idioma do cliente.
+
+**O popup do Facebook fecha sem completar — o que faço?**
+Verifica se o browser bloqueia popups para agentfy.shaklabs.tech (permite nas definições do browser).
+
+**Quem paga ao Agentify?**
+Tu (o cliente do Agentify). O Instagram não cobra nada à Meta pelo uso da API de DMs.
+
+---
+
+### Problemas comuns
+
+| Problema | Solução |
+|---|---|
+| Popup fecha sem completar | Permite popups para agentfy.shaklabs.tech no browser |
+| "Instagram não ligado à Página" | Liga a conta Instagram à Página do Facebook nas definições do Instagram |
+| Não recebo DMs no agente | Verifica se o Webhook está configurado e se o campo `messages` está subscrito |
+| Agente não responde a comentários | Verifica se o campo `comments` está subscrito no Webhook |
+| Token expirado | Volta ao tab Instagram e clica de novo em "Continuar com Facebook" |
+| Conta não é Business | Muda para conta Business/Creator nas definições do Instagram |
