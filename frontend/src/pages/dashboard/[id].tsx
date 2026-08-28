@@ -229,9 +229,9 @@ export default function AgentDetailPage() {
     setFbConnecting(true);
     setIgMsg('');
     win.FB!.login((response) => {
-      if (response.authResponse?.code) {
-        const code = response.authResponse.code;
-        api.post(`/api/integrations/instagram/connect`, { code, agentId: agent.id })
+      const token = response.authResponse?.accessToken;
+      if (token) {
+        api.post(`/api/integrations/instagram/connect`, { token, agentId: agent.id })
           .then(({ data }) => {
             setIgAccountId(data.igAccountId ?? '');
             setIgEnabled(true);
@@ -245,8 +245,6 @@ export default function AgentDetailPage() {
       }
     }, {
       config_id: '1334200631878203',
-      response_type: 'code',
-      override_default_response_type: true,
     });
   };
 

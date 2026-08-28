@@ -122,8 +122,8 @@ const FB_GRAPH = 'https://graph.facebook.com';
 // POST /api/integrations/instagram/connect
 // Recebe o accessToken do FB SDK, obtém o IG User ID e guarda no agente
 router.post('/instagram/connect', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { code, agentId } = req.body as { code?: string; agentId?: string };
-  if (!code || !agentId) { res.status(400).json({ error: 'code e agentId obrigatórios' }); return; }
+  const { token, agentId } = req.body as { token?: string; agentId?: string };
+  if (!token || !agentId) { res.status(400).json({ error: 'token e agentId obrigatórios' }); return; }
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId: req.tenant!.id } });
   if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
@@ -131,26 +131,10 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
   const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
 
-  // Troca code por access token — sem redirect_uri (popup flow via FB.login SDK)
-  let accessToken: string | undefined;
-  const exchangeParams = new URLSearchParams({ client_id: appId, code });
-  if (appSecret) exchangeParams.set('client_secret', appSecret);
-
-  const tokenResp = await fetch(`${FB_GRAPH}/v26.0/oauth/access_token?${exchangeParams}`);
-  const tokenData = await tokenResp.json() as Record<string, unknown>;
-  console.log(`[Instagram Connect] token exchange status=${tokenResp.status}:`, JSON.stringify(tokenData).slice(0, 200));
-
-  if (tokenData.access_token) {
-    accessToken = tokenData.access_token as string;
-  } else {
-    res.status(400).json({ error: 'Falha ao trocar code por token', detail: tokenData });
-    return;
-  }
-
-  // Obtém o Instagram User ID via /me
-  const meResp = await fetch(`${FB_GRAPH}/me?fields=id,name&access_token=${accessToken}`);
+  // Obtém o Instagram User ID via /me com o token do SDK
+  const meResp = await fetch(`${FB_GRAPH}/v26.0/me?fields=id,name&access_token=${token}`);
   const meData = await meResp.json() as Record<string, string>;
-  console.log(`[Instagram Connect] /me response:`, JSON.stringify(meData).slice(0, 200));
+  console.log(`[Instagram Connect] /me status=${meResp.status}:`, JSON.stringify(meData).slice(0, 200));
   if (!meResp.ok || !meData.id) {
     res.status(400).json({ error: 'Token inválido ou sem permissão para obter perfil Instagram' });
     return;
@@ -159,8 +143,8 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   const igAccountId = meData.id;
   const igName = meData.name ?? '';
 
-  // Troca por long-lived token (60 dias)
-  let longToken = accessToken;
+  // Troca por long-lived token (60 dias) — funciona com access_token, sem code exchange
+  let longToken = token;
   if (appId && appSecret) {
     const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
       grant_type: 'fb_exchange_token',
