@@ -133,13 +133,12 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI
     ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
 
-  // Troca code por access token
-  // Para apps desktop, tentar primeiro sem client_secret, depois com
+  // Troca code por access token — sem redirect_uri (popup flow via FB.login SDK)
   let accessToken: string | undefined;
-  const exchangeParams = new URLSearchParams({ client_id: appId, redirect_uri: redirectUri, code });
+  const exchangeParams = new URLSearchParams({ client_id: appId, code });
   if (appSecret) exchangeParams.set('client_secret', appSecret);
 
-  const tokenResp = await fetch(`${FB_GRAPH}/oauth/access_token?${exchangeParams}`);
+  const tokenResp = await fetch(`${FB_GRAPH}/v26.0/oauth/access_token?${exchangeParams}`);
   const tokenData = await tokenResp.json() as Record<string, unknown>;
   console.log(`[Instagram Connect] token exchange status=${tokenResp.status}:`, JSON.stringify(tokenData).slice(0, 200));
 
