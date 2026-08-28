@@ -122,8 +122,8 @@ const FB_GRAPH = 'https://graph.facebook.com';
 // POST /api/integrations/instagram/connect
 // Recebe o accessToken do FB SDK, obtém o IG User ID e guarda no agente
 router.post('/instagram/connect', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { token, agentId } = req.body as { token?: string; agentId?: string };
-  if (!token || !agentId) { res.status(400).json({ error: 'token e agentId obrigatórios' }); return; }
+  const { token, code, agentId } = req.body as { token?: string; code?: string; agentId?: string };
+  if ((!token && !code) || !agentId) { res.status(400).json({ error: 'token ou code + agentId obrigatórios' }); return; }
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId: req.tenant!.id } });
   if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
@@ -131,8 +131,36 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
   const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
 
+  let accessToken = token ?? '';
+
+  // Se recebemos code (Instagram Login for Business), trocamos por access_token
+  if (code && !accessToken) {
+    const redirectUri = process.env.FACEBOOK_REDIRECT_URI
+      ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
+    const codeResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      redirect_uri: redirectUri,
+      code,
+    }));
+    const codeData = await codeResp.json() as Record<string, unknown>;
+    console.log(`[Instagram Connect] code exchange status=${codeResp.status}:`, JSON.stringify(codeData).slice(0, 300));
+    if (codeData.access_token) {
+      accessToken = codeData.access_token as string;
+    } else {
+      // Desktop app fallback: Instagram Login for Business pode devolver access_token diretamente no code
+      // Se falhar, reporta o erro mas continua sem token (vai falhar mais abaixo)
+      console.warn('[Instagram] Code exchange falhou, sem access_token:', codeData);
+    }
+  }
+
+  if (!accessToken) {
+    res.status(400).json({ error: 'Não foi possível obter access_token do Instagram' });
+    return;
+  }
+
   // Obtém o Instagram User ID via /me com o token do SDK
-  const meResp = await fetch(`${FB_GRAPH}/v26.0/me?fields=id,name&access_token=${token}`);
+  const meResp = await fetch(`${FB_GRAPH}/v26.0/me?fields=id,name&access_token=${accessToken}`);
   const meData = await meResp.json() as Record<string, string>;
   console.log(`[Instagram Connect] /me status=${meResp.status}:`, JSON.stringify(meData).slice(0, 200));
   if (!meResp.ok || !meData.id) {
@@ -144,13 +172,13 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   const igName = meData.name ?? '';
 
   // Troca por long-lived token (60 dias) — funciona com access_token, sem code exchange
-  let longToken = token;
+  let longToken = accessToken;
   if (appId && appSecret) {
     const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
       grant_type: 'fb_exchange_token',
       client_id: appId,
       client_secret: appSecret,
-      fb_exchange_token: token,
+      fb_exchange_token: accessToken,
     }));
     const longData = await longResp.json() as Record<string, unknown>;
     if (longData.access_token) longToken = longData.access_token as string;
