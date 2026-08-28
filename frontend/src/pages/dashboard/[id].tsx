@@ -222,17 +222,32 @@ export default function AgentDetailPage() {
     }
   };
 
-  const handleFbConnect = async () => {
+  const handleFbConnect = () => {
     if (!agent) return;
+    const win = window as unknown as { FB?: { login: (cb: (r: { authResponse?: { accessToken?: string; code?: string } }) => void, opts: object) => void } };
+    if (!win.FB) { setIgMsg('❌ SDK do Facebook ainda não carregou. Aguarda e tenta de novo.'); return; }
     setFbConnecting(true);
-    try {
-      const { data } = await api.get(`/api/integrations/facebook/auth?agentId=${agent.id}`);
-      window.location.href = data.url;
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao iniciar OAuth';
-      alert(msg);
-      setFbConnecting(false);
-    }
+    setIgMsg('');
+    win.FB!.login((response) => {
+      if (response.authResponse?.accessToken) {
+        const token = response.authResponse.accessToken;
+        api.post(`/api/integrations/instagram/connect`, { token, agentId: agent.id })
+          .then(({ data }) => {
+            setIgAccountId(data.igAccountId ?? '');
+            setIgEnabled(true);
+            setIgMsg(`✅ Instagram ligado${data.name ? ` (${data.name})` : ''}! Verifica e guarda.`);
+          })
+          .catch(() => setIgMsg('❌ Erro ao guardar token Instagram. Tenta novamente.'))
+          .finally(() => setFbConnecting(false));
+      } else {
+        setIgMsg('');
+        setFbConnecting(false);
+      }
+    }, {
+      config_id: '1334200631878203',
+      response_type: 'token',
+      override_default_response_type: true,
+    });
   };
 
   const launchWhatsAppSignup = () => {
