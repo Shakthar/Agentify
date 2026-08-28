@@ -130,8 +130,6 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
 
   const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
   const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI
-    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
 
   // Troca code por access token — sem redirect_uri (popup flow via FB.login SDK)
   let accessToken: string | undefined;
