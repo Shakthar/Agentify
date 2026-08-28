@@ -41,7 +41,39 @@ A partir de 1 de outubro de 2026, a Meta cobra por cada mensagem enviada pelo ag
 - Adiciona um cartão de crédito/débito (Visa ou Mastercard) ou pede crédito a prazo à Meta
 - Seleciona a tua WhatsApp Business Account (a que criaste no passo 3)
 
-Custo médio por conversa (cliente escreve primeiro): **€0,014/mensagem (Portugal)** ou **$0,007/mensagem (Brasil)** — uma conversa típica de 8 mensagens custa menos de €0,12.
+Custo médio por conversa (cliente escreve primeiro): **€0,014/mensagem (Portugal)** ou **€0,006/mensagem (Brasil)** — uma conversa típica de 8 mensagens custa menos de €0,12.
+
+#### Preços por mensagem (Utility) — vigente desde 1 jul. 2026
+
+Fonte: Meta Rate Card EUR, effective July 1, 2026. Todos os valores em **EUR por mensagem**.
+
+**União Europeia**
+
+| País | Utility (€/msg) | Marketing (€/msg) |
+|---|---|---|
+| Alemanha | €0,0456 | €0,1131 |
+| França | €0,0248 | €0,0712 |
+| Itália | €0,0248 | €0,0658 |
+| Países Baixos | €0,0414 | €0,1323 |
+| Espanha | €0,0166 | €0,0585 |
+| Polónia | €0,0101 | €0,0303 |
+| Roménia | €0,0239 | €0,0712 |
+| Hungria | €0,0289 | €0,0712 |
+| Portugal, Irlanda, Áustria, Bélgica, Dinamarca, Finlândia, Grécia, Luxemburgo, Malta, Suécia *(Rest of Western Europe)* | €0,0142 | €0,0490 |
+| Bulgária, Croácia, Chipre, Rep. Checa, Estónia, Letónia, Lituânia, Eslováquia, Eslovénia *(Rest of Central & Eastern Europe)* | €0,0175 | €0,0712 |
+
+**América do Sul**
+
+| País | Utility (€/msg) | Marketing (€/msg) |
+|---|---|---|
+| Brasil | €0,0056 | €0,0518 |
+| Argentina | €0,0216 | €0,0512 |
+| Chile | €0,0166 | €0,0736 |
+| Peru | €0,0166 | €0,0582 |
+| Colômbia | €0,0008 | €0,0104 |
+| Bolívia, Equador, Paraguai, Uruguai, Venezuela, etc. *(Rest of Latin America)* | €0,0094 | €0,0612 |
+
+> **Nota:** "Utility" aplica-se a mensagens iniciadas pelo agente em resposta a uma ação do cliente (ex: confirmação de pedido, marcação de consulta). "Marketing" aplica-se a mensagens promocionais enviadas por iniciativa da empresa. Quando o **cliente escreve primeiro**, as respostas dentro da janela de 24h são cobradas como **service** (€n/a até out. 2026, depois equiparadas a utility). Volume elevado tem descontos de até 25% — ver [tabela de tiers](https://developers.facebook.com/docs/whatsapp/pricing/volume-tiers).
 
 **7. Pronto — o teu agente já responde!**
 Envia uma mensagem de teste para o número e verifica que o agente responde.
