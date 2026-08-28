@@ -177,6 +177,12 @@ model Agent {
   instagramAccountId    String?
   instagramToken        String?
 
+  // Channel schedules (JSON: { enabled, timezone, weekdays: {start,end}|null, weekends: {start,end}|null })
+  // null weekdays/weekends = sempre ativo nesse período; start/end = "HH:MM"
+  // Se start > end (ex: "18:00"-"08:59") a janela cruza meia-noite
+  whatsappSchedule      Json?
+  instagramSchedule     Json?
+
   // Google Calendar
   calendarEnabled       Boolean    @default(false)
   calendarId            String?

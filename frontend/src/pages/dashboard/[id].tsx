@@ -64,6 +64,16 @@ export default function AgentDetailPage() {
   const [tmSaving, setTmSaving] = useState(false);
   const [intSaving, setIntSaving] = useState(false);
   const [intMsg, setIntMsg] = useState('');
+  // WhatsApp schedule state
+  const [wpSchedEnabled, setWpSchedEnabled] = useState(false);
+  const [wpSchedTz, setWpSchedTz] = useState('Europe/Lisbon');
+  const [wpSchedWdStart, setWpSchedWdStart] = useState('18:00');
+  const [wpSchedWdEnd, setWpSchedWdEnd] = useState('08:59');
+  const [wpSchedWdEnabled, setWpSchedWdEnabled] = useState(true);
+  const [wpSchedWeEnabled, setWpSchedWeEnabled] = useState(false);
+  const [wpSchedWeStart, setWpSchedWeStart] = useState('00:00');
+  const [wpSchedWeEnd, setWpSchedWeEnd] = useState('23:59');
+  const [wpOffMsg, setWpOffMsg] = useState('');
   // Instagram state
   const [igAccountId, setIgAccountId] = useState('');
   const [igEnabled, setIgEnabled] = useState(false);
@@ -71,6 +81,16 @@ export default function AgentDetailPage() {
   const [igTokenVisible, setIgTokenVisible] = useState(false);
   const [igSaving, setIgSaving] = useState(false);
   const [igMsg, setIgMsg] = useState('');
+  // Instagram schedule state
+  const [igSchedEnabled, setIgSchedEnabled] = useState(false);
+  const [igSchedTz, setIgSchedTz] = useState('Europe/Lisbon');
+  const [igSchedWdStart, setIgSchedWdStart] = useState('18:00');
+  const [igSchedWdEnd, setIgSchedWdEnd] = useState('08:59');
+  const [igSchedWdEnabled, setIgSchedWdEnabled] = useState(true);
+  const [igSchedWeEnabled, setIgSchedWeEnabled] = useState(false);
+  const [igSchedWeStart, setIgSchedWeStart] = useState('00:00');
+  const [igSchedWeEnd, setIgSchedWeEnd] = useState('23:59');
+  const [igOffMsg, setIgOffMsg] = useState('');
   // Leads / briefing state
   const [briefingHistory, setBriefingHistory] = useState<Array<{role: 'user' | 'assistant'; content: string}>>([]);
   const [briefingInput, setBriefingInput] = useState('');
@@ -100,6 +120,28 @@ export default function AgentDetailPage() {
       setIgAccountId(data.instagramAccountId ?? '');
       setIgEnabled(data.instagramEnabled ?? false);
       // instagram token is also write-only
+      // Load WhatsApp schedule
+      const wps = data.whatsappSchedule as { enabled?: boolean; timezone?: string; weekdays?: { start: string; end: string } | null; weekends?: { start: string; end: string } | null } | null;
+      if (wps) {
+        setWpSchedEnabled(wps.enabled ?? false);
+        setWpSchedTz(wps.timezone ?? 'Europe/Lisbon');
+        setWpSchedWdEnabled(wps.weekdays !== null && wps.weekdays !== undefined);
+        if (wps.weekdays) { setWpSchedWdStart(wps.weekdays.start); setWpSchedWdEnd(wps.weekdays.end); }
+        setWpSchedWeEnabled(wps.weekends !== null && wps.weekends !== undefined);
+        if (wps.weekends) { setWpSchedWeStart(wps.weekends.start); setWpSchedWeEnd(wps.weekends.end); }
+      }
+      setWpOffMsg(data.offHoursMessage ?? '');
+      // Load Instagram schedule
+      const igs = data.instagramSchedule as { enabled?: boolean; timezone?: string; weekdays?: { start: string; end: string } | null; weekends?: { start: string; end: string } | null } | null;
+      if (igs) {
+        setIgSchedEnabled(igs.enabled ?? false);
+        setIgSchedTz(igs.timezone ?? 'Europe/Lisbon');
+        setIgSchedWdEnabled(igs.weekdays !== null && igs.weekdays !== undefined);
+        if (igs.weekdays) { setIgSchedWdStart(igs.weekdays.start); setIgSchedWdEnd(igs.weekdays.end); }
+        setIgSchedWeEnabled(igs.weekends !== null && igs.weekends !== undefined);
+        if (igs.weekends) { setIgSchedWeStart(igs.weekends.start); setIgSchedWeEnd(igs.weekends.end); }
+      }
+      setIgOffMsg((data as any).instagramOffHoursMessage ?? '');
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
@@ -320,11 +362,28 @@ export default function AgentDetailPage() {
     }
   };
 
+  const buildSchedulePayload = (
+    enabled: boolean, tz: string,
+    wdEnabled: boolean, wdStart: string, wdEnd: string,
+    weEnabled: boolean, weStart: string, weEnd: string,
+  ) => ({
+    enabled,
+    timezone: tz,
+    weekdays: wdEnabled ? { start: wdStart, end: wdEnd } : null,
+    weekends: weEnabled ? { start: weStart, end: weEnd } : null,
+  });
+
   const handleSaveWhatsApp = async () => {
     if (!agent) return;
     setWpSaving(true);
     try {
-      const payload: Record<string, unknown> = { whatsappNumber: phoneId, whatsappEnabled: wpEnabled, notifyPhone: notifyPhone || undefined };
+      const payload: Record<string, unknown> = {
+        whatsappNumber: phoneId,
+        whatsappEnabled: wpEnabled,
+        notifyPhone: notifyPhone || undefined,
+        offHoursMessage: wpOffMsg || undefined,
+        whatsappSchedule: buildSchedulePayload(wpSchedEnabled, wpSchedTz, wpSchedWdEnabled, wpSchedWdStart, wpSchedWdEnd, wpSchedWeEnabled, wpSchedWeStart, wpSchedWeEnd),
+      };
       if (wpToken.trim()) payload.whatsappToken = wpToken.trim();
       const updated = await updateAgent(agent.id, payload);
       setAgent(updated);
@@ -342,7 +401,13 @@ export default function AgentDetailPage() {
     setIgSaving(true);
     setIgMsg('');
     try {
-      const payload: Record<string, unknown> = { instagramAccountId: igAccountId, instagramEnabled: igEnabled, notifyPhone: notifyPhone || undefined };
+      const payload: Record<string, unknown> = {
+        instagramAccountId: igAccountId,
+        instagramEnabled: igEnabled,
+        notifyPhone: notifyPhone || undefined,
+        offHoursMessage: igOffMsg || undefined,
+        instagramSchedule: buildSchedulePayload(igSchedEnabled, igSchedTz, igSchedWdEnabled, igSchedWdStart, igSchedWdEnd, igSchedWeEnabled, igSchedWeStart, igSchedWeEnd),
+      };
       if (igToken.trim()) payload.instagramToken = igToken.trim();
       const updated = await updateAgent(agent.id, payload);
       setAgent(updated);
@@ -1444,6 +1509,63 @@ export default function AgentDetailPage() {
                       {wpEnabled ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
+                  {/* ── Horário de funcionamento ── */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">🕐 Horário de funcionamento</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Restringir o agente a determinados horários</p>
+                      </div>
+                      <button type="button" role="switch" aria-checked={wpSchedEnabled} onClick={() => setWpSchedEnabled(v => !v)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${wpSchedEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${wpSchedEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    {wpSchedEnabled && (<>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Fuso horário</label>
+                        <select className="input text-sm" value={wpSchedTz} onChange={e => setWpSchedTz(e.target.value)}>
+                          <option value="Europe/Lisbon">Europe/Lisbon (Portugal)</option>
+                          <option value="America/Sao_Paulo">America/Sao_Paulo (Brasil)</option>
+                          <option value="America/Argentina/Buenos_Aires">America/Buenos_Aires</option>
+                          <option value="America/Santiago">America/Santiago (Chile)</option>
+                          <option value="UTC">UTC</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="wpWdEnabled" checked={wpSchedWdEnabled} onChange={e => setWpSchedWdEnabled(e.target.checked)} className="rounded" />
+                          <label htmlFor="wpWdEnabled" className="text-xs text-gray-600 dark:text-gray-400 font-medium">Dias de semana (Seg–Sex)</label>
+                        </div>
+                        {wpSchedWdEnabled && (
+                          <div className="flex items-center gap-2 ml-5">
+                            <input type="time" className="input text-sm w-28" value={wpSchedWdStart} onChange={e => setWpSchedWdStart(e.target.value)} />
+                            <span className="text-xs text-gray-400">até</span>
+                            <input type="time" className="input text-sm w-28" value={wpSchedWdEnd} onChange={e => setWpSchedWdEnd(e.target.value)} />
+                            {wpSchedWdStart > wpSchedWdEnd && <span className="text-xs text-blue-500">↻ cruza meia-noite</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="wpWeEnabled" checked={wpSchedWeEnabled} onChange={e => setWpSchedWeEnabled(e.target.checked)} className="rounded" />
+                          <label htmlFor="wpWeEnabled" className="text-xs text-gray-600 dark:text-gray-400 font-medium">Fins de semana (Sáb–Dom)</label>
+                        </div>
+                        {wpSchedWeEnabled && (
+                          <div className="flex items-center gap-2 ml-5">
+                            <input type="time" className="input text-sm w-28" value={wpSchedWeStart} onChange={e => setWpSchedWeStart(e.target.value)} />
+                            <span className="text-xs text-gray-400">até</span>
+                            <input type="time" className="input text-sm w-28" value={wpSchedWeEnd} onChange={e => setWpSchedWeEnd(e.target.value)} />
+                            {wpSchedWeStart > wpSchedWeEnd && <span className="text-xs text-blue-500">↻ cruza meia-noite</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Mensagem fora de horário <span className="text-gray-400">(opcional — deixa vazio para ignorar silenciosamente)</span></label>
+                        <input className="input text-sm" placeholder="Ex: Estamos fechados. Respondemos às 9h. 🙏" value={wpOffMsg} onChange={e => setWpOffMsg(e.target.value)} />
+                      </div>
+                    </>)}
+                  </div>
                   {wpMsg && (
                     <p className={`text-xs mt-1 ${wpMsg.includes('Erro') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{wpMsg}</p>
                   )}
@@ -1590,6 +1712,63 @@ export default function AgentDetailPage() {
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {igEnabled ? 'Ativo' : 'Inativo'}
                     </span>
+                  </div>
+                  {/* ── Horário de funcionamento ── */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">🕐 Horário de funcionamento</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Restringir o agente a determinados horários</p>
+                      </div>
+                      <button type="button" role="switch" aria-checked={igSchedEnabled} onClick={() => setIgSchedEnabled(v => !v)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${igSchedEnabled ? 'bg-pink-500' : 'bg-gray-300'}`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${igSchedEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    {igSchedEnabled && (<>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Fuso horário</label>
+                        <select className="input text-sm" value={igSchedTz} onChange={e => setIgSchedTz(e.target.value)}>
+                          <option value="Europe/Lisbon">Europe/Lisbon (Portugal)</option>
+                          <option value="America/Sao_Paulo">America/Sao_Paulo (Brasil)</option>
+                          <option value="America/Argentina/Buenos_Aires">America/Buenos_Aires</option>
+                          <option value="America/Santiago">America/Santiago (Chile)</option>
+                          <option value="UTC">UTC</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="igWdEnabled" checked={igSchedWdEnabled} onChange={e => setIgSchedWdEnabled(e.target.checked)} className="rounded" />
+                          <label htmlFor="igWdEnabled" className="text-xs text-gray-600 dark:text-gray-400 font-medium">Dias de semana (Seg–Sex)</label>
+                        </div>
+                        {igSchedWdEnabled && (
+                          <div className="flex items-center gap-2 ml-5">
+                            <input type="time" className="input text-sm w-28" value={igSchedWdStart} onChange={e => setIgSchedWdStart(e.target.value)} />
+                            <span className="text-xs text-gray-400">até</span>
+                            <input type="time" className="input text-sm w-28" value={igSchedWdEnd} onChange={e => setIgSchedWdEnd(e.target.value)} />
+                            {igSchedWdStart > igSchedWdEnd && <span className="text-xs text-blue-500">↻ cruza meia-noite</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="igWeEnabled" checked={igSchedWeEnabled} onChange={e => setIgSchedWeEnabled(e.target.checked)} className="rounded" />
+                          <label htmlFor="igWeEnabled" className="text-xs text-gray-600 dark:text-gray-400 font-medium">Fins de semana (Sáb–Dom)</label>
+                        </div>
+                        {igSchedWeEnabled && (
+                          <div className="flex items-center gap-2 ml-5">
+                            <input type="time" className="input text-sm w-28" value={igSchedWeStart} onChange={e => setIgSchedWeStart(e.target.value)} />
+                            <span className="text-xs text-gray-400">até</span>
+                            <input type="time" className="input text-sm w-28" value={igSchedWeEnd} onChange={e => setIgSchedWeEnd(e.target.value)} />
+                            {igSchedWeStart > igSchedWeEnd && <span className="text-xs text-blue-500">↻ cruza meia-noite</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Mensagem fora de horário <span className="text-gray-400">(opcional — deixa vazio para ignorar silenciosamente)</span></label>
+                        <input className="input text-sm" placeholder="Ex: Estamos fechados. Respondemos às 9h. 🙏" value={igOffMsg} onChange={e => setIgOffMsg(e.target.value)} />
+                      </div>
+                    </>)}
                   </div>
                   {igMsg && (
                     <p className={`text-xs mt-1 ${igMsg.includes('Erro') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{igMsg}</p>

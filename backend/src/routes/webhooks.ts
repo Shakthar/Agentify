@@ -11,8 +11,9 @@ import { identifyCustomer } from '../services/customer.service.js';
 import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
-import { sendInstagramDM } from '../lib/instagram.js';
+import { sendInstagramDM, replyToInstagramComment } from '../lib/instagram.js';
 import { deductWaMsgCredit } from '../services/billing.service.js';
+import { isWithinSchedule } from '../utils/schedule.js';
 
 /** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
@@ -238,6 +239,16 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
         const effectiveToken = agentToken ?? process.env.WHATSAPP_TOKEN;
         console.log(`[WhatsApp] Token: agente=${agentToken ? 'sim' : 'não'} env=${process.env.WHATSAPP_TOKEN ? 'sim' : 'não'} effectiveToken=${effectiveToken ? 'presente' : 'AUSENTE!'}`);
 
+        // Verificar horário de funcionamento
+        if (!isWithinSchedule((agent as any).whatsappSchedule)) {
+          console.log(`[WhatsApp] Fora de horário — ignorando mensagem de ${from}`);
+          const offMsg = (agent as any).offHoursMessage as string | undefined;
+          if (offMsg && effectiveToken) {
+            await sendWhatsAppText(from, offMsg, phoneId, effectiveToken);
+          }
+          continue;
+        }
+
         // Identificar/criar Customer unificado
         const customer = await identifyCustomer({
           tenantId: agent.tenantId,
@@ -400,6 +411,61 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
   for (const entry of (body.entry ?? []) as InstagramEntry[]) {
     const pageId = entry.id;
 
+    // ── Comentários em posts ────────────────────────────────────────────────
+    for (const change of (entry.changes ?? []) as InstagramChange[]) {
+      if (change.field !== 'comments') continue;
+      const commentId = change.value?.id;
+      const commentText = change.value?.text;
+      const commentFrom = change.value?.from?.id;
+      if (!commentId || !commentText || !commentFrom) continue;
+
+      // Ignorar comentários da própria conta
+      if (commentFrom === pageId) continue;
+
+      console.log(`[Instagram] Comentário ${commentId} de ${commentFrom}: "${commentText.slice(0, 80)}"`);
+
+      const agentForComment = await prisma.agent.findFirst({
+        where: { instagramAccountId: pageId, instagramEnabled: true, isActive: true },
+        include: { tenant: { select: { encryptionKey: true } } },
+      });
+      if (!agentForComment) continue;
+
+      // Verificar horário de funcionamento (Instagram comentários)
+      if (!isWithinSchedule((agentForComment as any).instagramSchedule)) {
+        console.log(`[Instagram] Fora de horário — ignorando comentário de ${commentFrom}`);
+        continue;
+      }
+
+      let commentToken: string | undefined;
+      if (agentForComment.instagramToken && agentForComment.tenant.encryptionKey) {
+        const { unwrapDataKey } = await import('../lib/keyVault.js');
+        const { decrypt } = await import('../lib/encryption.js');
+        const dataKey = unwrapDataKey(agentForComment.tenant.encryptionKey);
+        const [iv, ciphertext] = agentForComment.instagramToken.split(':');
+        try { if (dataKey) commentToken = decrypt(ciphertext, iv, dataKey); } catch { /* usa fallback */ }
+      }
+      const effectiveCommentToken = commentToken ?? process.env.INSTAGRAM_TOKEN;
+
+      // Cria/reutiliza conversa para este comentário
+      let commentConv = await prisma.conversation.findFirst({
+        where: { agentId: agentForComment.id, tenantId: agentForComment.tenantId, channelType: 'instagram_comment', externalId: commentFrom, resolved: false, closedAt: null },
+      });
+      if (!commentConv) {
+        commentConv = await prisma.conversation.create({
+          data: { agentId: agentForComment.id, tenantId: agentForComment.tenantId, channelType: 'instagram_comment' as any, externalId: commentFrom, visitorId: commentFrom } as any,
+        });
+      }
+
+      try {
+        const result = await conversationsService.sendMessage(agentForComment.tenantId, commentConv.id, commentText);
+        await replyToInstagramComment(commentId, result.content, effectiveCommentToken);
+        deductWaMsgCredit(agentForComment.tenantId, agentForComment.id, commentConv.id, 'instagram').catch(() => {});
+      } catch (err) {
+        console.error('[Instagram] Erro ao processar comentário LLM:', err);
+      }
+    }
+
+    // ── DMs ────────────────────────────────────────────────────────────────
     for (const messaging of (entry.messaging ?? [])) {
       const senderId = messaging.sender?.id;
       const text = messaging.message?.text;
@@ -427,6 +493,24 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
 
       if (!agent) {
         console.warn(`[Instagram] Nenhum agente encontrado para instagramAccountId=${pageId}`);
+        continue;
+      }
+
+      // Verificar horário de funcionamento (Instagram DMs)
+      if (!isWithinSchedule((agent as any).instagramSchedule)) {
+        console.log(`[Instagram] Fora de horário — ignorando DM de ${senderId}`);
+        // Para DMs podemos enviar mensagem de fora de horário se configurada
+        const offMsg = (agent as any).offHoursMessage as string | undefined;
+        if (offMsg) {
+          let offToken: string | undefined;
+          if (agent.instagramToken && agent.tenant.encryptionKey) {
+            const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
+            const [iv, ciphertext] = agent.instagramToken.split(':');
+            try { if (dataKey) offToken = decrypt(ciphertext, iv, dataKey); } catch { /* ignore */ }
+          }
+          const tok = offToken ?? process.env.INSTAGRAM_TOKEN;
+          if (tok) await sendInstagramDM(senderId, offMsg, pageId, tok);
+        }
         continue;
       }
 
@@ -514,8 +598,19 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
   }
 }));
 
+interface InstagramChange {
+  field: string;
+  value?: {
+    id?: string;
+    text?: string;
+    from?: { id: string; username?: string };
+    media?: { id: string };
+  };
+}
+
 interface InstagramEntry {
   id: string;
+  changes?: InstagramChange[];
   messaging: {
     sender: { id: string };
     recipient: { id: string };
