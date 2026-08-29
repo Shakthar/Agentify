@@ -7,6 +7,7 @@ import { useAdmin } from '../../hooks/useAdmin';
 import { ROUTES } from '../../utils/constants';
 import { AuditLogEntry } from '../../types';
 import api from '../../utils/api';
+import { startImpersonation } from '../../utils/auth';
 
 // ─── WhatsApp diagnostics types ──────────────────────────────────────────────
 interface WpAgentDiag {
@@ -185,7 +186,7 @@ function PlanBar({ byPlan }: { byPlan: Record<string, number> }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const router = useRouter();
-  const { tenant } = useAuth();
+  const { tenant, loadMe } = useAuth();
   const { auditLogs, auditTotal, loading: auditLoading, fetchAuditLogs } = useAdmin();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'balance' | 'pricing' | 'logs' | 'whatsapp'>('dashboard');
@@ -207,6 +208,7 @@ export default function AdminPage() {
   const [selectedTenant, setSelectedTenant] = useState<TenantDetail | null>(null);
   const [tenantDetailLoading, setTenantDetailLoading] = useState(false);
   const [planChanging, setPlanChanging] = useState(false);
+  const [impersonating, setImpersonating] = useState<string | null>(null);
 
   // WhatsApp diagnostics state
   const [wpData, setWpData] = useState<WhatsAppDiagnostics | null>(null);
@@ -369,6 +371,21 @@ export default function AdminPage() {
       await loadDashboard();
     } catch { /* ignore */ }
     finally { setPlanChanging(false); }
+  }
+
+  async function impersonateTenant(tenantId: string, tenantName: string) {
+    setImpersonating(tenantId);
+    try {
+      const r = await api.post(`/api/superadmin/impersonate/${tenantId}`);
+      startImpersonation(r.data.token, tenantName);
+      // Reload auth state with the new token, then navigate to the agent list
+      await loadMe();
+      router.push(ROUTES.agents);
+    } catch (e: any) {
+      alert(e?.response?.data?.error ?? 'Erro ao personificar conta');
+    } finally {
+      setImpersonating(null);
+    }
   }
 
   const tabList = [
@@ -636,6 +653,19 @@ export default function AdminPage() {
                                         </button>
                                       </div>
                                     </div>
+                                    {/* Impersonate */}
+                                    {!selectedTenant.isAdmin && (
+                                      <div className="min-w-[120px]">
+                                        <p className="text-[10px] text-gray-500 mb-1">Acesso direto</p>
+                                        <button
+                                          disabled={impersonating === selectedTenant.id}
+                                          onClick={() => impersonateTenant(selectedTenant.id, selectedTenant.name)}
+                                          className="btn-secondary text-xs px-3 py-1 w-full"
+                                        >
+                                          {impersonating === selectedTenant.id ? '...' : '🔑 Entrar como'}
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Agents + skills */}

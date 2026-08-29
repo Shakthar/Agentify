@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../hooks/useAuth';
@@ -5,6 +6,7 @@ import { ROUTES } from '../utils/constants';
 import { Plan, PLAN_LABELS, PLAN_COLORS } from '../types';
 import LanguageSwitcher from './LanguageSwitcher';
 import Logo from './Logo';
+import { exitImpersonation, getImpersonationInfo } from '../utils/auth';
 
 const BASE_NAV_ITEMS = [
   { href: ROUTES.dashboard,          label: 'Dashboard',   icon: '◈'  },
@@ -27,7 +29,19 @@ const mobileItems = [
 
 export default function Navigation() {
   const router = useRouter();
-  const { tenant, logout } = useAuth();
+  const { tenant, logout, loadMe } = useAuth();
+  const [impersonation, setImpersonation] = useState({ active: false, tenantName: '' });
+
+  useEffect(() => {
+    setImpersonation(getImpersonationInfo());
+  }, []);
+
+  async function handleExitImpersonation() {
+    exitImpersonation();
+    setImpersonation({ active: false, tenantName: '' });
+    await loadMe();
+    router.push(ROUTES.admin);
+  }
   const navItems = [
     ...BASE_NAV_ITEMS,
     ...(tenant?.isAgency || tenant?.isAdmin ? [{ href: ROUTES.agency, label: 'Agência', icon: '🏢' }] : []),
@@ -49,6 +63,19 @@ export default function Navigation() {
 
   return (
     <>
+      {/* ═══ IMPERSONATION BANNER ══════════════════════════════════════════ */}
+      {impersonation.active && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-xs flex items-center justify-between px-4 py-2 shadow-md">
+          <span>🔑 A gerir como: <strong>{impersonation.tenantName}</strong></span>
+          <button
+            onClick={handleExitImpersonation}
+            className="ml-4 bg-white text-amber-700 font-semibold px-3 py-0.5 rounded-full hover:bg-amber-100 transition-colors"
+          >
+            Sair da conta
+          </button>
+        </div>
+      )}
+
       {/* ═══ DESKTOP SIDEBAR (md+) ══════════════════════════════════════════ */}
       <aside className="hidden md:flex flex-col w-56 shrink-0 min-h-screen bg-white border-r border-gray-200 px-3 py-5 dark:bg-gray-900 dark:border-gray-800">
         {/* Logo */}

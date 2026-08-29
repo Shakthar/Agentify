@@ -6,6 +6,8 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { BadRequestError, ForbiddenError } from '../lib/errors.js';
 import * as superadminService from '../services/superadmin.service.js';
 import { getConfig, saveConfig } from '../lib/platformConfig.js';
+import { signAccessToken } from '../lib/auth.js';
+import prisma from '../lib/prisma.js';
 
 const router = Router();
 router.use(authenticate);
@@ -230,6 +232,33 @@ router.patch('/config', asyncHandler(async (req: AuthenticatedRequest, res: Resp
   }
   const updated = await saveConfig(parsed.data as Parameters<typeof saveConfig>[0]);
   res.json(updated);
+}));
+
+// POST /api/superadmin/impersonate/:tenantId
+// Issues a short-lived access token for the target tenant so the admin
+// can navigate the app as that tenant. The impersonatedBy field is stored
+// in the JWT for audit purposes.
+router.post('/impersonate/:tenantId', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const target = await prisma.tenant.findUnique({
+    where: { id: req.params.tenantId, deletedAt: null },
+    select: { id: true, name: true, email: true, plan: true },
+  });
+  if (!target) { res.status(404).json({ error: 'Tenant não encontrado' }); return; }
+
+  // Prevent impersonating another superadmin (optional safety guard)
+  const targetFull = await prisma.tenant.findUnique({ where: { id: target.id }, select: { isAdmin: true } });
+  if (targetFull?.isAdmin) {
+    res.status(403).json({ error: 'Não é possível personificar outro superadmin' }); return;
+  }
+
+  const token = signAccessToken({
+    tenantId: target.id,
+    email: target.email,
+    plan: target.plan,
+    impersonatedBy: req.tenant!.id,
+  });
+
+  res.json({ token, tenant: { id: target.id, name: target.name, email: target.email, plan: target.plan } });
 }));
 
 export default router;

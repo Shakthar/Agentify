@@ -18,6 +18,7 @@ export interface JWTPayload {
   tenantId: string;
   email: string;
   plan: string;
+  impersonatedBy?: string;
   iat?: number;
   exp?: number;
 }
