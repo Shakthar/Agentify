@@ -120,6 +120,15 @@ router.delete('/google', authenticate, asyncHandler(async (req: AuthenticatedReq
 // ── Instagram Connect (via FB.login SDK — token direto do frontend) ──────────
 
 const FB_GRAPH = 'https://graph.facebook.com';
+// A troca inicial do code por access_token usa sempre graph.facebook.com (infraestrutura
+// OAuth partilhada). Mas para o login "Instagram API with Instagram Login" (standalone,
+// sem Pagina do Facebook — o que esta app usa), TODAS as chamadas seguintes com esse token
+// (obter o perfil, trocar por long-lived token) tem de ir para graph.instagram.com. Chamar
+// graph.facebook.com/me com este tipo de token nao da erro — devolve 200 — mas devolve a
+// identidade errada (ex: um "System User" do Business Manager em vez da conta Instagram
+// ligada), o que fazia o instagramAccountId guardado nunca bater certo com o pageId que
+// chega nos webhooks.
+const IG_GRAPH = 'https://graph.instagram.com';
 
 /**
  * Cifra um token do Instagram/Facebook antes de guardar, no mesmo formato
@@ -183,30 +192,35 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
     return;
   }
 
-  // Obtém o Instagram User ID via /me com o token do SDK
-  const meResp = await fetch(`${FB_GRAPH}/v26.0/me?fields=id,name&access_token=${accessToken}`);
+  // Obtém o Instagram User ID via /me — TEM de ser graph.instagram.com para este tipo de
+  // login (Instagram API with Instagram Login), senão devolve a identidade errada (ver nota
+  // acima do IG_GRAPH). user_id é o ID que aparece nos webhooks; id é um ID de app, não usar.
+  const meResp = await fetch(`${IG_GRAPH}/v21.0/me?fields=user_id,id,username,name&access_token=${accessToken}`);
   const meData = await meResp.json() as Record<string, string>;
-  console.log(`[Instagram Connect] /me status=${meResp.status}:`, JSON.stringify(meData).slice(0, 200));
-  if (!meResp.ok || !meData.id) {
+  console.log(`[Instagram Connect] /me status=${meResp.status}:`, JSON.stringify(meData).slice(0, 300));
+  if (!meResp.ok || (!meData.user_id && !meData.id)) {
     res.status(400).json({ error: 'Token inválido ou sem permissão para obter perfil Instagram' });
     return;
   }
 
-  const igAccountId = meData.id;
-  const igName = meData.name ?? '';
+  const igAccountId = meData.user_id ?? meData.id;
+  const igName = meData.username ?? meData.name ?? '';
 
-  // Troca por long-lived token (60 dias) — funciona com access_token, sem code exchange
+  // Troca por long-lived token (60 dias). Para tokens do Instagram API with Instagram Login,
+  // isto usa o endpoint e o grant_type próprios do Instagram (ig_exchange_token em
+  // graph.instagram.com com o Instagram App Secret), não o fb_exchange_token do Facebook.
+  const igAppSecret = process.env.INSTAGRAM_APP_SECRET ?? appSecret;
   let longToken = accessToken;
-  if (appId && appSecret) {
-    const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      grant_type: 'fb_exchange_token',
-      client_id: appId,
-      client_secret: appSecret,
-      fb_exchange_token: accessToken,
+  if (igAppSecret) {
+    const longResp = await fetch(`${IG_GRAPH}/access_token?` + new URLSearchParams({
+      grant_type: 'ig_exchange_token',
+      client_secret: igAppSecret,
+      access_token: accessToken,
     }));
     const longData = await longResp.json() as Record<string, unknown>;
+    console.log(`[Instagram Connect] long-lived token exchange status=${longResp.status}:`, JSON.stringify(longData).slice(0, 200));
     if (longData.access_token) longToken = longData.access_token as string;
-    else console.warn('[Instagram] Long-lived token exchange:', longData);
+    else console.warn('[Instagram] Long-lived token exchange falhou, a usar token de curta duração:', longData);
   }
 
   const encryptedToken = await encryptTokenForTenant(req.tenant!.id, longToken);
@@ -295,21 +309,23 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     if (!tokenData.access_token) throw new Error(`Token exchange failed: ${JSON.stringify(tokenData)}`);
     const shortToken = tokenData.access_token as string;
 
-    // 2. Converte para long-lived token (60 dias)
-    const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      grant_type: 'fb_exchange_token',
-      client_id: appId,
-      client_secret: appSecret,
-      fb_exchange_token: shortToken,
+    // 2. Converte para long-lived token (60 dias) — endpoint e grant_type do Instagram,
+    // não os do Facebook (ver nota junto a IG_GRAPH mais acima no ficheiro).
+    const igAppSecret = process.env.INSTAGRAM_APP_SECRET ?? appSecret;
+    const longResp = await fetch(`${IG_GRAPH}/access_token?` + new URLSearchParams({
+      grant_type: 'ig_exchange_token',
+      client_secret: igAppSecret,
+      access_token: shortToken,
     }));
     const longData = await longResp.json() as Record<string, unknown>;
     const longToken = (longData.access_token as string) ?? shortToken;
 
-    // 3. Obtém o Instagram User ID via /me (nova Instagram API com Instagram Login)
-    const meResp = await fetch(`${FB_GRAPH}/me?fields=id,name&access_token=${longToken}`);
+    // 3. Obtém o Instagram User ID via /me — graph.instagram.com, não graph.facebook.com
+    // (senão devolve a identidade errada, ver nota acima).
+    const meResp = await fetch(`${IG_GRAPH}/v21.0/me?fields=user_id,id,username,name&access_token=${longToken}`);
     const meData = await meResp.json() as Record<string, string>;
-    const igAccountId = meData.id ?? '';
-    const igName = meData.name ?? '';
+    const igAccountId = meData.user_id ?? meData.id ?? '';
+    const igName = meData.username ?? meData.name ?? '';
 
     // 4. Guarda no agente (token long-lived do utilizador, ID da conta Instagram)
     const encryptedToken = await encryptTokenForTenant(tenantId, longToken);
