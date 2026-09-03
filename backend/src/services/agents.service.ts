@@ -61,6 +61,7 @@ interface CreateAgentInput {
   // Instagram
   instagramEnabled?: boolean;
   instagramAccountId?: string;
+  instagramPageId?: string;
   instagramToken?: string;
   // Calendar
   calendarEnabled?: boolean;

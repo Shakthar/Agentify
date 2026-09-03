@@ -76,6 +76,7 @@ export default function AgentDetailPage() {
   const [wpOffMsg, setWpOffMsg] = useState('');
   // Instagram state
   const [igAccountId, setIgAccountId] = useState('');
+  const [igPageId, setIgPageId] = useState('');
   const [igEnabled, setIgEnabled] = useState(false);
   const [igToken, setIgToken] = useState('');
   const [igTokenVisible, setIgTokenVisible] = useState(false);
@@ -118,6 +119,7 @@ export default function AgentDetailPage() {
       setWpEnabled(data.whatsappEnabled ?? false);
       // token is write-only — never returned from API, leave blank
       setIgAccountId(data.instagramAccountId ?? '');
+      setIgPageId(data.instagramPageId ?? '');
       setIgEnabled(data.instagramEnabled ?? false);
       // instagram token is also write-only
       // Load WhatsApp schedule
@@ -403,6 +405,7 @@ export default function AgentDetailPage() {
     try {
       const payload: Record<string, unknown> = {
         instagramAccountId: igAccountId,
+        instagramPageId: igPageId || undefined,
         instagramEnabled: igEnabled,
         notifyPhone: notifyPhone || undefined,
         offHoursMessage: igOffMsg || undefined,
@@ -1392,6 +1395,13 @@ export default function AgentDetailPage() {
                           onBlur={(e) => handleSaveIntegrations({ instagramAccountId: e.target.value || undefined })}
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Facebook Page ID <span className="text-gray-400 font-normal">(obrigatório para enviar DMs)</span></label>
+                        <input className="input w-full" placeholder="ex: 1281854898348672"
+                          defaultValue={(agent as any).instagramPageId ?? ''}
+                          onBlur={(e) => handleSaveIntegrations({ instagramPageId: e.target.value || undefined })}
+                        />
+                      </div>
                       <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded text-xs text-pink-700 dark:text-pink-300">
                         1. No Meta for Developers, adiciona o produto <strong>Instagram Graph API</strong> à tua app.<br/>
                         2. Liga a conta Instagram Business.<br/>
@@ -1666,9 +1676,16 @@ export default function AgentDetailPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Instagram Account ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico da página/conta)</span>
+                      Instagram Account ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico da conta do Instagram)</span>
                     </label>
                     <input className="input" placeholder="ex: 17841400008460056" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Facebook Page ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID da Página ligada a esta conta — obrigatório para enviar DMs)</span>
+                    </label>
+                    <input className="input" placeholder="ex: 1281854898348672" value={igPageId} onChange={(e) => setIgPageId(e.target.value)} />
+                    <p className="text-[11px] text-gray-400 mt-1">É diferente do Instagram Account ID. Encontra-o em Meta Business Suite → Configurações → Páginas → (a tua página) → Identificação.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

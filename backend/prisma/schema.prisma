@@ -174,7 +174,8 @@ model Agent {
 
   // Instagram DM
   instagramEnabled      Boolean    @default(false)
-  instagramAccountId    String?
+  instagramAccountId    String?    // Instagram Business Account ID (recebido nos webhooks)
+  instagramPageId       String?    // Facebook Page ID ligada à conta do Instagram — obrigatório para POST /{id}/messages
   instagramToken        String?
 
   // Channel schedules (JSON: { enabled, timezone, weekdays: {start,end}|null, weekends: {start,end}|null })

@@ -509,6 +509,14 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
         continue;
       }
 
+      // A Graph API exige o Facebook Page ID (não o Instagram Business Account ID)
+      // no endpoint /{id}/messages. Sem isto configurado, o envio falha com
+      // "(#3) Application does not have the capability to make this API call.".
+      const instaPageId = (agent as any).instagramPageId as string | undefined;
+      if (!instaPageId) {
+        console.warn(`[Instagram] Agente ${agent.id} sem instagramPageId configurado — DM não enviada para ${senderId}`);
+      }
+
       // Verificar horário de funcionamento (Instagram DMs)
       if (!isWithinSchedule((agent as any).instagramSchedule)) {
         console.log(`[Instagram] Fora de horário — ignorando DM de ${senderId}`);
@@ -522,7 +530,7 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
             try { if (dataKey) offToken = decrypt(ciphertext, iv, dataKey); } catch { /* ignore */ }
           }
           const tok = offToken ?? process.env.INSTAGRAM_TOKEN;
-          if (tok) await sendInstagramDM(senderId, offMsg, pageId, tok);
+          if (tok && instaPageId) await sendInstagramDM(senderId, offMsg, instaPageId, tok);
         }
         continue;
       }
@@ -587,11 +595,11 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
         result = await conversationsService.sendMessage(agent.tenantId, conversation.id, text);
       } catch (err) {
         console.error('[Instagram] Erro ao processar mensagem LLM:', err);
-        await sendInstagramDM(senderId, '⚠️ Ocorreu um erro. Por favor, tenta novamente mais tarde.', pageId, effectiveToken);
+        if (instaPageId) await sendInstagramDM(senderId, '⚠️ Ocorreu um erro. Por favor, tenta novamente mais tarde.', instaPageId, effectiveToken);
         continue;
       }
 
-      await sendInstagramDM(senderId, result.content, pageId, effectiveToken);
+      if (instaPageId) await sendInstagramDM(senderId, result.content, instaPageId, effectiveToken);
       // Debitar crédito WA por mensagem Instagram enviada
       deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'instagram').catch(() => {});
       // Notificar responsável via WhatsApp quando handoff foi ativado no Instagram

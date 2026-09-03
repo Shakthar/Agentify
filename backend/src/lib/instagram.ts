@@ -14,12 +14,18 @@ function igVersion(): string {
 export async function sendInstagramDM(
   recipientId: string,
   text: string,
-  igUserId: string,
+  pageId: string,
   token: string | undefined,
 ): Promise<void> {
+  // Nota: a Graph API do Instagram (via Facebook Login) exige o ID da Página do
+  // Facebook ligada à conta do Instagram neste endpoint — NÃO o Instagram Business
+  // Account ID (esse vem nos webhooks e é usado só para encontrar o agente).
+  // Usar o ID errado aqui causa "(#3) Application does not have the capability
+  // to make this API call.".
   if (!token) { console.warn('[Instagram] Token em falta — DM não enviada para', recipientId); return; }
+  if (!pageId) { console.warn('[Instagram] Facebook Page ID em falta (instagramPageId) — DM não enviada para', recipientId); return; }
   try {
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${igUserId}/messages`, {
+    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${pageId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),

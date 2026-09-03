@@ -67,6 +67,7 @@ export interface Agent {
   crmEnabled: boolean;
   instagramEnabled: boolean;
   instagramAccountId?: string;
+  instagramPageId?: string;
   instagramTokenConfigured?: boolean;
   calendarEnabled: boolean;
   calendarId?: string;
