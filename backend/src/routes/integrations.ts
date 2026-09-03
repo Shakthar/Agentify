@@ -20,6 +20,8 @@ import {
   decryptCalendarToken,
 } from '../lib/googleCalendar.js';
 import prisma from '../lib/prisma.js';
+import { encrypt } from '../lib/encryption.js';
+import { unwrapDataKey } from '../lib/keyVault.js';
 
 const router = Router();
 
@@ -119,6 +121,24 @@ router.delete('/google', authenticate, asyncHandler(async (req: AuthenticatedReq
 
 const FB_GRAPH = 'https://graph.facebook.com';
 
+/**
+ * Cifra um token do Instagram/Facebook antes de guardar, no mesmo formato
+ * "iv:ciphertext" usado em agents.service.ts. Sem isto, o token ficava em
+ * texto simples na BD e o decrypt() no webhook falhava (split(':') não
+ * encontrava um par iv/ciphertext válido) — TypeError ao tentar responder
+ * a DMs do Instagram.
+ */
+async function encryptTokenForTenant(tenantId: string, token: string): Promise<string> {
+  const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { encryptionKey: true } });
+  const dataKey = unwrapDataKey(tenantRecord?.encryptionKey);
+  if (!dataKey) {
+    console.warn(`[Instagram] Sem chave de encriptação para tenant=${tenantId} — a guardar token sem cifrar (não devia acontecer)`);
+    return token;
+  }
+  const { ciphertext, iv } = encrypt(token, dataKey);
+  return `${iv}:${ciphertext}`;
+}
+
 // POST /api/integrations/instagram/connect
 // Recebe o accessToken do FB SDK, obtém o IG User ID e guarda no agente
 router.post('/instagram/connect', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -189,9 +209,11 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
     else console.warn('[Instagram] Long-lived token exchange:', longData);
   }
 
+  const encryptedToken = await encryptTokenForTenant(req.tenant!.id, longToken);
+
   await (prisma.agent as any).update({
     where: { id: agentId, tenantId: req.tenant!.id },
-    data: { instagramToken: longToken, instagramAccountId: igAccountId, instagramEnabled: true },
+    data: { instagramToken: encryptedToken, instagramAccountId: igAccountId, instagramEnabled: true },
   });
 
   console.log(`[Instagram] Conta ligada: igAccountId=${igAccountId} name=${igName} agentId=${agentId}`);
@@ -290,10 +312,11 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     const igName = meData.name ?? '';
 
     // 4. Guarda no agente (token long-lived do utilizador, ID da conta Instagram)
+    const encryptedToken = await encryptTokenForTenant(tenantId, longToken);
     await (prisma.agent as any).update({
       where: { id: agentId, tenantId },
       data: {
-        instagramToken: longToken,
+        instagramToken: encryptedToken,
         instagramAccountId: igAccountId || undefined,
         instagramEnabled: !!igAccountId,
       },
