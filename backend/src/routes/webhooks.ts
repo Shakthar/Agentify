@@ -17,10 +17,15 @@ import { isWithinSchedule } from '../utils/schedule.js';
 
 /** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
 function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
-  const appSecret = process.env.META_APP_SECRET;
+  // Mesma prioridade de variáveis usada em integrations.ts (OAuth do Facebook/Instagram):
+  // FACEBOOK_APP_SECRET tem prioridade, com fallback para META_APP_SECRET. Antes disto,
+  // esta função só lia META_APP_SECRET — se o Railway tivesse FACEBOOK_APP_SECRET (usado
+  // com sucesso no OAuth) e um META_APP_SECRET diferente/desatualizado, a troca de token
+  // funcionava mas a verificação de assinatura dos webhooks falhava sempre.
+  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
   if (!appSecret) {
     // FIX: sem segredo configurado, REJEITAR — nunca permitir sem verificação
-    console.error('[WhatsApp] META_APP_SECRET não configurado — a rejeitar webhook (configure a variável de ambiente)');
+    console.error('[WhatsApp] FACEBOOK_APP_SECRET/META_APP_SECRET não configurado — a rejeitar webhook (configure a variável de ambiente)');
     return false;
   }
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
