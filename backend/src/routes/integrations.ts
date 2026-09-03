@@ -153,18 +153,19 @@ async function encryptTokenForTenant(tenantId: string, token: string): Promise<s
  * devolve um Business Integration System User Access Token — por isso /me devolve o System
  * User da app ("Agentfy System User"), não a conta Instagram escolhida.
  *
- * Testámos 3 mecanismos, do mais para o menos confiável (o 2º falhou em produção com
- * "missing permissions" porque o token de System User não tem acesso de leitura ao
- * Business Manager do cliente, apenas aos scopes de página/instagram concedidos):
+ * Testámos vários mecanismos, do mais para o menos confiável:
  *
  *   1. GET /me/accounts?fields=instagram_business_account — lista as Páginas de Facebook
  *      concedidas a este token (scope pages_show_list) e, para cada uma, o campo
- *      instagram_business_account devolve o IGUser ligado a essa Página (scope
- *      instagram_basic). Mecanismo clássico e mais amplamente documentado para ligar
- *      Página <-> Conta Instagram, sem depender de acesso ao Business Manager.
+ *      instagram_business_account devolve o IGUser ligado a essa Página. Em produção
+ *      devolveu {"data":[]} — o token não tem Páginas assignadas via este edge (possível
+ *      restrição de modo de desenvolvimento/Standard Access da app).
  *   2. GET /me?fields=client_business_id + GET /{client_business_id}/instagram_accounts
- *      — requer permissão business_management sobre esse negócio.
- *   3. Reserva: /debug_token e os granular_scopes, equivalente para tokens de utilizador.
+ *      — falhou com "missing permissions" (subcode 33): ler ativos de um negócio que a
+ *      app não possui/gere requer Advanced Access aprovado por App Review da Meta.
+ *   3. /debug_token + granular_scopes dos scopes instagram_* diretamente.
+ *   4. Reserva final: granular_scopes de pages_show_list → busca instagram_business_account
+ *      dessa Página diretamente (contorna o /me/accounts, que pode devolver vazio).
  */
 async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<{ id: string; name: string } | undefined> {
   // 1. Páginas concedidas → instagram_business_account (mecanismo principal)
@@ -197,22 +198,43 @@ async function findGrantedInstagramAccountId(accessToken: string, appId: string,
     }
   }
 
-  // 3. Reserva final: granular_scopes via /debug_token (tokens de utilizador, não de sistema)
+  // 3. granular_scopes via /debug_token — log de TODOS os scopes (não só os de instagram),
+  // porque o alvo concedido pode aparecer em pages_show_list ou business_management em vez de
+  // diretamente num scope instagram_*.
   const debugResp = await fetch(`${FB_GRAPH}/debug_token?` + new URLSearchParams({
     input_token: accessToken,
     access_token: `${appId}|${appSecret}`,
   }));
   const debugData = await debugResp.json() as { data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } };
-  const relevantScopes = ['instagram_manage_messages', 'instagram_basic', 'instagram_manage_comments', 'instagram_content_publish'];
   const scopes = debugData.data?.granular_scopes ?? [];
-  // Log só os scopes relevantes (filtrado) para não sermos cortados pelo tamanho do array completo.
-  console.log(`[Instagram Connect] debug_token status=${debugResp.status} granular_scopes(relevantes)=`, JSON.stringify(scopes.filter(s => relevantScopes.includes(s.scope))));
+  // Só listamos scope + quantos target_ids cada um tem (não os IDs completos) para não sermos
+  // cortados pelo tamanho do array e para vermos rapidamente onde procurar.
+  console.log(`[Instagram Connect] debug_token status=${debugResp.status} scopes=`, JSON.stringify(scopes.map(s => ({ scope: s.scope, target_ids: s.target_ids ?? null }))));
 
+  const instagramScopes = ['instagram_manage_messages', 'instagram_basic', 'instagram_manage_comments', 'instagram_content_publish'];
   for (const scope of scopes) {
-    if (relevantScopes.includes(scope.scope) && scope.target_ids?.length) {
+    if (instagramScopes.includes(scope.scope) && scope.target_ids?.length) {
       return { id: scope.target_ids[0], name: meData.name ?? '' };
     }
   }
+
+  // 4. Reserva: se o Page ID foi concedido via pages_show_list, busca o instagram_business_account
+  // dessa Página diretamente (contorna /me/accounts, que pode devolver vazio em modo de teste/dev).
+  const pagesScope = scopes.find(s => s.scope === 'pages_show_list' && s.target_ids?.length);
+  if (pagesScope?.target_ids) {
+    for (const pageId of pagesScope.target_ids) {
+      const pageResp = await fetch(`${FB_GRAPH}/v21.0/${pageId}?fields=name,instagram_business_account&access_token=${accessToken}`);
+      const pageData = await pageResp.json() as { name?: string; instagram_business_account?: { id: string }; error?: unknown };
+      console.log(`[Instagram Connect] page ${pageId} status=${pageResp.status}:`, JSON.stringify(pageData).slice(0, 300));
+      if (pageData.instagram_business_account?.id) {
+        const igId = pageData.instagram_business_account.id;
+        const igResp = await fetch(`${FB_GRAPH}/v21.0/${igId}?fields=username&access_token=${accessToken}`);
+        const igData = await igResp.json() as { username?: string };
+        return { id: igId, name: igData.username ?? pageData.name ?? '' };
+      }
+    }
+  }
+
   return undefined;
 }
 
