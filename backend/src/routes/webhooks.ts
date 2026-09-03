@@ -15,44 +15,39 @@ import { sendInstagramDM, replyToInstagramComment } from '../lib/instagram.js';
 import { deductWaMsgCredit } from '../services/billing.service.js';
 import { isWithinSchedule } from '../utils/schedule.js';
 
-/** Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta */
-function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
-  // Mesma prioridade de variáveis usada em integrations.ts (OAuth do Facebook/Instagram):
-  // FACEBOOK_APP_SECRET tem prioridade, com fallback para META_APP_SECRET. Antes disto,
-  // esta função só lia META_APP_SECRET — se o Railway tivesse FACEBOOK_APP_SECRET (usado
-  // com sucesso no OAuth) e um META_APP_SECRET diferente/desatualizado, a troca de token
-  // funcionava mas a verificação de assinatura dos webhooks falhava sempre.
-  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
+/**
+ * Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta.
+ *
+ * IMPORTANTE: o WhatsApp Business Platform assina os webhooks com o App Secret
+ * principal (Settings > Basic), mas a API nova do Instagram (Instagram Login for
+ * Business / Instagram Messaging) assina os SEUS webhooks com um segredo
+ * DIFERENTE — o "Instagram App Secret", visível em Meta App Dashboard >
+ * Instagram > API setup with Instagram Login. Usar o App Secret principal para
+ * validar webhooks do Instagram falha sempre (código correto, segredo errado),
+ * mesmo que o OAuth funcione perfeitamente (o OAuth usa sempre o App Secret
+ * principal, independentemente do canal).
+ */
+function verifyMetaSignature(req: Request & { rawBody?: Buffer }, channel: 'WhatsApp' | 'Instagram'): boolean {
+  const appSecret = channel === 'Instagram'
+    ? process.env.INSTAGRAM_APP_SECRET ?? process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET
+    : process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
   if (!appSecret) {
     // FIX: sem segredo configurado, REJEITAR — nunca permitir sem verificação
-    console.error('[WhatsApp] FACEBOOK_APP_SECRET/META_APP_SECRET não configurado — a rejeitar webhook (configure a variável de ambiente)');
+    console.error(`[${channel}] Segredo do webhook não configurado — a rejeitar webhook (configure a variável de ambiente)`);
     return false;
   }
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
   if (!signature || !req.rawBody) {
-    console.warn('[WhatsApp] Assinatura ou rawBody em falta na verificação');
+    console.warn(`[${channel}] Assinatura ou rawBody em falta na verificação`);
     return false;
   }
   const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
   const sigBuf = Buffer.from(signature);
   const expBuf = Buffer.from(expected);
-  // DEBUG TEMPORÁRIO: diagnóstico de mismatch de assinatura sem expor o segredo.
-  // Nenhum destes valores (tamanhos, digests, content-type, preview do corpo) revela
-  // o app secret — o HMAC digest não é reversível. Remover depois de confirmada a causa.
-  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-    console.error('[Webhook Signature Debug]', JSON.stringify({
-      contentType: req.headers['content-type'] ?? null,
-      contentLength: req.headers['content-length'] ?? null,
-      rawBodyBytes: req.rawBody.length,
-      receivedSig: signature,
-      expectedSig: expected,
-      rawBodyPreview: req.rawBody.toString('utf8').slice(0, 200),
-    }));
-  }
   // timingSafeEqual requer buffers do mesmo tamanho
-  if (sigBuf.length !== expBuf.length) { console.warn('[WhatsApp] Assinatura com tamanho errado'); return false; }
+  if (sigBuf.length !== expBuf.length) { console.warn(`[${channel}] Assinatura com tamanho errado`); return false; }
   const match = crypto.timingSafeEqual(sigBuf, expBuf);
-  if (!match) console.warn('[WhatsApp] Assinatura inválida — possível payload adulterado');
+  if (!match) console.warn(`[${channel}] Assinatura inválida — possível payload adulterado`);
   return match;
 }
 
@@ -160,7 +155,7 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
   console.log(`[WhatsApp Webhook POST] chegou — phone_number_ids: [${phoneIds.join(', ') || 'nenhum'}]`);
 
   // Verificar assinatura HMAC-SHA256 antes de processar qualquer payload
-  if (!verifyMetaSignature(req)) {
+  if (!verifyMetaSignature(req, 'WhatsApp')) {
     console.error(`[WhatsApp Webhook POST] assinatura inválida para phone_ids=[${phoneIds.join(', ')}] — a rejeitar com 403`);
     res.status(403).send('Forbidden');
     return;
@@ -417,7 +412,7 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
   }
 
   // Verificar assinatura HMAC-SHA256 antes de processar qualquer payload
-  if (!verifyMetaSignature(req)) {
+  if (!verifyMetaSignature(req, 'Instagram')) {
     console.error('[Instagram Webhook] assinatura inválida — a rejeitar com 403');
     res.status(403).send('Forbidden');
     return;
