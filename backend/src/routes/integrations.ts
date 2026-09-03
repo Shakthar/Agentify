@@ -148,11 +148,38 @@ async function encryptTokenForTenant(tenantId: string, token: string): Promise<s
 
 /**
  * Descobre o Instagram Account ID concedido pelo utilizador durante o consentimento do
- * Business Login, inspecionando os granular_scopes do token via /debug_token. Isto é
- * necessário porque /me, com um token deste tipo de login, devolve o System User da app
- * (não a conta Instagram escolhida) — ver nota acima de FB_GRAPH.
+ * Business Login. Confirmado contra a documentação oficial da Meta (Login do Facebook
+ * para Empresas, configuração de "token de acesso do usuário do sistema"): este config_id
+ * devolve um Business Integration System User Access Token — por isso /me devolve o System
+ * User da app ("Agentfy System User"), não a conta Instagram escolhida.
+ *
+ * Método principal (documentado em developers.facebook.com/docs/facebook-login/facebook-login-for-business
+ * e .../marketing-api/reference/business/instagram_accounts):
+ *   1. GET /me?fields=client_business_id — devolve o ID do Business Manager do cliente
+ *      que concedeu acesso.
+ *   2. GET /{client_business_id}/instagram_accounts — lista as contas Instagram desse
+ *      negócio (nós IGUser), das quais usamos a primeira.
+ *
+ * Reserva: se o token não tiver client_business_id (ex: configuração de "token de acesso
+ * do usuário" em vez de "usuário do sistema"), tenta via /debug_token e os granular_scopes,
+ * que é o mecanismo equivalente para tokens de utilizador.
  */
-async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<string | undefined> {
+async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<{ id: string; name: string } | undefined> {
+  const meResp = await fetch(`${FB_GRAPH}/v21.0/me?fields=client_business_id,name&access_token=${accessToken}`);
+  const meData = await meResp.json() as { client_business_id?: string; name?: string; error?: unknown };
+  console.log(`[Instagram Connect] /me (client_business_id) status=${meResp.status}:`, JSON.stringify(meData).slice(0, 300));
+
+  if (meData.client_business_id) {
+    const igListResp = await fetch(`${FB_GRAPH}/v21.0/${meData.client_business_id}/instagram_accounts?fields=id,username&access_token=${accessToken}`);
+    const igListData = await igListResp.json() as { data?: Array<{ id: string; username?: string }>; error?: unknown };
+    console.log(`[Instagram Connect] instagram_accounts status=${igListResp.status}:`, JSON.stringify(igListData).slice(0, 500));
+    if (igListData.data?.length) {
+      const first = igListData.data[0];
+      return { id: first.id, name: first.username ?? meData.name ?? '' };
+    }
+  }
+
+  // Reserva: granular_scopes via /debug_token (tokens de utilizador, não de sistema)
   const debugResp = await fetch(`${FB_GRAPH}/debug_token?` + new URLSearchParams({
     input_token: accessToken,
     access_token: `${appId}|${appSecret}`,
@@ -164,7 +191,7 @@ async function findGrantedInstagramAccountId(accessToken: string, appId: string,
   const scopes = debugData.data?.granular_scopes ?? [];
   for (const scope of scopes) {
     if (relevantScopes.includes(scope.scope) && scope.target_ids?.length) {
-      return scope.target_ids[0];
+      return { id: scope.target_ids[0], name: meData.name ?? '' };
     }
   }
   return undefined;
@@ -214,23 +241,17 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
     return;
   }
 
-  // Descobre a conta Instagram concedida via /debug_token (ver nota acima de FB_GRAPH).
-  const igAccountId = await findGrantedInstagramAccountId(accessToken, appId, appSecret);
-  if (!igAccountId) {
+  // Descobre a conta Instagram concedida (ver findGrantedInstagramAccountId acima).
+  const granted = await findGrantedInstagramAccountId(accessToken, appId, appSecret);
+  if (!granted) {
     res.status(400).json({
       error: 'Não foi possível identificar automaticamente a conta Instagram concedida. '
         + 'Introduz o Instagram Account ID manualmente no campo abaixo (consulta os logs do servidor '
-        + 'para veres os granular_scopes devolvidos, se precisares de diagnosticar).',
+        + 'para diagnosticar, se precisares).',
     });
     return;
   }
-
-  // Nome só para exibição — vem do System User da app (não da conta Instagram em si, ver
-  // nota acima), por isso pode não corresponder ao nome real da conta. Não é usado em
-  // nenhuma lógica de correspondência, só na mensagem de confirmação ao utilizador.
-  const meResp = await fetch(`${FB_GRAPH}/v21.0/me?fields=name&access_token=${accessToken}`);
-  const meData = await meResp.json() as Record<string, string>;
-  const igName = meData.name ?? '';
+  const { id: igAccountId, name: igName } = granted;
 
   // Troca por long-lived token (60 dias) — endpoint do Facebook, como a troca do code
   // (graph.instagram.com rejeita este token por completo, ver nota acima de FB_GRAPH).
@@ -345,12 +366,10 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     const longData = await longResp.json() as Record<string, unknown>;
     const longToken = (longData.access_token as string) ?? shortToken;
 
-    // 3. Descobre a conta Instagram concedida via /debug_token (não via /me — ver nota
-    // acima de FB_GRAPH).
-    const igAccountId = await findGrantedInstagramAccountId(longToken, appId, appSecret) ?? '';
-    const meResp = await fetch(`${FB_GRAPH}/v21.0/me?fields=name&access_token=${longToken}`);
-    const meData = await meResp.json() as Record<string, string>;
-    const igName = meData.name ?? '';
+    // 3. Descobre a conta Instagram concedida (ver findGrantedInstagramAccountId acima).
+    const granted = await findGrantedInstagramAccountId(longToken, appId, appSecret);
+    const igAccountId = granted?.id ?? '';
+    const igName = granted?.name ?? '';
 
     // 4. Guarda no agente (token long-lived do utilizador, ID da conta Instagram)
     const encryptedToken = await encryptTokenForTenant(tenantId, longToken);
