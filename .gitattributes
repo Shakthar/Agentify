@@ -1,0 +1,4 @@
+# Normaliza automaticamente os fins de linha: guarda LF no repositorio
+# (consistente entre Windows/Mac/Linux e com o build no Railway),
+# faz checkout com o fim de linha nativo do sistema operativo.
+* text=auto
