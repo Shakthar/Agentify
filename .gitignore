@@ -71,3 +71,7 @@ tmp/
 
 # Redis dump
 dump.rdb
+
+# Backups locais do projeto (nao devem ir para o Git)
+Agentify-sem-node_modules/
+Agentify-sem-node_modules.tar.gz
