@@ -153,18 +153,36 @@ async function encryptTokenForTenant(tenantId: string, token: string): Promise<s
  * devolve um Business Integration System User Access Token — por isso /me devolve o System
  * User da app ("Agentfy System User"), não a conta Instagram escolhida.
  *
- * Método principal (documentado em developers.facebook.com/docs/facebook-login/facebook-login-for-business
- * e .../marketing-api/reference/business/instagram_accounts):
- *   1. GET /me?fields=client_business_id — devolve o ID do Business Manager do cliente
- *      que concedeu acesso.
- *   2. GET /{client_business_id}/instagram_accounts — lista as contas Instagram desse
- *      negócio (nós IGUser), das quais usamos a primeira.
+ * Testámos 3 mecanismos, do mais para o menos confiável (o 2º falhou em produção com
+ * "missing permissions" porque o token de System User não tem acesso de leitura ao
+ * Business Manager do cliente, apenas aos scopes de página/instagram concedidos):
  *
- * Reserva: se o token não tiver client_business_id (ex: configuração de "token de acesso
- * do usuário" em vez de "usuário do sistema"), tenta via /debug_token e os granular_scopes,
- * que é o mecanismo equivalente para tokens de utilizador.
+ *   1. GET /me/accounts?fields=instagram_business_account — lista as Páginas de Facebook
+ *      concedidas a este token (scope pages_show_list) e, para cada uma, o campo
+ *      instagram_business_account devolve o IGUser ligado a essa Página (scope
+ *      instagram_basic). Mecanismo clássico e mais amplamente documentado para ligar
+ *      Página <-> Conta Instagram, sem depender de acesso ao Business Manager.
+ *   2. GET /me?fields=client_business_id + GET /{client_business_id}/instagram_accounts
+ *      — requer permissão business_management sobre esse negócio.
+ *   3. Reserva: /debug_token e os granular_scopes, equivalente para tokens de utilizador.
  */
 async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<{ id: string; name: string } | undefined> {
+  // 1. Páginas concedidas → instagram_business_account (mecanismo principal)
+  const pagesResp = await fetch(`${FB_GRAPH}/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`);
+  const pagesData = await pagesResp.json() as { data?: Array<{ id: string; name?: string; instagram_business_account?: { id: string } }>; error?: unknown };
+  console.log(`[Instagram Connect] me/accounts status=${pagesResp.status}:`, JSON.stringify(pagesData).slice(0, 800));
+
+  for (const page of pagesData.data ?? []) {
+    if (page.instagram_business_account?.id) {
+      const igId = page.instagram_business_account.id;
+      const igResp = await fetch(`${FB_GRAPH}/v21.0/${igId}?fields=username&access_token=${accessToken}`);
+      const igData = await igResp.json() as { username?: string; error?: unknown };
+      console.log(`[Instagram Connect] ig account ${igId} status=${igResp.status}:`, JSON.stringify(igData).slice(0, 300));
+      return { id: igId, name: igData.username ?? page.name ?? '' };
+    }
+  }
+
+  // 2. client_business_id → instagram_accounts (reserva)
   const meResp = await fetch(`${FB_GRAPH}/v21.0/me?fields=client_business_id,name&access_token=${accessToken}`);
   const meData = await meResp.json() as { client_business_id?: string; name?: string; error?: unknown };
   console.log(`[Instagram Connect] /me (client_business_id) status=${meResp.status}:`, JSON.stringify(meData).slice(0, 300));
@@ -179,16 +197,17 @@ async function findGrantedInstagramAccountId(accessToken: string, appId: string,
     }
   }
 
-  // Reserva: granular_scopes via /debug_token (tokens de utilizador, não de sistema)
+  // 3. Reserva final: granular_scopes via /debug_token (tokens de utilizador, não de sistema)
   const debugResp = await fetch(`${FB_GRAPH}/debug_token?` + new URLSearchParams({
     input_token: accessToken,
     access_token: `${appId}|${appSecret}`,
   }));
   const debugData = await debugResp.json() as { data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } };
-  console.log(`[Instagram Connect] debug_token status=${debugResp.status}:`, JSON.stringify(debugData).slice(0, 500));
-
   const relevantScopes = ['instagram_manage_messages', 'instagram_basic', 'instagram_manage_comments', 'instagram_content_publish'];
   const scopes = debugData.data?.granular_scopes ?? [];
+  // Log só os scopes relevantes (filtrado) para não sermos cortados pelo tamanho do array completo.
+  console.log(`[Instagram Connect] debug_token status=${debugResp.status} granular_scopes(relevantes)=`, JSON.stringify(scopes.filter(s => relevantScopes.includes(s.scope))));
+
   for (const scope of scopes) {
     if (relevantScopes.includes(scope.scope) && scope.target_ids?.length) {
       return { id: scope.target_ids[0], name: meData.name ?? '' };
