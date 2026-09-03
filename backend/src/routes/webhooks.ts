@@ -36,6 +36,19 @@ function verifyMetaSignature(req: Request & { rawBody?: Buffer }): boolean {
   const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
   const sigBuf = Buffer.from(signature);
   const expBuf = Buffer.from(expected);
+  // DEBUG TEMPORÁRIO: diagnóstico de mismatch de assinatura sem expor o segredo.
+  // Nenhum destes valores (tamanhos, digests, content-type, preview do corpo) revela
+  // o app secret — o HMAC digest não é reversível. Remover depois de confirmada a causa.
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    console.error('[Webhook Signature Debug]', JSON.stringify({
+      contentType: req.headers['content-type'] ?? null,
+      contentLength: req.headers['content-length'] ?? null,
+      rawBodyBytes: req.rawBody.length,
+      receivedSig: signature,
+      expectedSig: expected,
+      rawBodyPreview: req.rawBody.toString('utf8').slice(0, 200),
+    }));
+  }
   // timingSafeEqual requer buffers do mesmo tamanho
   if (sigBuf.length !== expBuf.length) { console.warn('[WhatsApp] Assinatura com tamanho errado'); return false; }
   const match = crypto.timingSafeEqual(sigBuf, expBuf);
