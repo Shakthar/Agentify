@@ -133,14 +133,18 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
 
   let accessToken = token ?? '';
 
-  // Se recebemos code (Instagram Login for Business), trocamos por access_token
+  // Se recebemos code (Instagram Login for Business), trocamos por access_token.
+  // Este 'code' vem do popup do FB.login() (JS SDK) — NÃO do fluxo de redirect
+  // (/api/integrations/facebook/auth + /callback). O SDK não usa o FACEBOOK_REDIRECT_URI
+  // do backend como redirect_uri no dialog OAuth interno, por isso a troca do code tem de
+  // usar redirect_uri vazio para bater certo com o que foi usado no pedido original —
+  // caso contrário a Meta devolve "Error validating verification code ... redirect_uri"
+  // (OAuthException code 100, subcode 36008).
   if (code && !accessToken) {
-    const redirectUri = process.env.FACEBOOK_REDIRECT_URI
-      ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
     const codeResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
       client_id: appId,
       client_secret: appSecret,
-      redirect_uri: redirectUri,
+      redirect_uri: '',
       code,
     }));
     const codeData = await codeResp.json() as Record<string, unknown>;
