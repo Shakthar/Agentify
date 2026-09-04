@@ -4,7 +4,7 @@ import { ForbiddenError, NotFoundError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
-import { subscribeInstagramPage } from '../lib/instagram.js';
+import { subscribeInstagramPage, subscribeInstagramComments } from '../lib/instagram.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -284,14 +284,18 @@ export async function updateAgent(
   });
 
   // Se o Instagram foi ligado/configurado manualmente (Passo 3 do dashboard, sem
-  // passar pelo OAuth /instagram/connect) e agora já temos token + Facebook Page ID,
-  // subscreve a Página aos webhooks aqui também — sem isto a Meta não entrega
-  // mensagens nem comentários desta conta, mesmo com o token e o ID certos guardados.
+  // passar pelo OAuth /instagram/connect) e agora já temos token + IDs, subscreve
+  // a Página (mensagens) e a conta Instagram (comentários) aos webhooks aqui também
+  // — sem isto a Meta não entrega mensagens nem comentários desta conta, mesmo com
+  // o token e os IDs certos guardados.
   // Só verifica/subscreve quando este pedido tocou de facto em algo do Instagram
   // (evita chamadas desnecessárias à Meta em updates que nada têm a ver, ex.: WhatsApp).
-  const touchedInstagram = instagramToken !== undefined || (updateData as any).instagramPageId !== undefined;
+  const touchedInstagram = instagramToken !== undefined
+    || (updateData as any).instagramPageId !== undefined
+    || (updateData as any).instagramAccountId !== undefined;
   const pageIdForSub = (updatedAgent as any).instagramPageId as string | undefined;
-  if (touchedInstagram && pageIdForSub) {
+  const igAccountIdForSub = (updatedAgent as any).instagramAccountId as string | undefined;
+  if (touchedInstagram && (pageIdForSub || igAccountIdForSub)) {
     let rawTokenForSub = instagramToken; // token novo, em texto simples, se foi enviado agora
     if (!rawTokenForSub && existing.instagramToken) {
       // Nenhum token novo neste pedido (ex.: só se guardou o Page ID agora) —
@@ -308,12 +312,19 @@ export async function updateAgent(
       }
     }
     if (rawTokenForSub) {
-      subscribeInstagramPage(pageIdForSub, rawTokenForSub).then((ok) => {
-        if (!ok) console.warn(`[Instagram] Não foi possível subscrever a Página ${pageIdForSub} aos webhooks (agentId=${agentId}).`);
-      });
+      if (pageIdForSub) {
+        subscribeInstagramPage(pageIdForSub, rawTokenForSub).then((ok) => {
+          if (!ok) console.warn(`[Instagram] Não foi possível subscrever a Página ${pageIdForSub} aos webhooks (agentId=${agentId}).`);
+        });
+      }
+      if (igAccountIdForSub) {
+        subscribeInstagramComments(igAccountIdForSub, rawTokenForSub).then((ok) => {
+          if (!ok) console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountIdForSub} aos webhooks de comentários (agentId=${agentId}).`);
+        });
+      }
     }
   } else if (instagramToken) {
-    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId — não foi possível subscrever webhooks para agentId=${agentId}.`);
+    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId/instagramAccountId — não foi possível subscrever webhooks para agentId=${agentId}.`);
   }
 
   return updatedAgent;
