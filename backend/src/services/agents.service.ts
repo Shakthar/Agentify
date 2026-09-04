@@ -2,8 +2,9 @@ import prisma from '../lib/prisma.js';
 import { PLAN_LIMITS, ALLOWED_MODELS } from '../types/index.js';
 import { ForbiddenError, NotFoundError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
-import { encrypt } from '../lib/encryption.js';
+import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
+import { subscribeInstagramPage } from '../lib/instagram.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -272,7 +273,7 @@ export async function updateAgent(
       }
     : {};
 
-  return prisma.agent.update({
+  const updatedAgent = await prisma.agent.update({
     where: { id: agentId },
     data: {
       ...updateData,
@@ -281,6 +282,41 @@ export async function updateAgent(
       ...skillsUpdate,
     },
   });
+
+  // Se o Instagram foi ligado/configurado manualmente (Passo 3 do dashboard, sem
+  // passar pelo OAuth /instagram/connect) e agora já temos token + Facebook Page ID,
+  // subscreve a Página aos webhooks aqui também — sem isto a Meta não entrega
+  // mensagens nem comentários desta conta, mesmo com o token e o ID certos guardados.
+  // Só verifica/subscreve quando este pedido tocou de facto em algo do Instagram
+  // (evita chamadas desnecessárias à Meta em updates que nada têm a ver, ex.: WhatsApp).
+  const touchedInstagram = instagramToken !== undefined || (updateData as any).instagramPageId !== undefined;
+  const pageIdForSub = (updatedAgent as any).instagramPageId as string | undefined;
+  if (touchedInstagram && pageIdForSub) {
+    let rawTokenForSub = instagramToken; // token novo, em texto simples, se foi enviado agora
+    if (!rawTokenForSub && existing.instagramToken) {
+      // Nenhum token novo neste pedido (ex.: só se guardou o Page ID agora) —
+      // reutiliza o token já guardado, desencriptando-o.
+      try {
+        const tenantForDecrypt = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
+        const dataKeyForDecrypt = unwrapDataKey(tenantForDecrypt?.encryptionKey);
+        const [ivExisting, ciphertextExisting] = existing.instagramToken.split(':');
+        if (dataKeyForDecrypt && ivExisting && ciphertextExisting) {
+          rawTokenForSub = decrypt(ciphertextExisting, ivExisting, dataKeyForDecrypt);
+        }
+      } catch (err) {
+        console.error('[Instagram] Falha ao desencriptar token existente para subscrever webhooks:', err);
+      }
+    }
+    if (rawTokenForSub) {
+      subscribeInstagramPage(pageIdForSub, rawTokenForSub).then((ok) => {
+        if (!ok) console.warn(`[Instagram] Não foi possível subscrever a Página ${pageIdForSub} aos webhooks (agentId=${agentId}).`);
+      });
+    }
+  } else if (instagramToken) {
+    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId — não foi possível subscrever webhooks para agentId=${agentId}.`);
+  }
+
+  return updatedAgent;
 }
 
 export async function deleteAgent(tenantId: string, agentId: string) {
