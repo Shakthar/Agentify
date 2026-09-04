@@ -70,6 +70,9 @@ export interface Agent {
   instagramAccountId?: string;
   instagramPageId?: string;
   instagramTokenConfigured?: boolean;
+  telegramEnabled: boolean;
+  telegramUsername?: string;
+  telegramBotTokenConfigured?: boolean;
   calendarEnabled: boolean;
   calendarId?: string;
   totalConversations: number;
@@ -205,6 +208,8 @@ export interface CreateAgentInput {
   };
   whatsappEnabled?: boolean;
   whatsappNumber?: string;
+  telegramEnabled?: boolean;
+  telegramBotToken?: string;
   notifyPhone?: string;
   webChatEnabled?: boolean;
   whitelabelEnabled?: boolean;

@@ -1,10 +1,12 @@
 import prisma from '../lib/prisma.js';
 import { PLAN_LIMITS, ALLOWED_MODELS } from '../types/index.js';
-import { ForbiddenError, NotFoundError } from '../lib/errors.js';
+import { ForbiddenError, NotFoundError, BadRequestError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { subscribeInstagramAccount } from '../lib/instagram.js';
+import crypto from 'crypto';
+import { getTelegramBotInfo, setTelegramWebhook, deleteTelegramWebhook } from '../lib/telegram.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -64,6 +66,9 @@ interface CreateAgentInput {
   instagramAccountId?: string;
   instagramPageId?: string;
   instagramToken?: string;
+  // Telegram
+  telegramEnabled?: boolean;
+  telegramBotToken?: string;
   // Calendar
   calendarEnabled?: boolean;
   calendarId?: string;
@@ -177,12 +182,13 @@ export async function getAgent(tenantId: string, agentId: string) {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { whatsappToken: _omitWA, instagramToken: _omitIG, ...safeAgent } = agent;
+  const { whatsappToken: _omitWA, instagramToken: _omitIG, telegramBotToken: _omitTG, ...safeAgent } = agent as any;
   return {
     ...safeAgent,
     testMode: agent.testMode,
     whatsappTokenConfigured: !!agent.whatsappToken,
     instagramTokenConfigured: !!agent.instagramToken,
+    telegramBotTokenConfigured: !!(agent as any).telegramBotToken,
     skills: {
       handoff: agent.skillHandoff,
       dataCollection: agent.skillDataCollection,
@@ -242,12 +248,13 @@ export async function updateAgent(
     }
   }
 
-  const { skills, whatsappToken, instagramToken, ...updateData } = input;
+  const { skills, whatsappToken, instagramToken, telegramBotToken, ...updateData } = input;
 
   // Encriptar tokens se fornecidos no update
   let encryptedWhatsappToken: string | undefined;
   let encryptedInstagramToken: string | undefined;
-  if (whatsappToken || instagramToken) {
+  let encryptedTelegramBotToken: string | undefined;
+  if (whatsappToken || instagramToken || telegramBotToken) {
     const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
     const dataKey = unwrapDataKey(tenantRecord?.encryptionKey);
     if (dataKey) {
@@ -259,7 +266,31 @@ export async function updateAgent(
         const { ciphertext, iv } = encrypt(instagramToken, dataKey);
         encryptedInstagramToken = `${iv}:${ciphertext}`;
       }
+      if (telegramBotToken) {
+        const { ciphertext, iv } = encrypt(telegramBotToken, dataKey);
+        encryptedTelegramBotToken = `${iv}:${ciphertext}`;
+      }
     }
+  }
+
+  // Se um novo token de bot do Telegram foi colado agora, valida-o e regista o
+  // webhook ANTES de gravar — ao contrário do Instagram (onde a validação corre em
+  // segundo plano após gravar, porque testa vários campos), aqui é uma única
+  // chamada rápida à API do Telegram, por isso vale a pena ser síncrona: um token
+  // errado nunca fica "guardado" sem funcionar, o cliente vê logo o erro.
+  let telegramConnectData: { telegramUsername?: string; telegramWebhookSecret?: string } = {};
+  if (telegramBotToken) {
+    const botInfo = await getTelegramBotInfo(telegramBotToken);
+    if (!botInfo) {
+      throw new BadRequestError('Token do bot do Telegram inválido — confirma que copiaste o token certo do @BotFather.');
+    }
+    const webhookSecret = crypto.randomBytes(24).toString('hex');
+    const backendUrl = process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app';
+    const registered = await setTelegramWebhook(telegramBotToken, `${backendUrl}/api/webhooks/telegram/${agentId}`, webhookSecret);
+    if (!registered) {
+      throw new BadRequestError('Não foi possível registar o webhook do Telegram — tenta novamente dentro de alguns segundos.');
+    }
+    telegramConnectData = { telegramUsername: botInfo.username, telegramWebhookSecret: webhookSecret };
   }
 
   const skillsUpdate = skills
@@ -279,6 +310,8 @@ export async function updateAgent(
       ...updateData,
       ...(encryptedWhatsappToken ? { whatsappToken: encryptedWhatsappToken } : {}),
       ...(encryptedInstagramToken ? { instagramToken: encryptedInstagramToken } : {}),
+      ...(encryptedTelegramBotToken ? { telegramBotToken: encryptedTelegramBotToken } : {}),
+      ...telegramConnectData,
       ...skillsUpdate,
     },
   });
@@ -318,6 +351,40 @@ export async function updateAgent(
     }
   } else if (instagramToken) {
     console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId/instagramAccountId — não foi possível subscrever webhooks para agentId=${agentId}.`);
+  }
+
+  // Telegram: um token novo já foi validado e o webhook registado mais acima
+  // (síncrono). Aqui só tratamos o caso de o cliente só mexer no toggle
+  // telegramEnabled (sem colar um token novo) — reativa/remove o webhook usando
+  // o token já guardado, em segundo plano (não bloqueia a resposta do PATCH).
+  const telegramEnabledTouched = (updateData as any).telegramEnabled !== undefined;
+  if (!telegramBotToken && telegramEnabledTouched && (existing as any).telegramBotToken) {
+    const tenantForDecrypt = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
+    const dataKeyForDecrypt = unwrapDataKey(tenantForDecrypt?.encryptionKey);
+    const [ivExisting, ciphertextExisting] = ((existing as any).telegramBotToken as string).split(':');
+    let rawTokenForToggle: string | undefined;
+    try {
+      if (dataKeyForDecrypt && ivExisting && ciphertextExisting) {
+        rawTokenForToggle = decrypt(ciphertextExisting, ivExisting, dataKeyForDecrypt);
+      }
+    } catch (err) {
+      console.error('[Telegram] Falha ao desencriptar token existente para (des)registar webhook:', err);
+    }
+    if (rawTokenForToggle) {
+      if ((updateData as any).telegramEnabled) {
+        const backendUrl = process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app';
+        const existingSecret = (existing as any).telegramWebhookSecret as string | undefined;
+        const secret = existingSecret ?? crypto.randomBytes(24).toString('hex');
+        setTelegramWebhook(rawTokenForToggle, `${backendUrl}/api/webhooks/telegram/${agentId}`, secret).then((ok) => {
+          if (!ok) console.warn(`[Telegram] Não foi possível reativar o webhook do bot (agentId=${agentId}).`);
+        });
+        if (!existingSecret) {
+          prisma.agent.update({ where: { id: agentId }, data: { telegramWebhookSecret: secret } as any }).catch(() => {});
+        }
+      } else {
+        deleteTelegramWebhook(rawTokenForToggle).catch(() => {});
+      }
+    }
   }
 
   return updatedAgent;

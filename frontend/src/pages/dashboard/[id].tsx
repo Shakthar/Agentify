@@ -44,7 +44,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'instagram' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations' | 'leads'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chat' | 'edit' | 'embed' | 'whatsapp' | 'instagram' | 'telegram' | 'knowledge' | 'docs' | 'orders' | 'history' | 'skills' | 'integrations' | 'leads'>('overview');
   const [skillsSaving, setSkillsSaving] = useState(false);
   const [skillsMsg, setSkillsMsg] = useState('');
   const [editForm, setEditForm] = useState<Partial<Agent>>({});
@@ -92,6 +92,14 @@ export default function AgentDetailPage() {
   const [igSchedWeStart, setIgSchedWeStart] = useState('00:00');
   const [igSchedWeEnd, setIgSchedWeEnd] = useState('23:59');
   const [igOffMsg, setIgOffMsg] = useState('');
+  // Telegram state
+  const [tgEnabled, setTgEnabled] = useState(false);
+  const [tgUsername, setTgUsername] = useState('');
+  const [tgBotToken, setTgBotToken] = useState('');
+  const [tgBotTokenVisible, setTgBotTokenVisible] = useState(false);
+  const [tgBotTokenConfigured, setTgBotTokenConfigured] = useState(false);
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgMsg, setTgMsg] = useState('');
   // Leads / briefing state
   const [briefingHistory, setBriefingHistory] = useState<Array<{role: 'user' | 'assistant'; content: string}>>([]);
   const [briefingInput, setBriefingInput] = useState('');
@@ -144,6 +152,11 @@ export default function AgentDetailPage() {
         if (igs.weekends) { setIgSchedWeStart(igs.weekends.start); setIgSchedWeEnd(igs.weekends.end); }
       }
       setIgOffMsg((data as any).instagramOffHoursMessage ?? '');
+      // Load Telegram
+      setTgEnabled((data as any).telegramEnabled ?? false);
+      setTgUsername((data as any).telegramUsername ?? '');
+      setTgBotTokenConfigured((data as any).telegramBotTokenConfigured ?? false);
+      // bot token is write-only — never returned from API, leave blank
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
@@ -423,6 +436,30 @@ export default function AgentDetailPage() {
     }
   };
 
+  const handleSaveTelegram = async () => {
+    if (!agent) return;
+    setTgSaving(true);
+    setTgMsg('');
+    try {
+      const payload: Record<string, unknown> = {
+        telegramEnabled: tgEnabled,
+      };
+      if (tgBotToken.trim()) payload.telegramBotToken = tgBotToken.trim();
+      const updated = await updateAgent(agent.id, payload);
+      setAgent(updated);
+      setTgUsername(updated.telegramUsername ?? '');
+      setTgBotTokenConfigured(updated.telegramBotTokenConfigured ?? false);
+      setTgBotToken('');
+      setTgMsg('✅ Guardado com sucesso!');
+      setTimeout(() => setTgMsg(''), 3000);
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setTgMsg(`❌ ${message ?? 'Erro ao guardar.'}`);
+    } finally {
+      setTgSaving(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!agent) return;
     if (!confirm(`Eliminar agente "${agent.name}"?`)) return;
@@ -493,6 +530,7 @@ export default function AgentDetailPage() {
               { key: 'embed',      label: '🌐 Web Embed' },
               { key: 'whatsapp',   label: '📱 WhatsApp' },
               { key: 'instagram',  label: '📸 Instagram' },
+              { key: 'telegram',   label: '✈️ Telegram' },
               { key: 'leads',      label: '🎯 Leads' },
               { key: 'history',    label: '📁 Histórico' },
               { key: 'skills',     label: '⚡ Skills' },
@@ -1792,6 +1830,79 @@ export default function AgentDetailPage() {
                   )}
                   <button onClick={handleSaveInstagram} disabled={igSaving} className="btn-primary text-sm w-full mt-2" style={{ background: igEnabled ? '#e1306c' : undefined }}>
                     {igSaving ? 'A guardar...' : '💾 Guardar configuração Instagram'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Telegram ─── */}
+          {activeTab === 'telegram' && (
+            <div className="space-y-6">
+              <div className="card border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/10">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">✈️ Ligar o Telegram</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Ao contrário do WhatsApp/Instagram, não é preciso conta Meta nem configurar webhooks à mão —
+                  basta um bot do Telegram, criado em segundos.
+                </p>
+              </div>
+
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Criar um bot no Telegram</h2>
+                <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
+                  <li>Abre o Telegram e procura por <strong>@BotFather</strong> (o bot oficial para criar bots).</li>
+                  <li>Envia o comando <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/newbot</code> e segue as instruções (nome + username do bot, que tem de terminar em <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">bot</code>).</li>
+                  <li>O @BotFather devolve um <strong>token</strong> (ex: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>) — copia-o.</li>
+                </ol>
+              </div>
+
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 2 — Ligar este agente</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Token do bot <span className="text-gray-400 dark:text-gray-500 font-normal">(dado pelo @BotFather)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        className="input pr-20"
+                        type={tgBotTokenVisible ? 'text' : 'password'}
+                        placeholder={tgBotTokenConfigured ? '••••••••  (já configurado — deixa vazio para manter)' : '123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
+                        value={tgBotToken}
+                        onChange={(e) => setTgBotToken(e.target.value)}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setTgBotTokenVisible(v => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1"
+                      >
+                        {tgBotTokenVisible ? 'Ocultar' : 'Mostrar'}
+                      </button>
+                    </div>
+                    {tgUsername && (
+                      <p className="text-[11px] text-green-600 dark:text-green-400 mt-1">Bot ligado: @{tgUsername}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={tgEnabled}
+                      onClick={() => setTgEnabled((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${tgEnabled ? 'bg-sky-500' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tgEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {tgEnabled ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  {tgMsg && (
+                    <p className={`text-xs mt-1 ${tgMsg.startsWith('❌') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{tgMsg}</p>
+                  )}
+                  <button onClick={handleSaveTelegram} disabled={tgSaving} className="btn-primary text-sm w-full mt-2" style={{ background: tgEnabled ? '#0ea5e9' : undefined }}>
+                    {tgSaving ? 'A guardar...' : '💾 Guardar configuração Telegram'}
                   </button>
                 </div>
               </div>

@@ -57,6 +57,8 @@ const createAgentSchema = z.object({
   instagramAccountId:  z.string().optional(),
   instagramPageId:     z.string().optional(),
   instagramToken:      z.string().min(20).max(500).optional(),
+  telegramEnabled:     z.boolean().optional(),
+  telegramBotToken:    z.string().min(20).max(200).optional(),
   calendarEnabled:     z.boolean().optional(),
   calendarId:          z.string().optional(),
 });

@@ -179,6 +179,14 @@ model Agent {
   instagramPageId       String?    // Facebook Page ID ligada à conta do Instagram — obrigatório para POST /{id}/messages
   instagramToken        String?
 
+  // Telegram — 1 agente = 1 bot do Telegram (criado pelo cliente via @BotFather)
+  telegramEnabled       Boolean    @default(false)
+  telegramBotToken      String?    // Token do bot (encriptado, como whatsappToken/instagramToken)
+  telegramUsername      String?    // @username do bot, obtido via getMe — só para mostrar no painel
+  telegramWebhookSecret String?    // Secret aleatório enviado ao Telegram no setWebhook; validado no header
+                                   // X-Telegram-Bot-Api-Secret-Token de cada pedido, já que o Telegram não
+                                   // assina os webhooks como a Meta (sem X-Hub-Signature-256).
+
   // Channel schedules (JSON: { enabled, timezone, weekdays: {start,end}|null, weekends: {start,end}|null })
   // null weekdays/weekends = sempre ativo nesse período; start/end = "HH:MM"
   // Se start > end (ex: "18:00"-"08:59") a janela cruza meia-noite

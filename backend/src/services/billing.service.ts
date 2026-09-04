@@ -71,7 +71,7 @@ export async function deductWaMsgCredit(
   tenantId: string,
   agentId: string,
   conversationId: string,
-  channel: 'whatsapp' | 'instagram',
+  channel: 'whatsapp' | 'instagram' | 'telegram',
 ): Promise<void> {
   try {
     const tenant = await prisma.tenant.findUnique({

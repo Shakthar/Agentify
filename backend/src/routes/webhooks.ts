@@ -12,6 +12,7 @@ import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
 import { sendInstagramDM, replyToInstagramComment } from '../lib/instagram.js';
+import { sendTelegramMessage } from '../lib/telegram.js';
 import { deductWaMsgCredit } from '../services/billing.service.js';
 import { isWithinSchedule } from '../utils/schedule.js';
 
@@ -642,6 +643,143 @@ interface InstagramEntry {
       is_echo?: boolean;
     };
   }[];
+}
+
+// ─── POST /api/webhooks/telegram/:agentId ────────────────────────────────────
+// Cada agente tem o seu próprio bot do Telegram (1 bot = 1 token), por isso o
+// agentId vai no próprio URL do webhook — ao contrário do WhatsApp/Instagram, que
+// partilham um único endpoint por app Meta e têm de "descobrir" o agente a partir
+// do payload (phone_number_id / instagram account id), aqui já sabemos qual é.
+router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const { agentId } = req.params;
+
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, telegramEnabled: true, isActive: true } as any,
+    include: { tenant: { select: { encryptionKey: true } } },
+  });
+
+  if (!agent) {
+    console.warn(`[Telegram] Webhook recebido para agentId=${agentId}, mas o agente não existe ou está desativado.`);
+    res.status(200).send('OK'); // 200 sempre — nunca dar ao Telegram motivo para reter/retentar
+    return;
+  }
+
+  // O Telegram não assina o payload (sem X-Hub-Signature-256 como a Meta) — em vez
+  // disso devolve, em cada pedido, o secret_token que passámos no setWebhook.
+  const secretHeader = req.headers['x-telegram-bot-api-secret-token'] as string | undefined;
+  const expectedSecret = (agent as any).telegramWebhookSecret as string | undefined;
+  if (!expectedSecret || secretHeader !== expectedSecret) {
+    console.error(`[Telegram] Secret token inválido/ausente para agentId=${agentId} — a rejeitar.`);
+    res.status(403).send('Forbidden');
+    return;
+  }
+
+  // Responder já — o Telegram reenvia se não receber 200 a tempo.
+  res.status(200).send('OK');
+
+  const update = req.body as TelegramUpdate;
+  const message = update.message;
+  if (!message || typeof message.text !== 'string' || !message.text) {
+    // Ignora silenciosamente updates que não sejam mensagens de texto simples
+    // (fotos, stickers, edited_message, callback_query, etc.) — fora do âmbito por agora.
+    return;
+  }
+
+  const chatId = message.chat.id;
+  const from = String(chatId);
+
+  // Desencriptar o token do bot para poder responder
+  let botToken: string | undefined;
+  const encryptedBotToken = (agent as any).telegramBotToken as string | undefined;
+  if (encryptedBotToken && agent.tenant.encryptionKey) {
+    const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
+    const [iv, ciphertext] = encryptedBotToken.split(':');
+    try { if (dataKey) botToken = decrypt(ciphertext, iv, dataKey); } catch (err) {
+      console.error('[Telegram] Erro ao desencriptar token do bot:', err);
+    }
+  }
+  if (!botToken) {
+    console.error(`[Telegram] Sem token utilizável para agentId=${agentId} — não é possível responder.`);
+    return;
+  }
+
+  console.log(`[Telegram] Mensagem de chat=${chatId} → agente=${agent.name} texto="${message.text.slice(0, 80)}"`);
+
+  // Identificar/criar Customer unificado
+  const customer = await identifyCustomer({
+    tenantId: agent.tenantId,
+    channel: 'telegram',
+    channelId: from,
+  }).catch(err => { console.error('[Telegram] Erro ao identificar customer:', err); return null; });
+
+  // Reutilizar conversa aberta deste chat ou criar nova
+  let conversation = await prisma.conversation.findFirst({
+    where: {
+      agentId:     agent.id,
+      tenantId:    agent.tenantId,
+      channelType: 'telegram',
+      externalId:  from,
+      resolved:    false,
+      closedAt:    null,
+    },
+  });
+
+  // Se em handoff humano, não responder automaticamente
+  if (conversation?.handedOffToHuman) {
+    console.log(`[Telegram] Conversa ${conversation.id} em handoff humano — a ignorar resposta automática para chat=${chatId}`);
+    return;
+  }
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: {
+        agentId:     agent.id,
+        tenantId:    agent.tenantId,
+        channelType: 'telegram',
+        externalId:  from,
+        visitorId:   from,
+        ...(customer?.id ? { customerId: customer.id } : {}),
+      } as any,
+    });
+  } else if (customer?.id && !(conversation as any).customerId) {
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { customerId: customer.id } as any });
+  }
+
+  // Processar mensagem no LLM
+  let result: { content: string; handoff?: { triggered: true; summary: string } | null };
+  try {
+    result = await conversationsService.sendMessage(agent.tenantId, conversation.id, message.text);
+  } catch (err) {
+    console.error('[Telegram] Erro ao processar mensagem LLM:', err);
+    await sendTelegramMessage(chatId, '⚠️ Ocorreu um erro ao processar a sua mensagem. Por favor, tente novamente mais tarde.', botToken)
+      .catch(sendErr => console.error('[Telegram] Erro ao enviar mensagem de erro:', sendErr));
+    return;
+  }
+
+  await sendTelegramMessage(chatId, result.content, botToken);
+  // Debitar crédito por mensagem enviada — mesmo modelo de custo dos outros canais
+  deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'telegram').catch(() => {});
+
+  // NOTA: por agora só regista o handoff no log — os outros canais notificam o
+  // responsável via WhatsApp (agent.notifyPhone), mas isso pressupõe que o mesmo
+  // agente também tem o WhatsApp configurado, o que nem sempre será o caso para um
+  // agente só de Telegram. Fica como possível melhoria futura (ex.: notificar no
+  // próprio Telegram, ou por email).
+  if (result.handoff?.triggered) {
+    console.log(`[Telegram] Handoff acionado na conversa ${conversation.id} (chat=${chatId}) — resumo: ${result.handoff.summary}`);
+  }
+}));
+
+// ─── Tipos locais (Telegram) ──────────────────────────────────────────────────
+
+interface TelegramUpdate {
+  update_id: number;
+  message?: {
+    message_id: number;
+    from?: { id: number; username?: string; first_name?: string };
+    chat: { id: number; type: string };
+    text?: string;
+  };
 }
 
 export default router;
