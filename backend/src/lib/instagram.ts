@@ -52,33 +52,26 @@ export async function getPageAccessToken(pageId: string, systemUserToken: string
  * Subscreve (instala) a Página do Facebook ligada à conta profissional do Instagram
  * nesta app, via POST /{page-id}/subscribed_apps?subscribed_fields=<campo>.
  *
- * NOTA (04/09): esta função usava o ID da conta Instagram (Instagram Business Account
- * ID) em vez do Page ID, o que dava sempre "(#3) Application does not have the
- * capability to make this API call.". Corrigido para usar pageId (commit b5a8a36), o
- * que eliminou o erro #3.
+ * NOTA (04/09): esta função usava o ID da conta Instagram em vez do Page ID, o que
+ * dava sempre "(#3) Application does not have the capability to make this API call.".
+ * Corrigido para usar pageId (commit b5a8a36) — eliminou o erro #3.
  *
- * NOTA 2 (04/09): tentámos passar subscribed_fields=comments/messages — "comments" não
- * existe no enum de campos do tópico "page" (erro #100), e "messages"/
- * "messaging_postbacks" exigem a permissão pages_messaging (erro #200), que o Agentify
- * não pede de propósito (é específica do Messenger).
+ * PAUSADO (04/09): testámos 10 campos diferentes do tópico "page" (comments, feed,
+ * messages, messaging_postbacks, mention, name, picture, category, description,
+ * conversations, standby, message_mention, inbox_labels, agent_messages) e TODOS, sem
+ * excepção, exigem a permissão pages_manage_metadata ou pages_messaging — nenhuma das
+ * duas disponível/desejada para esta app (Instagram-only, Facebook Login for
+ * Business). Ou seja, este endpoint de "instalação" da Página não está atualmente
+ * acessível para o Agentify, com as permissões que a app tem hoje.
  *
- * NOTA 3 (04/09): tentámos depois "feed" (o exemplo oficial da doc genérica "Open
- * Graph Page Subscribed Apps") — mas esse dá #200 a exigir pages_manage_metadata.
- * Confirmámos na doc "App Review for Instagram API"
- * (developers.facebook.com/docs/instagram-platform/app-review/, secção "Available
- * permissions & features") que pages_manage_metadata NEM SEQUER está na lista de
- * permissões disponíveis para apps "Instagram API with Facebook Login" — por isso não
- * aparece no seletor de permissões da app no Dashboard (o que já tínhamos confirmado
- * visualmente antes). Ou seja, "feed" também está errado: é um campo do Facebook Page
- * "puro" (posts/conteúdo da Página), não faz sentido para uma app só de Instagram.
- *
- * Como o enum de campos válidos aqui é o do tópico "page" completo (webhooks para
- * Página, não específico do Instagram) mas o Agentify só tem permissões
- * Instagram+básicas (pages_show_list, pages_read_engagement, business_management,
- * instagram_basic, instagram_manage_comments, instagram_manage_messages), testamos
- * uma lista de campos "leves"/informativos até encontrar um que não exija
- * pages_manage_metadata nem pages_messaging. Assim que soubermos qual funciona,
- * simplificamos isto para uma única chamada fixa.
+ * IMPORTANTE: isto NÃO bloqueia o envio/receção de DMs — confirmado em produção
+ * (04/09) que as DMs continuam a funcionar normalmente mesmo com esta função a falhar
+ * sempre (é chamada em modo "fire-and-forget"/best-effort nos 3 sítios onde é usada,
+ * nunca bloqueia a ligação da conta nem o envio de mensagens). Por decisão do
+ * utilizador, pausámos a investigação da subscrição de comentários (que dependia
+ * disto) para não continuar a gastar chamadas à API sem sucesso — deixamos só UMA
+ * tentativa (em vez do loop de 10), só para log/diagnóstico, sem qualquer efeito no
+ * funcionamento atual do agente.
  */
 export async function subscribeInstagramAccount(
   igAccountId: string,
@@ -93,35 +86,17 @@ export async function subscribeInstagramAccount(
   try {
     const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
 
-    // Diagnóstico temporário: candidatos a campo "leve" do tópico "page" que talvez não
-    // exijam pages_manage_metadata nem pages_messaging (permissões que o Agentify não
-    // tem/não quer). Paramos no primeiro que der success:true. Remover depois de
-    // confirmarmos qual funciona, deixando só esse.
-    const candidateFields = [
-      'mention', 'name', 'picture', 'category', 'description',
-      'conversations', 'standby', 'message_mention', 'inbox_labels', 'agent_messages',
-    ];
-    let lastData: { success?: boolean; error?: unknown } = {};
-    for (const field of candidateFields) {
-      try {
-        const diagResp = await fetch(
-          `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=${field}&access_token=${encodeURIComponent(pageToken)}`,
-          { method: 'POST' },
-        );
-        const diagData = await diagResp.json() as { success?: boolean; error?: unknown };
-        lastData = diagData;
-        console.log(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${field}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData));
-        if (diagResp.ok && diagData.success) {
-          console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita/instalada para webhooks (campo "${field}").`);
-          return true;
-        }
-      } catch (diagErr) {
-        console.error(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${field}" -> exceção:`, diagErr);
-      }
+    const resp = await fetch(
+      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=mention&access_token=${encodeURIComponent(pageToken)}`,
+      { method: 'POST' },
+    );
+    const data = await resp.json() as { success?: boolean; error?: unknown };
+    if (!resp.ok || !data.success) {
+      console.warn(`[Instagram] Instalação da Página ${pageId} (conta Instagram ${igAccountId}) pausada — falta pages_manage_metadata/pages_messaging, sem impacto nas DMs:`, JSON.stringify(data));
+      return false;
     }
-
-    console.error(`[Instagram] Nenhum campo testado conseguiu subscrever/instalar a Página ${pageId} (conta Instagram ${igAccountId}). Último erro:`, JSON.stringify(lastData));
-    return false;
+    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita/instalada para webhooks.`);
+    return true;
   } catch (err) {
     console.error('[Instagram] Erro ao subscrever webhooks da conta Instagram:', err);
     return false;
