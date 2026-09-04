@@ -100,6 +100,25 @@ export async function subscribeInstagramAccount(
       console.error('[Instagram][debug_token] Falha ao inspecionar pageToken:', debugErr);
     }
 
+    // Diagnóstico temporário: testa cada campo isoladamente (e a combinação da doc
+    // oficial, sem messaging_postbacks) para isolar exatamente qual campo dispara o
+    // erro #3, antes da chamada real combinada. Cada chamada a subscribed_apps
+    // substitui a lista de campos anterior, por isso o resultado real é o da ÚLTIMA
+    // chamada (a combinada, como já estava) — isto só serve para log.
+    const diagnosticCombos = ['comments', 'messages', 'messaging_postbacks', 'messages,comments'];
+    for (const combo of diagnosticCombos) {
+      try {
+        const diagResp = await fetch(
+          `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=${combo}&access_token=${encodeURIComponent(pageToken)}`,
+          { method: 'POST' },
+        );
+        const diagData = await diagResp.json() as { success?: boolean; error?: unknown };
+        console.log(`[Instagram][debug] subscribed_apps fields="${combo}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData).slice(0, 300));
+      } catch (diagErr) {
+        console.error(`[Instagram][debug] subscribed_apps fields="${combo}" -> exceção:`, diagErr);
+      }
+    }
+
     const resp = await fetch(
       `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
       { method: 'POST' },
