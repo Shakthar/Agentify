@@ -94,7 +94,15 @@ export async function subscribeInstagramAccount(
         const debugData = await debugResp.json() as {
           data?: { scopes?: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }>; type?: string; app_id?: string };
         };
-        console.log(`[Instagram][debug_token] pageToken info para ${igAccountId}:`, JSON.stringify(debugData?.data).slice(0, 500));
+        // Sem slice() agora: precisamos de ver granular_scopes (com target_ids) na
+        // íntegra, que fica de fora quando cortamos aos 500 caracteres.
+        console.log(`[Instagram][debug_token] pageToken info completa para ${igAccountId} (pageId=${pageId}):`, JSON.stringify(debugData?.data));
+        const granular = debugData?.data?.granular_scopes ?? [];
+        for (const g of granular) {
+          const hasIgId = g.target_ids?.includes(igAccountId) ?? false;
+          const hasPageId = pageId ? (g.target_ids?.includes(pageId) ?? false) : false;
+          console.log(`[Instagram][debug_token] granular scope="${g.scope}" target_ids=${JSON.stringify(g.target_ids)} incluiIgAccountId=${hasIgId} incluiPageId=${hasPageId}`);
+        }
       }
     } catch (debugErr) {
       console.error('[Instagram][debug_token] Falha ao inspecionar pageToken:', debugErr);
