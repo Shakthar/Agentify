@@ -129,19 +129,28 @@ export async function login(email: string, password: string) {
 interface FacebookProfileInput {
   email: string;
   name: string;
+  facebookId: string;
 }
 
 /**
  * Login/registo via "Continuar com Facebook" na própria plataforma Agentify
  * (autenticação da conta, distinto da ligação de contas Instagram/WhatsApp a um
- * agente). Se já existe um Tenant com este email (verificado pela Meta), a conta
- * é ligada por email — caso contrário, cria-se uma conta nova. Como o Tenant exige
- * passwordHash, contas criadas por esta via recebem uma password aleatória (nunca
- * partilhada) — o login normal por password fica indisponível até o utilizador
- * definir uma própria (fluxo "esqueci a password").
+ * agente). Procura primeiro por facebookId (conta já associada, mesmo que o email
+ * atual do Tenant seja diferente do email do Facebook) e só depois por email — se
+ * encontrar por email uma conta ainda sem facebookId, associa-o agora automaticamente.
+ * Caso contrário, cria-se uma conta nova. Como o Tenant exige passwordHash, contas
+ * criadas por esta via recebem uma password aleatória (nunca partilhada) — o login
+ * normal por password fica indisponível até o utilizador definir uma própria.
  */
 export async function loginOrSignupWithFacebook(input: FacebookProfileInput) {
-  let tenant = await prisma.tenant.findUnique({ where: { email: input.email, deletedAt: null } });
+  let tenant = await prisma.tenant.findFirst({
+    where: { deletedAt: null, OR: [{ facebookId: input.facebookId }, { email: input.email }] },
+  });
+
+  if (tenant && tenant.facebookId !== input.facebookId) {
+    // Encontrado por email mas ainda não tinha o Facebook associado — associa agora.
+    tenant = await prisma.tenant.update({ where: { id: tenant.id }, data: { facebookId: input.facebookId } });
+  }
 
   if (!tenant) {
     const plan = 'free';
@@ -151,6 +160,7 @@ export async function loginOrSignupWithFacebook(input: FacebookProfileInput) {
       data: {
         name: input.name || input.email.split('@')[0],
         email: input.email,
+        facebookId: input.facebookId,
         passwordHash: await hashPassword(generateRefreshToken()),
         plan,
         creditsTotal,
@@ -168,6 +178,27 @@ export async function loginOrSignupWithFacebook(input: FacebookProfileInput) {
   }
 
   return { tenantId: tenant.id, requiresTwoFactor: tenant.twoFactorEnabled };
+}
+
+/**
+ * Associa (ou remove a associação d)a conta do Facebook a um Tenant já autenticado —
+ * usado na aba de Perfil, para o caso de o email do Facebook ser diferente do email
+ * de login do Agentify. Rejeita se essa conta do Facebook já estiver associada a OUTRO
+ * Tenant (uma conta do Facebook só pode estar associada a uma conta Agentify de cada vez).
+ */
+export async function linkFacebookAccount(tenantId: string, facebookId: string, facebookEmail: string) {
+  const existing = await prisma.tenant.findUnique({ where: { facebookId } });
+  if (existing && existing.id !== tenantId) {
+    throw new ConflictError('Esta conta do Facebook já está associada a outra conta Agentify.');
+  }
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { facebookId } });
+  writeAuditLog(tenantId, 'tenant_link_facebook', 'tenant', tenantId, { facebookEmail });
+}
+
+export async function unlinkFacebookAccount(tenantId: string) {
+  await prisma.tenant.update({ where: { id: tenantId }, data: { facebookId: null } });
+  writeAuditLog(tenantId, 'tenant_unlink_facebook', 'tenant', tenantId, {});
 }
 
 /** Troca o ticket de curta duração (ver signFbLoginTicket) pelos tokens reais de
@@ -270,6 +301,7 @@ export async function getProfile(tenantId: string) {
       phone: true, vatNumber: true,
       addressLine1: true, addressCity: true, addressCountry: true, addressZip: true,
       brandColor: true, logoUrl: true, domain: true,
+      facebookId: true,
       createdAt: true, isAdmin: true,
     },
   });
@@ -297,6 +329,7 @@ export async function updateProfile(tenantId: string, data: {
       phone: true, vatNumber: true,
       addressLine1: true, addressCity: true, addressCountry: true, addressZip: true,
       brandColor: true, logoUrl: true, domain: true,
+      facebookId: true,
       createdAt: true, isAdmin: true,
     },
   });

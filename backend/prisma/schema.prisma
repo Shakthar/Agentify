@@ -66,6 +66,7 @@ model Tenant {
   // Relations
   // Programa de indicação
   referralCode          String?    @unique
+  facebookId            String?    @unique // ID do utilizador no Facebook, para "Continuar com Facebook" (login e associação)
   referralCredits       Int        @default(0)
   referredBy            String?    // código do tenant que indicou
 

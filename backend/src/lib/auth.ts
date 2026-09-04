@@ -62,15 +62,21 @@ export function verifyTwoFactorToken(token: string): { tenantId: string } {
 
 /** State assinado (CSRF) para o fluxo OAuth do "Login com Facebook" — stateless,
  *  não precisa de sessão/cookie: a Meta devolve-o tal e qual no callback e nós
- *  validamos a assinatura e o prazo. Válido por 10 min. */
-export function signOAuthState(): string {
+ *  validamos a assinatura e o prazo. Válido por 10 min.
+ *
+ *  mode 'login' — fluxo público de login/registo (GET /api/auth/facebook).
+ *  mode 'link'  — associar a conta do Facebook a um tenant já autenticado
+ *  (GET /api/auth/facebook/link), carrega o tenantId para o callback saber a quem
+ *  associar mesmo sem cabeçalho Authorization (perdido no redirect da Meta). */
+export function signOAuthState(mode: 'login' | 'link' = 'login', tenantId?: string): string {
   const nonce = crypto.randomBytes(16).toString('hex');
-  return jwt.sign({ nonce, type: 'oauth_state' }, JWT_SECRET, { expiresIn: '10m' } as jwt.SignOptions);
+  return jwt.sign({ nonce, mode, tenantId, type: 'oauth_state' }, JWT_SECRET, { expiresIn: '10m' } as jwt.SignOptions);
 }
 
-export function verifyOAuthState(state: string): void {
-  const payload = jwt.verify(state, JWT_SECRET, { algorithms: ['HS256'] }) as { type: string };
+export function verifyOAuthState(state: string): { mode: 'login' | 'link'; tenantId?: string } {
+  const payload = jwt.verify(state, JWT_SECRET, { algorithms: ['HS256'] }) as { type: string; mode?: 'login' | 'link'; tenantId?: string };
   if (payload.type !== 'oauth_state') throw new Error('Invalid state type');
+  return { mode: payload.mode ?? 'login', tenantId: payload.tenantId };
 }
 
 /** Ticket de curta duração (2 min) emitido no callback do "Login com Facebook",

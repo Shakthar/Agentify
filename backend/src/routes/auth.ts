@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter, loginLimiter, signupLimiter } from '../middleware/rateLimit.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { BadRequestError, UnauthorizedError } from '../lib/errors.js';
+import { BadRequestError, UnauthorizedError, ConflictError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import * as authService from '../services/auth.service.js';
 import { signOAuthState, verifyOAuthState, signFbLoginTicket, verifyFbLoginTicket } from '../lib/auth.js';
@@ -151,12 +151,20 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     return;
   }
 
+  let oauthMode: 'login' | 'link' = 'login';
+  let oauthTenantId: string | undefined;
   try {
-    verifyOAuthState(state);
+    const parsedState = verifyOAuthState(state);
+    oauthMode = parsedState.mode;
+    oauthTenantId = parsedState.tenantId;
   } catch {
     res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Sessão OAuth expirada — tenta outra vez')}`);
     return;
   }
+
+  // Fluxo de associação (aba de Perfil): erros redirecionam para o perfil, não para a home.
+  const errorRedirectBase = oauthMode === 'link' ? `${frontendUrl}/dashboard/profile` : frontendUrl;
+  const errorParam = oauthMode === 'link' ? 'fbLinkError' : 'fbAuthError';
 
   const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
   const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
@@ -176,7 +184,7 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     const tokenData = await tokenResp.json() as { access_token?: string; error?: { message?: string } };
     if (!tokenResp.ok || !tokenData.access_token) {
       console.error('[Facebook Login] Falha ao trocar code por token:', JSON.stringify(tokenData));
-      res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Não foi possível concluir o login com o Facebook')}`);
+      res.redirect(`${errorRedirectBase}?${errorParam}=${encodeURIComponent('Não foi possível concluir o login com o Facebook')}`);
       return;
     }
 
@@ -184,22 +192,43 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
       `https://graph.facebook.com/${FB_GRAPH_VERSION}/me?fields=id,name,email&access_token=${encodeURIComponent(tokenData.access_token)}`,
     );
     const profile = await profileResp.json() as { id?: string; name?: string; email?: string; error?: { message?: string } };
-    if (!profileResp.ok || !profile.email) {
-      console.error('[Facebook Login] Perfil sem email (permissão recusada ou conta sem email verificado):', JSON.stringify(profile));
+    if (!profileResp.ok || !profile.id) {
+      console.error('[Facebook Login] Perfil inválido (permissão recusada):', JSON.stringify(profile));
+      res.redirect(`${errorRedirectBase}?${errorParam}=${encodeURIComponent('Não foi possível obter os dados da tua conta do Facebook.')}`);
+      return;
+    }
+    if (oauthMode === 'login' && !profile.email) {
+      console.error('[Facebook Login] Perfil sem email (conta sem email verificado):', JSON.stringify(profile));
       res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('A tua conta do Facebook não tem um email verificado. Usa email e password para criar conta.')}`);
       return;
     }
 
+    if (oauthMode === 'link') {
+      if (!oauthTenantId) {
+        res.redirect(`${frontendUrl}/dashboard/profile?fbLinkError=${encodeURIComponent('Sessão expirada — entra novamente e tenta associar outra vez')}`);
+        return;
+      }
+      try {
+        await authService.linkFacebookAccount(oauthTenantId, profile.id, profile.email ?? '');
+        res.redirect(`${frontendUrl}/dashboard/profile?fbLink=success`);
+      } catch (err) {
+        const message = err instanceof ConflictError ? err.message : 'Não foi possível associar a conta do Facebook';
+        res.redirect(`${frontendUrl}/dashboard/profile?fbLinkError=${encodeURIComponent(message)}`);
+      }
+      return;
+    }
+
     const { tenantId, requiresTwoFactor } = await authService.loginOrSignupWithFacebook({
-      email: profile.email,
-      name: profile.name ?? profile.email.split('@')[0],
+      email: profile.email!,
+      name: profile.name ?? profile.email!.split('@')[0],
+      facebookId: profile.id,
     });
 
     const ticket = signFbLoginTicket(tenantId, requiresTwoFactor);
     res.redirect(`${frontendUrl}/?fbTicket=${encodeURIComponent(ticket)}`);
   } catch (err) {
     console.error('[Facebook Login] Erro no callback:', err);
-    res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Erro inesperado ao ligar com o Facebook')}`);
+    res.redirect(`${errorRedirectBase}?${errorParam}=${encodeURIComponent('Erro inesperado ao ligar com o Facebook')}`);
   }
 }));
 
@@ -218,6 +247,39 @@ router.post('/facebook/exchange', authLimiter, asyncHandler(async (req: Request,
 
   const result = await authService.completeFacebookLogin(payload.tenantId, payload.requiresTwoFactor);
   res.json(result);
+}));
+
+// GET /api/auth/facebook/link — devolve o URL do diálogo OAuth do Facebook para
+// ASSOCIAR a conta do Facebook a um Tenant já autenticado (aba de Perfil). Usa o
+// mesmo diálogo do login, mas o `state` transporta mode='link' + tenantId, para o
+// callback saber que deve chamar linkFacebookAccount em vez de fazer login/registo.
+router.get('/facebook/link', authenticate, authLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
+  if (!appId) {
+    res.status(503).json({ error: 'FACEBOOK_APP_ID não configurado nas variáveis de ambiente' });
+    return;
+  }
+
+  const redirectUri = process.env.FACEBOOK_LOGIN_REDIRECT_URI
+    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/auth/facebook/callback`;
+
+  const state = signOAuthState('link', req.tenant!.id);
+
+  const params = new URLSearchParams({
+    client_id: appId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'email,public_profile',
+    state,
+  });
+
+  res.json({ url: `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?${params}` });
+}));
+
+// POST /api/auth/facebook/unlink — remove a associação da conta do Facebook do Tenant atual.
+router.post('/facebook/unlink', authenticate, authLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  await authService.unlinkFacebookAccount(req.tenant!.id);
+  res.json({ message: 'Conta do Facebook desassociada' });
 }));
 
 export default router;

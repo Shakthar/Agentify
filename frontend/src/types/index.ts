@@ -10,6 +10,7 @@ export interface Tenant {
   isAdmin?: boolean;
   isAgency?: boolean;
   agencyId?: string;
+  facebookId?: string | null;
   // Profile / billing
   phone?: string;
   vatNumber?: string;

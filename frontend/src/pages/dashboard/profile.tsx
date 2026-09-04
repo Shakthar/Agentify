@@ -94,6 +94,10 @@ export default function ProfilePage() {
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaMsg, setTwoFaMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Facebook (associar conta)
+  const [fbMsg, setFbMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [fbLoading, setFbLoading] = useState(false);
+
   // Subscription / invoices
   interface PlatformInvoice {
     id: string; plan: string; amount: number; method: string; status: string;
@@ -138,6 +142,21 @@ export default function ProfilePage() {
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
+
+  // Regresso do fluxo "Associar conta do Facebook" (ver GET /api/auth/facebook/callback):
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { fbLink, fbLinkError } = router.query as { fbLink?: string; fbLinkError?: string };
+    if (fbLink === 'success') {
+      setFbMsg({ type: 'ok', text: 'Conta do Facebook associada com sucesso!' });
+      loadMe();
+      router.replace(router.pathname, undefined, { shallow: true });
+    } else if (fbLinkError) {
+      setFbMsg({ type: 'err', text: fbLinkError });
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
 
   if (!tenant) return null;
 
@@ -226,6 +245,31 @@ export default function ProfilePage() {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao confirmar';
       setConfirmMsg({ type: 'err', text: msg });
     } finally { setConfirmingId(null); }
+  };
+
+  // ─── Facebook (associar/desassociar conta) ─────────────────────────────────
+  const handleLinkFacebook = async () => {
+    setFbLoading(true); setFbMsg(null);
+    try {
+      const { data } = await api.get('/api/auth/facebook/link');
+      window.location.href = data.url;
+    } catch {
+      setFbMsg({ type: 'err', text: 'Não foi possível iniciar a associação com o Facebook.' });
+      setFbLoading(false);
+    }
+  };
+
+  const handleUnlinkFacebook = async () => {
+    setFbLoading(true); setFbMsg(null);
+    try {
+      await api.post('/api/auth/facebook/unlink');
+      await loadMe();
+      setFbMsg({ type: 'ok', text: 'Conta do Facebook desassociada.' });
+    } catch {
+      setFbMsg({ type: 'err', text: 'Erro ao desassociar a conta do Facebook.' });
+    } finally {
+      setFbLoading(false);
+    }
   };
 
   return (
@@ -330,6 +374,40 @@ export default function ProfilePage() {
             )}
             <button type="submit" className="btn-primary" disabled={pwSaving}>{pwSaving ? 'A alterar...' : '🔒 Alterar palavra-passe'}</button>
           </form>
+
+          {/* ─── Facebook ─────────────────────────────────────────────── */}
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">📘 Conta do Facebook</h2>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tenant.facebookId ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                {tenant.facebookId ? 'Associada' : 'Não associada'}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Associa a tua conta do Facebook para entrares mais rápido — útil sobretudo se o email do Facebook for diferente do email desta conta ({tenant.email}).
+            </p>
+            {fbMsg && (
+              <p className={`text-sm px-3 py-2 rounded-lg ${fbMsg.type === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                {fbMsg.text}
+              </p>
+            )}
+            {tenant.facebookId ? (
+              <button type="button" onClick={handleUnlinkFacebook} disabled={fbLoading} className="btn-secondary text-sm">
+                {fbLoading ? 'A desassociar...' : 'Desassociar conta do Facebook'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLinkFacebook}
+                disabled={fbLoading}
+                className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm text-white transition-colors"
+                style={{ background: fbLoading ? '#888' : '#1877F2' }}
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                {fbLoading ? 'A associar...' : 'Associar conta do Facebook'}
+              </button>
+            )}
+          </div>
 
           {/* ─── APARÊNCIA ────────────────────────────────────────────── */}
           <ThemeCard />
