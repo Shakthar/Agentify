@@ -107,7 +107,7 @@ const FAQS = [
   },
   {
     q: 'Posso acumular créditos não usados?',
-    a: 'Sim, com o addon Rollover. Pagas 85% do valor dos créditos não usados para os transferir para o mês seguinte (validade de 2 meses). Créditos do plano Free não são renováveis.',
+    a: '🔜 Em breve: o addon Rollover vai permitir pagar 85% do valor dos créditos não usados para os transferir para o mês seguinte (validade de 2 meses). Por agora, os créditos não usados não transitam de mês — créditos do plano Free também não são renováveis.',
   },
   {
     q: '1 agente = 1 WhatsApp?',
@@ -120,6 +120,18 @@ const FAQS = [
   {
     q: 'Quanto tempo demora a criar um agente?',
     a: 'Com o assistente de criação IA, menos de 10 minutos. O assistente recolhe informações sobre o teu negócio, gera o system prompt e sugere as skills adequadas. Podes sempre ajustar depois.',
+  },
+  {
+    q: 'Posso entrar com o Facebook em vez de criar password?',
+    a: 'Sim. No ecrã de login/registo tens o botão "Continuar com Facebook" — cria conta ou entra automaticamente com o teu perfil do Facebook. Se já tiveres conta com email/password, também podes associar a tua conta do Facebook depois, na aba de Perfil (útil se o email do Facebook for diferente do email da tua conta).',
+  },
+  {
+    q: 'Como ligo o meu WhatsApp Business ao agente?',
+    a: 'Dentro do agente, na aba WhatsApp, clica em "Continuar com Facebook / Meta" — autentica com a tua conta Meta e o agente fica ligado ao teu número WhatsApp Business automaticamente, sem precisares de copiar tokens. Só falta confirmar o Phone Number ID e, se for pedido, introduzir o PIN de 6 dígitos para ativar o número. Também existe uma opção de configuração manual para quem prefere gerir o token diretamente na Meta for Developers.',
+  },
+  {
+    q: 'Como ligo a minha conta do Instagram ao agente?',
+    a: 'Dentro do agente, na aba Instagram, clica em "Continuar com Facebook" — abre-se um popup de autenticação e, depois de aceitares, o agente fica ligado à tua conta Instagram Business automaticamente, sem copiar tokens. É preciso que a conta Instagram seja do tipo Business/Criador e esteja ligada a uma Página do Facebook. Também há uma opção manual, para quem prefere configurar via Meta for Developers.',
   },
 ];
 

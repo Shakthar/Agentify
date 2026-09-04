@@ -17,8 +17,16 @@ const FAQ: Array<{ keywords: string[]; answer: string }> = [
     answer: `Temos 4 planos:\n\n🆓 **Free** — €0 (1.000 créditos únicos, 1 agente)\n🔵 **Starter** — €59/mês (5.000 créditos, 1 agente)\n🟠 **Business** — €159/mês (15.000 créditos, 3 agentes)\n🟢 **Enterprise** — €399/mês (40.000 créditos, 10 agentes)\n\nTodos os planos incluem WhatsApp + Chat Web.`,
   },
   {
-    keywords: ['whatsapp', 'número', 'numero', 'ligar', 'conectar'],
-    answer: `Sim, podes conectar o teu número de WhatsApp existente via Evolution API. O processo demora apenas alguns minutos.\n\n1 agente = 1 número WhatsApp. No entanto, um agente pode estar integrado com múltiplas plataformas (site, Shopify, etc.) em simultâneo.`,
+    keywords: ['ligar whatsapp', 'conectar whatsapp', 'configurar whatsapp', 'ativar whatsapp', 'número de whatsapp', 'numero de whatsapp'],
+    answer: `Dentro do agente, na aba **WhatsApp**, clica em "Continuar com Facebook / Meta":\n\n1. Autentica com a tua conta Meta\n2. O agente fica ligado ao teu número WhatsApp Business automaticamente (sem copiar tokens)\n3. Confirma o Phone Number ID e introduz o PIN de 6 dígitos, se for pedido\n\nTambém há uma opção de configuração manual (Meta for Developers → produto WhatsApp), para quem prefere gerir o token diretamente.\n\n1 agente = 1 número WhatsApp, mas um agente pode estar ligado a múltiplas plataformas (site, Shopify, etc.) em simultâneo.`,
+  },
+  {
+    keywords: ['ligar instagram', 'conectar instagram', 'configurar instagram', 'ativar instagram', 'conta de instagram', 'conta do instagram'],
+    answer: `Dentro do agente, na aba **Instagram**, clica em "Continuar com Facebook":\n\n1. Abre-se um popup de autenticação com o Facebook\n2. Depois de aceitares, o agente fica ligado à tua conta Instagram Business automaticamente (sem copiar tokens)\n\nA conta do Instagram precisa de ser do tipo Business/Criador e estar ligada a uma Página do Facebook. Também há uma opção manual (Meta for Developers), para quem prefere.`,
+  },
+  {
+    keywords: ['entrar com facebook', 'login com facebook', 'login pelo facebook', 'criar conta com facebook', 'registar com facebook', 'associar facebook', 'associar conta do facebook', 'associar a conta do facebook'],
+    answer: `Sim! No ecrã de login/registo tens o botão "Continuar com Facebook" — cria conta ou entra automaticamente com o teu perfil do Facebook.\n\nJá tens conta com email/password? Também podes associar a tua conta do Facebook depois, na aba de **Perfil** — útil se o email do Facebook for diferente do email da tua conta Agentify.`,
   },
   {
     keywords: ['código', 'codigo', 'programar', 'técnico', 'tecnico', 'it', 'desenvolv'],
@@ -26,7 +34,7 @@ const FAQ: Array<{ keywords: string[]; answer: string }> = [
   },
   {
     keywords: ['rollover', 'acumular', 'sobrar', 'transferir', 'guardar'],
-    answer: `Sim! Com o addon **Rollover** podes transferir créditos não usados para o mês seguinte.\n\n• Pagas 85% do valor dos créditos restantes (15% de desconto)\n• Os créditos rollover são válidos 2 meses\n• Disponível 1 vez por mês\n• Não disponível no plano Free`,
+    answer: `🔜 Ainda não, mas está a caminho! O addon **Rollover** vai permitir transferir créditos não usados para o mês seguinte:\n\n• Pagarás 85% do valor dos créditos restantes (15% de desconto)\n• Créditos rollover válidos 2 meses\n• Disponível 1 vez por mês\n• Não disponível no plano Free\n\nPor agora, os créditos não usados não transitam de mês.`,
   },
   {
     keywords: ['agente', 'agentes', 'adicionar', 'extra', 'mais agente'],

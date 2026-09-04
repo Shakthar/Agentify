@@ -166,7 +166,7 @@ const INFRA_FEATURES: FeatureRow[] = [
   { label: 'Chat Web',               icon: '🌐', values: [true, true, true, true] },
   { label: 'Modelos IA',             icon: '⚡', values: ['Haiku / GPT-mini', '+ Sonnet', '+ GPT-4o + Gemini', '+ Claude Opus'], note: 'Auto-routing escolhe o modelo mais barato para cada tipo de mensagem' },
   { label: 'Base de conhecimento',   icon: '📚', values: [true, true, true, true], note: 'PDF, Word, Excel, PPT, YouTube, Páginas web' },
-  { label: 'Rollover de créditos',   icon: '🔄', values: ['—', '➕ Addon', '➕ Addon', '➕ Addon'], note: 'Paga 85% dos créditos não usados para os transferir para o mês seguinte. Válido 2 meses.' },
+  { label: 'Rollover de créditos',   icon: '🔄', values: ['—', '🔜 Em breve', '🔜 Em breve', '🔜 Em breve'], note: 'Em breve: paga 85% dos créditos não usados para os transferir para o mês seguinte (válido 2 meses).' },
   { label: 'Créditos extra (demand)', icon: '⚡', values: ['—', '€0.0118/crd', '€0.0106/crd', '€0.01/crd'] },
   { label: 'Agentes extras (addon)', icon: '➕', values: ['—', '+€20/ag/mês ²', '+€15/ag/mês ²', '+€10/ag/mês'] },
   { label: 'White-label',            icon: '🎨', values: ['—', '+€5/ag/mês ➕', '+€3/ag/mês ➕', 'Incluído'] },
