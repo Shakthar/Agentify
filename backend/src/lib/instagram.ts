@@ -13,7 +13,15 @@ const IG_GRAPH = 'https://graph.facebook.com';
 // graph.facebook.com aqui, que é o host correto para o tipo de token que este app usa.
 
 function igVersion(): string {
-  return process.env.INSTAGRAM_API_VERSION ?? process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+  // NOTA (04/09): esta função tinha 'v20.0' como último fallback, muito mais antiga do
+  // que o resto do código (whatsapp.ts e webhooks.ts usam 'v26.0'). Se INSTAGRAM_API_VERSION
+  // e WHATSAPP_API_VERSION não estiverem definidos no Railway, todas as chamadas do
+  // Instagram (incluindo subscribed_apps) caíam para v20.0 — uma versão da API anterior à
+  // unificação do tópico "instagram" (mensagens+comentários), o que explica plausivelmente o
+  // "(#3) Application does not have the capability to make this API call.": nessa versão
+  // antiga a app pode não ter mesmo essa capacidade para este tipo de nó. Alinhado agora
+  // com o resto do código.
+  return process.env.INSTAGRAM_API_VERSION ?? process.env.WHATSAPP_API_VERSION ?? 'v26.0';
 }
 
 // ─── DMs ─────────────────────────────────────────────────────────────────────
