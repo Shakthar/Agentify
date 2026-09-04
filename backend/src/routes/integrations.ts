@@ -167,7 +167,7 @@ async function encryptTokenForTenant(tenantId: string, token: string): Promise<s
  *   4. Reserva final: granular_scopes de pages_show_list → busca instagram_business_account
  *      dessa Página diretamente (contorna o /me/accounts, que pode devolver vazio).
  */
-async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<{ id: string; name: string } | undefined> {
+async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<{ id: string; name: string; pageId?: string } | undefined> {
   // 1. Páginas concedidas → instagram_business_account (mecanismo principal)
   const pagesResp = await fetch(`${FB_GRAPH}/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`);
   const pagesData = await pagesResp.json() as { data?: Array<{ id: string; name?: string; instagram_business_account?: { id: string } }>; error?: unknown };
@@ -179,7 +179,8 @@ async function findGrantedInstagramAccountId(accessToken: string, appId: string,
       const igResp = await fetch(`${FB_GRAPH}/v21.0/${igId}?fields=username&access_token=${accessToken}`);
       const igData = await igResp.json() as { username?: string; error?: unknown };
       console.log(`[Instagram Connect] ig account ${igId} status=${igResp.status}:`, JSON.stringify(igData).slice(0, 300));
-      return { id: igId, name: igData.username ?? page.name ?? '' };
+      // page.id aqui é o Facebook Page ID — necessário para enviar DMs (POST /{PAGE-ID}/messages).
+      return { id: igId, name: igData.username ?? page.name ?? '', pageId: page.id };
     }
   }
 
@@ -230,7 +231,7 @@ async function findGrantedInstagramAccountId(accessToken: string, appId: string,
         const igId = pageData.instagram_business_account.id;
         const igResp = await fetch(`${FB_GRAPH}/v21.0/${igId}?fields=username&access_token=${accessToken}`);
         const igData = await igResp.json() as { username?: string };
-        return { id: igId, name: igData.username ?? pageData.name ?? '' };
+        return { id: igId, name: igData.username ?? pageData.name ?? '', pageId };
       }
     }
   }
@@ -292,7 +293,7 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
     });
     return;
   }
-  const { id: igAccountId, name: igName } = granted;
+  const { id: igAccountId, name: igName, pageId: igPageId } = granted;
 
   // Troca por long-lived token (60 dias) — endpoint do Facebook, como a troca do code
   // (graph.instagram.com rejeita este token por completo, ver nota acima de FB_GRAPH).
@@ -312,9 +313,18 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
 
   const encryptedToken = await encryptTokenForTenant(req.tenant!.id, longToken);
 
+  if (!igPageId) {
+    console.warn(`[Instagram] Facebook Page ID não foi descoberto automaticamente para agentId=${agentId} — envio de DMs não vai funcionar até seres preenchido manualmente no dashboard.`);
+  }
+
   await (prisma.agent as any).update({
     where: { id: agentId, tenantId: req.tenant!.id },
-    data: { instagramToken: encryptedToken, instagramAccountId: igAccountId, instagramEnabled: true },
+    data: {
+      instagramToken: encryptedToken,
+      instagramAccountId: igAccountId,
+      ...(igPageId ? { instagramPageId: igPageId } : {}),
+      instagramEnabled: true,
+    },
   });
 
   console.log(`[Instagram] Conta ligada: igAccountId=${igAccountId} name=${igName} agentId=${agentId}`);
@@ -411,6 +421,10 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     const granted = await findGrantedInstagramAccountId(longToken, appId, appSecret);
     const igAccountId = granted?.id ?? '';
     const igName = granted?.name ?? '';
+    const igPageId = granted?.pageId;
+    if (igAccountId && !igPageId) {
+      console.warn(`[Facebook OAuth] Facebook Page ID não foi descoberto automaticamente para agentId=${agentId} — envio de DMs não vai funcionar até seres preenchido manualmente no dashboard.`);
+    }
 
     // 4. Guarda no agente (token long-lived do utilizador, ID da conta Instagram)
     const encryptedToken = await encryptTokenForTenant(tenantId, longToken);
@@ -419,6 +433,7 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
       data: {
         instagramToken: encryptedToken,
         instagramAccountId: igAccountId || undefined,
+        ...(igPageId ? { instagramPageId: igPageId } : {}),
         instagramEnabled: !!igAccountId,
       },
     });
