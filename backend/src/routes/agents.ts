@@ -9,6 +9,13 @@ import * as agentsService from '../services/agents.service.js';
 const router = Router();
 router.use(authenticate);
 
+const channelScheduleSchema = z.object({
+  enabled: z.boolean(),
+  timezone: z.string(),
+  weekdays: z.object({ start: z.string(), end: z.string() }).nullable(),
+  weekends: z.object({ start: z.string(), end: z.string() }).nullable(),
+}).nullable();
+
 const createAgentSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
@@ -26,6 +33,8 @@ const createAgentSchema = z.object({
   whatsappEnabled: z.boolean().optional().default(false),
   whatsappNumber: z.string().max(40).optional(),
   whatsappToken: z.string().min(20).max(500).optional(),
+  notifyPhone: z.string().max(40).optional(),
+  whatsappSchedule: channelScheduleSchema.optional(),
   webChatEnabled: z.boolean().optional().default(true),
   whitelabelEnabled: z.boolean().optional(),
   emailEnabled: z.boolean().optional().default(false),
@@ -57,8 +66,12 @@ const createAgentSchema = z.object({
   instagramAccountId:  z.string().optional(),
   instagramPageId:     z.string().optional(),
   instagramToken:      z.string().min(20).max(500).optional(),
+  instagramSchedule:   channelScheduleSchema.optional(),
+  instagramOffHoursMessage: z.string().max(500).optional(),
   telegramEnabled:     z.boolean().optional(),
   telegramBotToken:    z.string().min(20).max(200).optional(),
+  telegramSchedule:    channelScheduleSchema.optional(),
+  telegramOffHoursMessage: z.string().max(500).optional(),
   calendarEnabled:     z.boolean().optional(),
   calendarId:          z.string().optional(),
 });

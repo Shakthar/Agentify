@@ -133,6 +133,10 @@ const FAQS = [
     q: 'Como ligo a minha conta do Instagram ao agente?',
     a: 'Dentro do agente, na aba Instagram, clica em "Continuar com Facebook" — abre-se um popup de autenticação e, depois de aceitares, o agente fica ligado à tua conta Instagram Business automaticamente, sem copiar tokens. É preciso que a conta Instagram seja do tipo Business/Criador e esteja ligada a uma Página do Facebook. Também há uma opção manual, para quem prefere configurar via Meta for Developers.',
   },
+  {
+    q: 'Posso definir um horário em que o agente não trabalha?',
+    a: 'Sim. Na aba de cada canal (WhatsApp, Instagram e Telegram) existe um bloco "Horário de funcionamento" onde defines dias de semana e fins de semana com janelas diferentes (ex: só ativo das 9h às 18h) e, opcionalmente, uma mensagem automática para quando alguém escrever fora desse horário (ex: "Estamos fechados, respondemos às 9h 🙏"). Fora da janela definida, o agente não responde normalmente — fica em silêncio ou envia essa mensagem, consoante configures.',
+  },
 ];
 
 export default function Home() {

@@ -73,6 +73,7 @@ export interface Agent {
   telegramEnabled: boolean;
   telegramUsername?: string;
   telegramBotTokenConfigured?: boolean;
+  telegramOffHoursMessage?: string;
   calendarEnabled: boolean;
   calendarId?: string;
   totalConversations: number;

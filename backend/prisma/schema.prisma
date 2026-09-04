@@ -134,9 +134,15 @@ model Agent {
   skillTicketing        String?
   
   // Settings
+  // offHoursMessage é a mensagem fora de horário do WhatsApp especificamente —
+  // Instagram e Telegram têm os seus próprios campos abaixo (cada canal tinha o
+  // seu próprio schedule Json, mas partilhavam por engano este mesmo campo de
+  // mensagem, o que fazia um canal sobrescrever a mensagem do outro ao guardar).
   offHoursMessage       String?
   offHourStart          String?
   offHourEnd            String?
+  instagramOffHoursMessage String?
+  telegramOffHoursMessage  String?
   
   // Analytics
   totalConversations    Int        @default(0)
@@ -192,6 +198,7 @@ model Agent {
   // Se start > end (ex: "18:00"-"08:59") a janela cruza meia-noite
   whatsappSchedule      Json?
   instagramSchedule     Json?
+  telegramSchedule      Json?
 
   // Google Calendar
   calendarEnabled       Boolean    @default(false)

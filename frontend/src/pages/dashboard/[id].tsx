@@ -100,6 +100,16 @@ export default function AgentDetailPage() {
   const [tgBotTokenConfigured, setTgBotTokenConfigured] = useState(false);
   const [tgSaving, setTgSaving] = useState(false);
   const [tgMsg, setTgMsg] = useState('');
+  // Telegram schedule state
+  const [tgSchedEnabled, setTgSchedEnabled] = useState(false);
+  const [tgSchedTz, setTgSchedTz] = useState('Europe/Lisbon');
+  const [tgSchedWdStart, setTgSchedWdStart] = useState('18:00');
+  const [tgSchedWdEnd, setTgSchedWdEnd] = useState('08:59');
+  const [tgSchedWdEnabled, setTgSchedWdEnabled] = useState(true);
+  const [tgSchedWeEnabled, setTgSchedWeEnabled] = useState(false);
+  const [tgSchedWeStart, setTgSchedWeStart] = useState('00:00');
+  const [tgSchedWeEnd, setTgSchedWeEnd] = useState('23:59');
+  const [tgOffMsg, setTgOffMsg] = useState('');
   // Leads / briefing state
   const [briefingHistory, setBriefingHistory] = useState<Array<{role: 'user' | 'assistant'; content: string}>>([]);
   const [briefingInput, setBriefingInput] = useState('');
@@ -157,6 +167,16 @@ export default function AgentDetailPage() {
       setTgUsername((data as any).telegramUsername ?? '');
       setTgBotTokenConfigured((data as any).telegramBotTokenConfigured ?? false);
       // bot token is write-only — never returned from API, leave blank
+      const tgs = (data as any).telegramSchedule as { enabled?: boolean; timezone?: string; weekdays?: { start: string; end: string } | null; weekends?: { start: string; end: string } | null } | null;
+      if (tgs) {
+        setTgSchedEnabled(tgs.enabled ?? false);
+        setTgSchedTz(tgs.timezone ?? 'Europe/Lisbon');
+        setTgSchedWdEnabled(tgs.weekdays !== null && tgs.weekdays !== undefined);
+        if (tgs.weekdays) { setTgSchedWdStart(tgs.weekdays.start); setTgSchedWdEnd(tgs.weekdays.end); }
+        setTgSchedWeEnabled(tgs.weekends !== null && tgs.weekends !== undefined);
+        if (tgs.weekends) { setTgSchedWeStart(tgs.weekends.start); setTgSchedWeEnd(tgs.weekends.end); }
+      }
+      setTgOffMsg((data as any).telegramOffHoursMessage ?? '');
     }).catch(() => router.replace(ROUTES.agents)).finally(() => setLoading(false));
     api.get('/api/webhooks/whatsapp/status').then(({ data }) => setWpTokenOk(data.configured)).catch(() => {});
   }, [tenant, id]);
@@ -421,7 +441,7 @@ export default function AgentDetailPage() {
         instagramPageId: igPageId || undefined,
         instagramEnabled: igEnabled,
         notifyPhone: notifyPhone || undefined,
-        offHoursMessage: igOffMsg || undefined,
+        instagramOffHoursMessage: igOffMsg || undefined,
         instagramSchedule: buildSchedulePayload(igSchedEnabled, igSchedTz, igSchedWdEnabled, igSchedWdStart, igSchedWdEnd, igSchedWeEnabled, igSchedWeStart, igSchedWeEnd),
       };
       if (igToken.trim()) payload.instagramToken = igToken.trim();
@@ -443,6 +463,8 @@ export default function AgentDetailPage() {
     try {
       const payload: Record<string, unknown> = {
         telegramEnabled: tgEnabled,
+        telegramOffHoursMessage: tgOffMsg || undefined,
+        telegramSchedule: buildSchedulePayload(tgSchedEnabled, tgSchedTz, tgSchedWdEnabled, tgSchedWdStart, tgSchedWdEnd, tgSchedWeEnabled, tgSchedWeStart, tgSchedWeEnd),
       };
       if (tgBotToken.trim()) payload.telegramBotToken = tgBotToken.trim();
       const updated = await updateAgent(agent.id, payload);
@@ -1897,6 +1919,63 @@ export default function AgentDetailPage() {
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {tgEnabled ? 'Ativo' : 'Inativo'}
                     </span>
+                  </div>
+                  {/* ── Horário de funcionamento ── */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">🕐 Horário de funcionamento</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Restringir o agente a determinados horários</p>
+                      </div>
+                      <button type="button" role="switch" aria-checked={tgSchedEnabled} onClick={() => setTgSchedEnabled(v => !v)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${tgSchedEnabled ? 'bg-sky-500' : 'bg-gray-300'}`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tgSchedEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    {tgSchedEnabled && (<>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Fuso horário</label>
+                        <select className="input text-sm" value={tgSchedTz} onChange={e => setTgSchedTz(e.target.value)}>
+                          <option value="Europe/Lisbon">Europe/Lisbon (Portugal)</option>
+                          <option value="America/Sao_Paulo">America/Sao_Paulo (Brasil)</option>
+                          <option value="America/Argentina/Buenos_Aires">America/Buenos_Aires</option>
+                          <option value="America/Santiago">America/Santiago (Chile)</option>
+                          <option value="UTC">UTC</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="tgWdEnabled" checked={tgSchedWdEnabled} onChange={e => setTgSchedWdEnabled(e.target.checked)} className="rounded" />
+                          <label htmlFor="tgWdEnabled" className="text-xs text-gray-600 dark:text-gray-400 font-medium">Dias de semana (Seg–Sex)</label>
+                        </div>
+                        {tgSchedWdEnabled && (
+                          <div className="flex items-center gap-2 ml-5">
+                            <input type="time" className="input text-sm w-28" value={tgSchedWdStart} onChange={e => setTgSchedWdStart(e.target.value)} />
+                            <span className="text-xs text-gray-400">até</span>
+                            <input type="time" className="input text-sm w-28" value={tgSchedWdEnd} onChange={e => setTgSchedWdEnd(e.target.value)} />
+                            {tgSchedWdStart > tgSchedWdEnd && <span className="text-xs text-blue-500">↻ cruza meia-noite</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" id="tgWeEnabled" checked={tgSchedWeEnabled} onChange={e => setTgSchedWeEnabled(e.target.checked)} className="rounded" />
+                          <label htmlFor="tgWeEnabled" className="text-xs text-gray-600 dark:text-gray-400 font-medium">Fins de semana (Sáb–Dom)</label>
+                        </div>
+                        {tgSchedWeEnabled && (
+                          <div className="flex items-center gap-2 ml-5">
+                            <input type="time" className="input text-sm w-28" value={tgSchedWeStart} onChange={e => setTgSchedWeStart(e.target.value)} />
+                            <span className="text-xs text-gray-400">até</span>
+                            <input type="time" className="input text-sm w-28" value={tgSchedWeEnd} onChange={e => setTgSchedWeEnd(e.target.value)} />
+                            {tgSchedWeStart > tgSchedWeEnd && <span className="text-xs text-blue-500">↻ cruza meia-noite</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Mensagem fora de horário <span className="text-gray-400">(opcional — deixa vazio para ignorar silenciosamente)</span></label>
+                        <input className="input text-sm" placeholder="Ex: Estamos fechados. Respondemos às 9h. 🙏" value={tgOffMsg} onChange={e => setTgOffMsg(e.target.value)} />
+                      </div>
+                    </>)}
                   </div>
                   {tgMsg && (
                     <p className={`text-xs mt-1 ${tgMsg.startsWith('❌') ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{tgMsg}</p>

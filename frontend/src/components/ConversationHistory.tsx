@@ -56,6 +56,13 @@ function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
 }
 
+function channelTag(channelType: string): string {
+  if (channelType === 'whatsapp') return '[WA] ';
+  if (channelType === 'instagram') return '[IG] ';
+  if (channelType === 'telegram') return '[TG] ';
+  return '[Web] ';
+}
+
 export default function ConversationHistory({ agentId }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [total, setTotal] = useState(0);
@@ -63,7 +70,7 @@ export default function ConversationHistory({ agentId }: Props) {
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState<ConversationWithMessages | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'web' | 'handoff'>('all');
+  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'instagram' | 'telegram' | 'web' | 'handoff'>('all');
   const [returningHandoff, setReturningHandoff] = useState(false);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -151,18 +158,18 @@ export default function ConversationHistory({ agentId }: Props) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-2.5 py-1.5 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-600"
           />
-          <div className="flex gap-1 mt-2">
-            {(['whatsapp', 'web', 'handoff', 'all'] as const).map((f) => (
+          <div className="flex gap-1 mt-2 flex-wrap">
+            {(['whatsapp', 'instagram', 'telegram', 'web', 'handoff', 'all'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); loadConversations(0, true); }}
-                className={`flex-1 text-[10px] py-1 rounded font-medium transition-colors ${
+                className={`flex-1 min-w-[2.5rem] text-[10px] py-1 rounded font-medium transition-colors ${
                   filter === f
                     ? f === 'handoff' ? 'bg-orange-500 text-white' : 'bg-brand-600 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                {f === 'whatsapp' ? 'WA' : f === 'web' ? 'Web' : f === 'handoff' ? '🤝' : 'Todas'}
+                {f === 'whatsapp' ? 'WA' : f === 'instagram' ? 'IG' : f === 'telegram' ? 'TG' : f === 'web' ? 'Web' : f === 'handoff' ? '🤝' : 'Todas'}
               </button>
             ))}
           </div>
@@ -181,7 +188,7 @@ export default function ConversationHistory({ agentId }: Props) {
             <div className="p-4 text-center text-xs text-gray-400">A carregar...</div>
           ) : displayed.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-400">
-              {filter === 'whatsapp' ? 'Sem conversas WhatsApp.' : filter === 'web' ? 'Sem conversas Web.' : 'Sem conversas ainda.'}
+              {filter === 'whatsapp' ? 'Sem conversas WhatsApp.' : filter === 'instagram' ? 'Sem conversas Instagram.' : filter === 'telegram' ? 'Sem conversas Telegram.' : filter === 'web' ? 'Sem conversas Web.' : 'Sem conversas ainda.'}
             </div>
           ) : (
             displayed.map((conv) => (
@@ -194,7 +201,7 @@ export default function ConversationHistory({ agentId }: Props) {
               >
                 <div className="flex items-center justify-between gap-1 mb-0.5">
                   <span className="font-medium text-xs text-gray-900 dark:text-gray-100 truncate">
-                    {conv.channelType === 'whatsapp' ? '[WA] ' : '[Web] '}
+                    {channelTag(conv.channelType)}
                     {conv.visitorId ?? 'Anonimo'}
                   </span>
                   <span className="text-[10px] text-gray-400 shrink-0">{formatDate(conv.createdAt)}</span>
@@ -239,7 +246,7 @@ export default function ConversationHistory({ agentId }: Props) {
             <div className="px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div>
                 <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                  {selected.channelType === 'whatsapp' ? '[WA] ' : '[Web] '}
+                  {channelTag(selected.channelType)}
                   {selected.visitorId ?? 'Anonimo'}
                 </p>
                 <p className="text-[10px] text-gray-400">

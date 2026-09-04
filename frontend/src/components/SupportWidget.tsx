@@ -25,6 +25,10 @@ const FAQ: Array<{ keywords: string[]; answer: string }> = [
     answer: `Dentro do agente, na aba **Instagram**, clica em "Continuar com Facebook":\n\n1. Abre-se um popup de autenticação com o Facebook\n2. Depois de aceitares, o agente fica ligado à tua conta Instagram Business automaticamente (sem copiar tokens)\n\nA conta do Instagram precisa de ser do tipo Business/Criador e estar ligada a uma Página do Facebook. Também há uma opção manual (Meta for Developers), para quem prefere.`,
   },
   {
+    keywords: ['horário', 'horario', 'fora de horário', 'fora de horario', 'expediente', 'horário de funcionamento', 'horario de funcionamento', 'não trabalhar', 'nao trabalhar', 'pausar agente', 'agente não responder', 'agente nao responder'],
+    answer: `Sim! Em cada canal (**WhatsApp**, **Instagram** e **Telegram**) tens um bloco "🕐 Horário de funcionamento" na respetiva aba do agente:\n\n1. Ativa o horário e escolhe o fuso horário\n2. Define uma janela para dias de semana e/ou fins de semana (ex: 09:00–18:00)\n3. Opcionalmente, escreve uma mensagem automática para quando alguém escrever fora desse horário\n\nFora da janela definida, o agente não responde normalmente — só envia a mensagem automática, se a tiveres configurado.`,
+  },
+  {
     keywords: ['entrar com facebook', 'login com facebook', 'login pelo facebook', 'criar conta com facebook', 'registar com facebook', 'associar facebook', 'associar conta do facebook', 'associar a conta do facebook'],
     answer: `Sim! No ecrã de login/registo tens o botão "Continuar com Facebook" — cria conta ou entra automaticamente com o teu perfil do Facebook.\n\nJá tens conta com email/password? Também podes associar a tua conta do Facebook depois, na aba de **Perfil** — útil se o email do Facebook for diferente do email da tua conta Agentify.`,
   },

@@ -8,6 +8,13 @@ import { subscribeInstagramAccount } from '../lib/instagram.js';
 import crypto from 'crypto';
 import { getTelegramBotInfo, setTelegramWebhook, deleteTelegramWebhook } from '../lib/telegram.js';
 
+interface ChannelSchedule {
+  enabled: boolean;
+  timezone: string;
+  weekdays: { start: string; end: string } | null;
+  weekends: { start: string; end: string } | null;
+}
+
 interface AgentSkills {
   handoff?: boolean;
   dataCollection?: boolean;
@@ -28,6 +35,8 @@ interface CreateAgentInput {
   whatsappEnabled?: boolean;
   whatsappNumber?: string;
   whatsappToken?: string;
+  notifyPhone?: string;
+  whatsappSchedule?: ChannelSchedule | null;
   webChatEnabled?: boolean;
   whitelabelEnabled?: boolean;
   emailEnabled?: boolean;
@@ -66,9 +75,13 @@ interface CreateAgentInput {
   instagramAccountId?: string;
   instagramPageId?: string;
   instagramToken?: string;
+  instagramSchedule?: ChannelSchedule | null;
+  instagramOffHoursMessage?: string;
   // Telegram
   telegramEnabled?: boolean;
   telegramBotToken?: string;
+  telegramSchedule?: ChannelSchedule | null;
+  telegramOffHoursMessage?: string;
   // Calendar
   calendarEnabled?: boolean;
   calendarId?: string;

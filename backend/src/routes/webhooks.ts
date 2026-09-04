@@ -258,7 +258,10 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
           console.log(`[WhatsApp] Fora de horário — ignorando mensagem de ${from}`);
           const offMsg = (agent as any).offHoursMessage as string | undefined;
           if (offMsg && effectiveToken) {
-            await sendWhatsAppText(from, offMsg, phoneId, effectiveToken);
+            // NOTA: a assinatura é (phoneNumberId, to, text, token) — estava trocada
+            // (from/offMsg/phoneId em vez de phoneId/from/offMsg), o que enviava o
+            // texto errado para o endpoint errado. Corrigido.
+            await sendWhatsAppText(phoneId, from, offMsg, effectiveToken);
           }
           continue;
         }
@@ -522,7 +525,8 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
       if (!isWithinSchedule((agent as any).instagramSchedule)) {
         console.log(`[Instagram] Fora de horário — ignorando DM de ${senderId}`);
         // Para DMs podemos enviar mensagem de fora de horário se configurada
-        const offMsg = (agent as any).offHoursMessage as string | undefined;
+        // (campo próprio do Instagram — antes reutilizava por engano o offHoursMessage do WhatsApp)
+        const offMsg = (agent as any).instagramOffHoursMessage as string | undefined;
         if (offMsg) {
           let offToken: string | undefined;
           if (agent.instagramToken && agent.tenant.encryptionKey) {
@@ -704,6 +708,16 @@ router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Reque
   }
 
   console.log(`[Telegram] Mensagem de chat=${chatId} → agente=${agent.name} texto="${message.text.slice(0, 80)}"`);
+
+  // Verificar horário de funcionamento (mesma mecânica do WhatsApp/Instagram)
+  if (!isWithinSchedule((agent as any).telegramSchedule)) {
+    console.log(`[Telegram] Fora de horário — ignorando mensagem de chat=${chatId}`);
+    const offMsg = (agent as any).telegramOffHoursMessage as string | undefined;
+    if (offMsg) {
+      await sendTelegramMessage(chatId, offMsg, botToken);
+    }
+    return;
+  }
 
   // Identificar/criar Customer unificado
   const customer = await identifyCustomer({
