@@ -49,27 +49,37 @@ export async function getPageAccessToken(pageId: string, systemUserToken: string
 }
 
 /**
- * Subscreve a Página do Facebook (ligada à conta profissional do Instagram) para
- * receber webhooks de mensagens e comentários, via
- * POST /{page-id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments.
+ * Subscreve (instala) a Página do Facebook ligada à conta profissional do Instagram
+ * nesta app, via POST /{page-id}/subscribed_apps?subscribed_fields=feed.
  *
- * NOTA (04/09): esta função usava o ID da conta Instagram (Instagram Business
- * Account ID) em vez do Page ID, com base em erros #100/#200 observados numa
- * versão antiga da API (v20.0, antes de definirmos INSTAGRAM_API_VERSION). Isso
- * dava sempre "(#3) Application does not have the capability to make this API
- * call.", em TODAS as combinações de campos testadas, mesmo com o token a ter
- * todas as permissões corretas e a versão certa da API.
+ * NOTA (04/09): esta função usava o ID da conta Instagram (Instagram Business Account
+ * ID) em vez do Page ID, o que dava sempre "(#3) Application does not have the
+ * capability to make this API call.". A doc oficial da Meta
+ * (developers.facebook.com/docs/instagram-platform/webhooks/, tabela "Requirements")
+ * esclarece isto: para "Facebook Login for Business" (o que o Agentify usa), o
+ * endpoint correto é sempre /<PAGE_ID> ou /me — nunca o ID da conta Instagram
+ * diretamente. Corrigido para usar pageId (commit b5a8a36), o que eliminou o erro #3.
  *
- * A doc oficial da Meta (developers.facebook.com/docs/instagram-platform/webhooks/,
- * tabela "Requirements") esclarece isto: para o componente "Facebook Login for
- * Business" (o que o Agentify usa), o endpoint correto é sempre
- * `/<PAGE_ID> ou /me` — nunca o ID da conta Instagram diretamente — mesmo para os
- * campos de mensagens e comentários. O ID da conta Instagram só se usa como
- * endpoint quando o login é feito via "Business Login for Instagram"
- * (graph.instagram.com, tokens IGAA..., uma integração diferente que o Agentify
- * não usa). A mesma tabela confirma: Advanced Access é exigido especificamente
- * para receber notificações de "comments" e "live_comments" (mesmo testando com a
- * própria conta) — "messages"/"messaging_postbacks" não têm essa exigência extra.
+ * NOTA 2 (04/09): depois de corrigir o endpoint, tentámos passar
+ * subscribed_fields=messages,messaging_postbacks,comments — mas "comments" dá sempre
+ * "(#100) ... must be one of {feed, mention, name, ...}" (o enum de campos do tópico
+ * "page", que não inclui "comments"), e "messages"/"messaging_postbacks" dão
+ * "(#200) ... precisa de pages_messaging" (permissão que o Agentify não pede, de
+ * propósito, por ser específica do Messenger).
+ *
+ * Causa raiz: o parâmetro subscribed_fields deste endpoint refere-se aos campos do
+ * tópico "page" (feed, mention, etc.) — a doc "Open Graph Page Subscribed Apps"
+ * confirma: "You cannot use the subscribed_fields parameter to configure or subscribe
+ * to Webhooks for Instagram. You must use your app dashboard to subscribe to Instagram
+ * Webhooks." Ou seja: os campos do Instagram (comments, live_comments, messages,
+ * messaging_postbacks, mentions, etc.) configuram-se a nível de app no Dashboard da
+ * Meta (Casos de uso → API do Instagram → Webhooks), passo que já foi feito
+ * manualmente. Esta chamada a /{page-id}/subscribed_apps serve só para
+ * "instalar"/ligar esta app a esta Página específica (autorizar a Página a entregar
+ * à app os webhooks a que a app já está subscrita a nível global) — por isso só
+ * precisa de UM campo válido do tópico "page", e usamos "feed" (o exemplo oficial da
+ * própria doc da Meta para este passo). Não deve incluir "comments"/"messages"/
+ * "messaging_postbacks" — esses não são campos válidos aqui.
  */
 export async function subscribeInstagramAccount(
   igAccountId: string,
@@ -84,71 +94,16 @@ export async function subscribeInstagramAccount(
   try {
     const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
 
-    // Diagnóstico temporário: imprime a versão da API resolvida e os scopes concedidos
-    // ao pageToken antes de tentar subscribed_apps, para percebermos exatamente o que
-    // está a acontecer quando o erro #3 aparecer de novo. Remover depois de confirmarmos
-    // a causa.
-    console.log(
-      `[Instagram][debug] igVersion()=${igVersion()} INSTAGRAM_API_VERSION=${process.env.INSTAGRAM_API_VERSION ?? '(unset)'} WHATSAPP_API_VERSION=${process.env.WHATSAPP_API_VERSION ?? '(unset)'}`,
-    );
-    try {
-      const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
-      const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
-      if (appId && appSecret) {
-        const appToken = `${appId}|${appSecret}`;
-        const debugResp = await fetch(
-          `${IG_GRAPH}/${igVersion()}/debug_token?input_token=${encodeURIComponent(pageToken)}&access_token=${encodeURIComponent(appToken)}`,
-        );
-        const debugData = await debugResp.json() as {
-          data?: { scopes?: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }>; type?: string; app_id?: string };
-        };
-        // Sem slice() agora: precisamos de ver granular_scopes (com target_ids) na
-        // íntegra, que fica de fora quando cortamos aos 500 caracteres.
-        console.log(`[Instagram][debug_token] pageToken info completa para ${igAccountId} (pageId=${pageId}):`, JSON.stringify(debugData?.data));
-        const granular = debugData?.data?.granular_scopes ?? [];
-        for (const g of granular) {
-          const hasIgId = g.target_ids?.includes(igAccountId) ?? false;
-          const hasPageId = pageId ? (g.target_ids?.includes(pageId) ?? false) : false;
-          console.log(`[Instagram][debug_token] granular scope="${g.scope}" target_ids=${JSON.stringify(g.target_ids)} incluiIgAccountId=${hasIgId} incluiPageId=${hasPageId}`);
-        }
-      }
-    } catch (debugErr) {
-      console.error('[Instagram][debug_token] Falha ao inspecionar pageToken:', debugErr);
-    }
-
-    // Diagnóstico temporário: testa cada campo isoladamente (e a combinação da doc
-    // oficial, sem messaging_postbacks) para isolar exatamente qual campo dispara o
-    // erro #3, antes da chamada real combinada. Cada chamada a subscribed_apps
-    // substitui a lista de campos anterior, por isso o resultado real é o da ÚLTIMA
-    // chamada (a combinada, como já estava) — isto só serve para log.
-    // Diagnóstico temporário: agora a testar contra o PAGE ID (endpoint correto para
-    // Facebook Login for Business, ver nota acima), campo a campo, para confirmar que
-    // o erro #3 desaparece e para vermos separadamente se "comments" continua a exigir
-    // Advanced Access (deve dar um erro diferente, tipo #200, não #3).
-    const diagnosticCombos = ['comments', 'messages', 'messaging_postbacks', 'messages,comments'];
-    for (const combo of diagnosticCombos) {
-      try {
-        const diagResp = await fetch(
-          `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=${combo}&access_token=${encodeURIComponent(pageToken)}`,
-          { method: 'POST' },
-        );
-        const diagData = await diagResp.json() as { success?: boolean; error?: unknown };
-        console.log(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData));
-      } catch (diagErr) {
-        console.error(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> exceção:`, diagErr);
-      }
-    }
-
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
+      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=feed&access_token=${encodeURIComponent(pageToken)}`,
       { method: 'POST' },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
-      console.error(`[Instagram] Falha ao subscrever webhooks da Página ${pageId} (conta Instagram ${igAccountId}):`, JSON.stringify(data));
+      console.error(`[Instagram] Falha ao subscrever/instalar a Página ${pageId} (conta Instagram ${igAccountId}):`, JSON.stringify(data));
       return false;
     }
-    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita para webhooks (messages, comments).`);
+    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita/instalada para webhooks.`);
     return true;
   } catch (err) {
     console.error('[Instagram] Erro ao subscrever webhooks da conta Instagram:', err);
