@@ -111,6 +111,15 @@ router.post('/logout', authenticate, asyncHandler(async (req: AuthenticatedReque
 
 const FB_GRAPH_VERSION = 'v26.0';
 
+// Configuração "Facebook Login for Business" (User access token, sem ativos) criada
+// especificamente para este fluxo de login/registo + associação de conta na aba de
+// Perfil. A Agentfy é uma app do tipo Business, por isso o diálogo OAuth clássico com
+// `scope=email,public_profile` é rejeitado ("precisa de pelo menos uma supported
+// permission") — apps Business têm sempre de usar uma Configuração (`config_id`) em
+// vez de `scope`. `public_profile` vem sempre incluído automaticamente nesta
+// configuração; só é preciso pedir `email` explicitamente ao criá-la no painel.
+const FB_LOGIN_CONFIG_ID = '1802300544308849';
+
 // GET /api/auth/facebook — devolve o URL do diálogo OAuth do Facebook
 router.get('/facebook', authLimiter, asyncHandler(async (_req: Request, res: Response) => {
   const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
@@ -128,7 +137,7 @@ router.get('/facebook', authLimiter, asyncHandler(async (_req: Request, res: Res
     client_id: appId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'email,public_profile',
+    config_id: FB_LOGIN_CONFIG_ID,
     state,
   });
 
@@ -269,7 +278,7 @@ router.get('/facebook/link', authenticate, authLimiter, asyncHandler(async (req:
     client_id: appId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'email,public_profile',
+    config_id: FB_LOGIN_CONFIG_ID,
     state,
   });
 
