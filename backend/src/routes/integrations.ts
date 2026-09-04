@@ -22,7 +22,7 @@ import {
 import prisma from '../lib/prisma.js';
 import { encrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
-import { subscribeInstagramPage, subscribeInstagramComments } from '../lib/instagram.js';
+import { subscribeInstagramAccount } from '../lib/instagram.js';
 
 const router = Router();
 
@@ -331,16 +331,10 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
   // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
   // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
   // configurado no dashboard.
-  if (igPageId) {
-    const subscribed = await subscribeInstagramPage(igPageId, longToken);
-    if (!subscribed) {
-      console.warn(`[Instagram] Não foi possível subscrever a Página ${igPageId} aos webhooks — mensagens podem não chegar.`);
-    }
-  }
   if (igAccountId) {
-    const subscribedComments = await subscribeInstagramComments(igAccountId, longToken);
-    if (!subscribedComments) {
-      console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountId} aos webhooks de comentários.`);
+    const subscribed = await subscribeInstagramAccount(igAccountId, igPageId ?? '', longToken);
+    if (!subscribed) {
+      console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountId} aos webhooks — mensagens/comentários podem não chegar.`);
     }
   }
 
@@ -458,16 +452,10 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
     // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
     // configurado no dashboard.
-    if (igPageId) {
-      const subscribed = await subscribeInstagramPage(igPageId, longToken);
-      if (!subscribed) {
-        console.warn(`[Facebook OAuth] Não foi possível subscrever a Página ${igPageId} aos webhooks — mensagens podem não chegar.`);
-      }
-    }
     if (igAccountId) {
-      const subscribedComments = await subscribeInstagramComments(igAccountId, longToken);
-      if (!subscribedComments) {
-        console.warn(`[Facebook OAuth] Não foi possível subscrever a conta ${igAccountId} aos webhooks de comentários.`);
+      const subscribed = await subscribeInstagramAccount(igAccountId, igPageId ?? '', longToken);
+      if (!subscribed) {
+        console.warn(`[Facebook OAuth] Não foi possível subscrever a conta ${igAccountId} aos webhooks — mensagens/comentários podem não chegar.`);
       }
     }
 

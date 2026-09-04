@@ -4,7 +4,7 @@ import { ForbiddenError, NotFoundError } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
-import { subscribeInstagramPage, subscribeInstagramComments } from '../lib/instagram.js';
+import { subscribeInstagramAccount } from '../lib/instagram.js';
 
 interface AgentSkills {
   handoff?: boolean;
@@ -311,17 +311,10 @@ export async function updateAgent(
         console.error('[Instagram] Falha ao desencriptar token existente para subscrever webhooks:', err);
       }
     }
-    if (rawTokenForSub) {
-      if (pageIdForSub) {
-        subscribeInstagramPage(pageIdForSub, rawTokenForSub).then((ok) => {
-          if (!ok) console.warn(`[Instagram] Não foi possível subscrever a Página ${pageIdForSub} aos webhooks (agentId=${agentId}).`);
-        });
-      }
-      if (igAccountIdForSub) {
-        subscribeInstagramComments(igAccountIdForSub, rawTokenForSub).then((ok) => {
-          if (!ok) console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountIdForSub} aos webhooks de comentários (agentId=${agentId}).`);
-        });
-      }
+    if (rawTokenForSub && igAccountIdForSub) {
+      subscribeInstagramAccount(igAccountIdForSub, pageIdForSub ?? '', rawTokenForSub).then((ok) => {
+        if (!ok) console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountIdForSub} aos webhooks (agentId=${agentId}).`);
+      });
     }
   } else if (instagramToken) {
     console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId/instagramAccountId — não foi possível subscrever webhooks para agentId=${agentId}.`);

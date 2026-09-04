@@ -34,68 +34,45 @@ export async function getPageAccessToken(pageId: string, systemUserToken: string
 }
 
 /**
- * Subscreve a Página do Facebook (ligada à conta do Instagram) para receber
- * eventos de mensagens (DMs) através deste app via POST /{page-id}/subscribed_apps.
+ * Subscreve a conta profissional do Instagram (Instagram Business Account ID)
+ * para receber webhooks de mensagens e comentários, via
+ * POST /{ig-account-id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments.
  *
- * Sem esta chamada, a Meta não entrega webhooks de mensagens para esta Página
- * especificamente, mesmo que o app esteja configurado no dashboard.
- *
- * NOTA: "comments" NÃO é um campo válido neste endpoint (a Graph API rejeita com
- * "(#100) Param subscribed_fields[1] must be one of {...}" — a lista de campos
- * válidos aqui é a do tópico "page", que não inclui "comments"). Comentários do
- * Instagram pertencem ao tópico "instagram" (universo diferente) e têm de ser
- * subscritos à conta do Instagram, não à Página — ver subscribeInstagramComments.
+ * Porquê subscrever pelo ID da conta Instagram e não pelo Facebook Page ID:
+ * - "comments" só é um campo válido no tópico "instagram" da Meta — subscrevê-lo
+ *   via /{page-id}/subscribed_apps é rejeitado com
+ *   "(#100) Param subscribed_fields[1] must be one of {...}" (lista do tópico "page",
+ *   que não inclui "comments").
+ * - "messages"/"messaging_postbacks" via /{page-id}/subscribed_apps exigem a
+ *   permissão pages_messaging (Messenger), que este app não tem — dá
+ *   "(#200) ... permission pages_messaging is needed". Mas esses dois campos
+ *   também existem no tópico "instagram", coberto por instagram_manage_messages
+ *   (que já temos), por isso subscrevemo-los ali em vez da Página.
+ * - A conta Instagram não tem um "access_token" próprio (GET .../instagram-id
+ *   ?fields=access_token dá "(#100) Tried accessing nonexisting field") — por
+ *   isso o token usado na chamada é sempre o Page Access Token da Página ligada.
  */
-export async function subscribeInstagramPage(pageId: string, systemUserToken: string): Promise<boolean> {
-  if (!pageId || !systemUserToken) return false;
+export async function subscribeInstagramAccount(
+  igAccountId: string,
+  pageId: string,
+  systemUserToken: string,
+): Promise<boolean> {
+  if (!igAccountId || !systemUserToken) return false;
   try {
-    const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
+    const pageToken = (pageId ? await getPageAccessToken(pageId, systemUserToken) : null) ?? systemUserToken;
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`,
+      `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments`,
       { method: 'POST', headers: { Authorization: `Bearer ${pageToken}` } },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
-      console.error(`[Instagram] Falha ao subscrever mensagens da Página ${pageId}:`, JSON.stringify(data).slice(0, 300));
+      console.error(`[Instagram] Falha ao subscrever webhooks da conta ${igAccountId}:`, JSON.stringify(data).slice(0, 300));
       return false;
     }
-    console.log(`[Instagram] Página ${pageId} subscrita para webhooks de mensagens.`);
+    console.log(`[Instagram] Conta ${igAccountId} subscrita para webhooks (messages, comments).`);
     return true;
   } catch (err) {
-    console.error('[Instagram] Erro ao subscrever webhooks da Página:', err);
-    return false;
-  }
-}
-
-/**
- * Subscreve a conta profissional do Instagram (Instagram Business Account ID —
- * NÃO o Facebook Page ID) para receber webhooks de comentários, via
- * POST /{ig-account-id}/subscribed_apps?subscribed_fields=comments.
- *
- * O campo "comments" pertence ao tópico "instagram" da Meta (universo "instagram"),
- * distinto do tópico "page" usado por subscribeInstagramPage — por isso precisa de
- * um alvo e uma chamada separados.
- */
-export async function subscribeInstagramComments(igAccountId: string, systemUserToken: string): Promise<boolean> {
-  if (!igAccountId || !systemUserToken) return false;
-  try {
-    // Tenta primeiro com um Page Access Token (via troca a partir do próprio ID —
-    // funciona tanto para Páginas como para contas Instagram ligadas); usa o token
-    // original como fallback se a troca falhar.
-    const igToken = await getPageAccessToken(igAccountId, systemUserToken) ?? systemUserToken;
-    const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=comments`,
-      { method: 'POST', headers: { Authorization: `Bearer ${igToken}` } },
-    );
-    const data = await resp.json() as { success?: boolean; error?: unknown };
-    if (!resp.ok || !data.success) {
-      console.error(`[Instagram] Falha ao subscrever comentários da conta ${igAccountId}:`, JSON.stringify(data).slice(0, 300));
-      return false;
-    }
-    console.log(`[Instagram] Conta ${igAccountId} subscrita para webhooks de comentários.`);
-    return true;
-  } catch (err) {
-    console.error('[Instagram] Erro ao subscrever webhooks de comentários:', err);
+    console.error('[Instagram] Erro ao subscrever webhooks da conta Instagram:', err);
     return false;
   }
 }
