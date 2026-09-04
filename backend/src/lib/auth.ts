@@ -59,3 +59,29 @@ export function verifyTwoFactorToken(token: string): { tenantId: string } {
   if (payload.type !== 'pending_2fa') throw new Error('Invalid token type');
   return { tenantId: payload.tenantId };
 }
+
+/** State assinado (CSRF) para o fluxo OAuth do "Login com Facebook" — stateless,
+ *  não precisa de sessão/cookie: a Meta devolve-o tal e qual no callback e nós
+ *  validamos a assinatura e o prazo. Válido por 10 min. */
+export function signOAuthState(): string {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  return jwt.sign({ nonce, type: 'oauth_state' }, JWT_SECRET, { expiresIn: '10m' } as jwt.SignOptions);
+}
+
+export function verifyOAuthState(state: string): void {
+  const payload = jwt.verify(state, JWT_SECRET, { algorithms: ['HS256'] }) as { type: string };
+  if (payload.type !== 'oauth_state') throw new Error('Invalid state type');
+}
+
+/** Ticket de curta duração (2 min) emitido no callback do "Login com Facebook",
+ *  passado ao frontend via redirect e trocado por tokens reais em
+ *  POST /api/auth/facebook/exchange. Evita colocar tokens de sessão no URL. */
+export function signFbLoginTicket(tenantId: string, requiresTwoFactor: boolean): string {
+  return jwt.sign({ tenantId, requiresTwoFactor, type: 'fb_login_ticket' }, JWT_SECRET, { expiresIn: '2m' } as jwt.SignOptions);
+}
+
+export function verifyFbLoginTicket(ticket: string): { tenantId: string; requiresTwoFactor: boolean } {
+  const payload = jwt.verify(ticket, JWT_SECRET, { algorithms: ['HS256'] }) as { tenantId: string; requiresTwoFactor: boolean; type: string };
+  if (payload.type !== 'fb_login_ticket') throw new Error('Invalid token type');
+  return { tenantId: payload.tenantId, requiresTwoFactor: payload.requiresTwoFactor };
+}

@@ -126,6 +126,82 @@ export async function login(email: string, password: string) {
   };
 }
 
+interface FacebookProfileInput {
+  email: string;
+  name: string;
+}
+
+/**
+ * Login/registo via "Continuar com Facebook" na própria plataforma Agentify
+ * (autenticação da conta, distinto da ligação de contas Instagram/WhatsApp a um
+ * agente). Se já existe um Tenant com este email (verificado pela Meta), a conta
+ * é ligada por email — caso contrário, cria-se uma conta nova. Como o Tenant exige
+ * passwordHash, contas criadas por esta via recebem uma password aleatória (nunca
+ * partilhada) — o login normal por password fica indisponível até o utilizador
+ * definir uma própria (fluxo "esqueci a password").
+ */
+export async function loginOrSignupWithFacebook(input: FacebookProfileInput) {
+  let tenant = await prisma.tenant.findUnique({ where: { email: input.email, deletedAt: null } });
+
+  if (!tenant) {
+    const plan = 'free';
+    const creditsTotal = PLAN_LIMITS[plan].credits;
+
+    tenant = await prisma.tenant.create({
+      data: {
+        name: input.name || input.email.split('@')[0],
+        email: input.email,
+        passwordHash: await hashPassword(generateRefreshToken()),
+        plan,
+        creditsTotal,
+        encryptionKey: wrapDataKey(generateEncryptionKey()),
+      },
+    });
+
+    await prisma.creditLog.create({
+      data: { tenantId: tenant.id, amount: creditsTotal, reason: 'signup-bonus' },
+    });
+
+    writeAuditLog(tenant.id, 'tenant_signup_facebook', 'tenant', tenant.id, { email: tenant.email, plan });
+  } else {
+    writeAuditLog(tenant.id, 'tenant_login_facebook', 'tenant', tenant.id, { email: tenant.email });
+  }
+
+  return { tenantId: tenant.id, requiresTwoFactor: tenant.twoFactorEnabled };
+}
+
+/** Troca o ticket de curta duração (ver signFbLoginTicket) pelos tokens reais de
+ *  sessão, ou pelo twoFactorToken se a conta tiver 2FA ativo — mesma forma de
+ *  resposta que login(), para o frontend reutilizar a mesma lógica. */
+export async function completeFacebookLogin(tenantId: string, requiresTwoFactor: boolean) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId, deletedAt: null } });
+  if (!tenant) {
+    throw new UnauthorizedError('Conta não encontrada');
+  }
+
+  if (requiresTwoFactor) {
+    const twoFactorToken = signTwoFactorToken(tenant.id);
+    return { requiresTwoFactor: true as const, twoFactorToken };
+  }
+
+  const tokens = await issueTokens(tenant);
+
+  return {
+    token: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    tenant: {
+      id: tenant.id,
+      email: tenant.email,
+      name: tenant.name,
+      companyName: tenant.companyName,
+      plan: tenant.plan,
+      creditsTotal: tenant.creditsTotal,
+      creditsUsed: tenant.creditsUsed,
+      isAdmin: tenant.isAdmin,
+    },
+  };
+}
+
 export async function refresh(refreshTokenRaw: string | undefined) {
   if (!refreshTokenRaw) {
     throw new BadRequestError('Refresh token required');

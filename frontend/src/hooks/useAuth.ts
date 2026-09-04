@@ -14,6 +14,7 @@ interface AuthState {
   completeTwoFactorLogin: (code: string) => Promise<void>;
   cancelTwoFactor: () => void;
   signup: (email: string, password: string, name: string, companyName?: string) => Promise<void>;
+  loginWithFacebookTicket: (ticket: string) => Promise<void>;
   logout: () => Promise<void>;
   loadMe: () => Promise<void>;
   clearError: () => void;
@@ -65,6 +66,26 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   cancelTwoFactor: () => {
     set({ pendingTwoFactor: false, twoFactorToken: null, error: null });
+  },
+
+  loginWithFacebookTicket: async (ticket: string) => {
+    set({ loading: true, error: null });
+    try {
+      const { data } = await api.post('/api/auth/facebook/exchange', { ticket });
+
+      if (data.requiresTwoFactor) {
+        set({ pendingTwoFactor: true, twoFactorToken: data.twoFactorToken, loading: false });
+        return;
+      }
+
+      setTokens(data.token, data.refreshToken);
+      saveTenant(data.tenant);
+      set({ tenant: data.tenant, loading: false });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Login com Facebook falhou';
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
   },
 
   signup: async (email, password, name, companyName) => {

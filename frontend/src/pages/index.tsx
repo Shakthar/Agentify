@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
 import SupportWidget from '../components/SupportWidget';
+import api from '../utils/api';
 
 type AuthTab = 'login' | 'signup';
 
@@ -124,7 +125,7 @@ const FAQS = [
 
 export default function Home() {
   const router = useRouter();
-  const { tenant, login, signup, loading, error, clearError, pendingTwoFactor, completeTwoFactorLogin, cancelTwoFactor } = useAuth();
+  const { tenant, login, signup, loading, error, clearError, pendingTwoFactor, completeTwoFactorLogin, cancelTwoFactor, loginWithFacebookTicket } = useAuth();
 
   const [authOpen, setAuthOpen] = useState(false);
   const [tab, setTab] = useState<AuthTab>('login');
@@ -134,11 +135,47 @@ export default function Home() {
   const [company, setCompany] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbError, setFbError] = useState<string | null>(null);
   const authRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (tenant) router.replace(ROUTES.dashboard);
   }, [tenant, router]);
+
+  // Regresso do fluxo "Continuar com Facebook" (ver GET /api/auth/facebook/callback):
+  // troca o ticket de curta duração pelos tokens de sessão reais.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { fbTicket, fbAuthError } = router.query as { fbTicket?: string; fbAuthError?: string };
+
+    if (fbAuthError) {
+      setFbError(fbAuthError);
+      setAuthOpen(true);
+      router.replace(router.pathname, undefined, { shallow: true });
+      return;
+    }
+
+    if (fbTicket) {
+      setAuthOpen(true);
+      loginWithFacebookTicket(fbTicket)
+        .then(() => router.replace(ROUTES.dashboard))
+        .catch((err: Error) => setFbError(err.message))
+        .finally(() => router.replace(router.pathname, undefined, { shallow: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
+
+  const handleFacebookLogin = async () => {
+    setFbLoading(true); setFbError(null);
+    try {
+      const { data } = await api.get('/api/auth/facebook');
+      window.location.href = data.url;
+    } catch {
+      setFbError('Não foi possível iniciar o login com o Facebook');
+      setFbLoading(false);
+    }
+  };
 
   // Close auth panel on outside click
   useEffect(() => {
@@ -234,12 +271,30 @@ export default function Home() {
                 <>
                   <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 -mt-2">
                     {(['login', 'signup'] as AuthTab[]).map((t) => (
-                      <button key={t} onClick={() => { setTab(t); clearError(); }}
+                      <button key={t} onClick={() => { setTab(t); clearError(); setFbError(null); }}
                         className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === t ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-400' : 'text-gray-500 hover:text-gray-700'}`}>
                         {t === 'login' ? 'Entrar' : 'Criar conta'}
                       </button>
                     ))}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleFacebookLogin}
+                    disabled={fbLoading}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm text-white transition-colors mb-4"
+                    style={{ background: fbLoading ? '#888' : '#1877F2' }}
+                  >
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    {fbLoading ? 'A ligar...' : 'Continuar com Facebook'}
+                  </button>
+                  {fbError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{fbError}</p>}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                    <span className="text-xs text-gray-400">ou com email</span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  </div>
+
                   <form onSubmit={handleSubmit} className="space-y-4">
                     {tab === 'signup' && (
                       <>

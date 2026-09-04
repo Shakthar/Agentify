@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter, loginLimiter, signupLimiter } from '../middleware/rateLimit.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { BadRequestError } from '../lib/errors.js';
+import { BadRequestError, UnauthorizedError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import * as authService from '../services/auth.service.js';
+import { signOAuthState, verifyOAuthState, signFbLoginTicket, verifyFbLoginTicket } from '../lib/auth.js';
 
 const router = Router();
 
@@ -102,6 +103,121 @@ router.post('/change-password', authenticate, authLimiter, asyncHandler(async (r
 router.post('/logout', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   await authService.logout(req.tenant!.id, req.body.refreshToken);
   res.json({ message: 'Logged out' });
+}));
+
+// ── Login com Facebook (autenticação da própria conta Agentify) ───────────────
+// Distinto da ligação de contas Instagram/WhatsApp a um agente (ver
+// routes/integrations.ts) — isto autentica/regista o utilizador na plataforma.
+
+const FB_GRAPH_VERSION = 'v26.0';
+
+// GET /api/auth/facebook — devolve o URL do diálogo OAuth do Facebook
+router.get('/facebook', authLimiter, asyncHandler(async (_req: Request, res: Response) => {
+  const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
+  if (!appId) {
+    res.status(503).json({ error: 'FACEBOOK_APP_ID não configurado nas variáveis de ambiente' });
+    return;
+  }
+
+  const redirectUri = process.env.FACEBOOK_LOGIN_REDIRECT_URI
+    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/auth/facebook/callback`;
+
+  const state = signOAuthState();
+
+  const params = new URLSearchParams({
+    client_id: appId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'email,public_profile',
+    state,
+  });
+
+  res.json({ url: `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?${params}` });
+}));
+
+// GET /api/auth/facebook/callback — troca o code por um token, obtém o perfil e
+// faz login/registo do Tenant, redirecionando de volta ao frontend com um ticket
+// de curta duração (nunca tokens de sessão reais no URL — ver POST /facebook/exchange).
+router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response) => {
+  const { code, state, error, error_description } = req.query as Record<string, string | undefined>;
+  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+
+  if (error) {
+    res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent(error_description ?? error)}`);
+    return;
+  }
+  if (!code || !state) {
+    res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Pedido inválido')}`);
+    return;
+  }
+
+  try {
+    verifyOAuthState(state);
+  } catch {
+    res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Sessão OAuth expirada — tenta outra vez')}`);
+    return;
+  }
+
+  const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
+  if (!appId || !appSecret) {
+    res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('App Facebook não configurada')}`);
+    return;
+  }
+
+  const redirectUri = process.env.FACEBOOK_LOGIN_REDIRECT_URI
+    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/auth/facebook/callback`;
+
+  try {
+    const tokenResp = await fetch(
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/oauth/access_token?` +
+        new URLSearchParams({ client_id: appId, redirect_uri: redirectUri, client_secret: appSecret, code }),
+    );
+    const tokenData = await tokenResp.json() as { access_token?: string; error?: { message?: string } };
+    if (!tokenResp.ok || !tokenData.access_token) {
+      console.error('[Facebook Login] Falha ao trocar code por token:', JSON.stringify(tokenData));
+      res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Não foi possível concluir o login com o Facebook')}`);
+      return;
+    }
+
+    const profileResp = await fetch(
+      `https://graph.facebook.com/${FB_GRAPH_VERSION}/me?fields=id,name,email&access_token=${encodeURIComponent(tokenData.access_token)}`,
+    );
+    const profile = await profileResp.json() as { id?: string; name?: string; email?: string; error?: { message?: string } };
+    if (!profileResp.ok || !profile.email) {
+      console.error('[Facebook Login] Perfil sem email (permissão recusada ou conta sem email verificado):', JSON.stringify(profile));
+      res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('A tua conta do Facebook não tem um email verificado. Usa email e password para criar conta.')}`);
+      return;
+    }
+
+    const { tenantId, requiresTwoFactor } = await authService.loginOrSignupWithFacebook({
+      email: profile.email,
+      name: profile.name ?? profile.email.split('@')[0],
+    });
+
+    const ticket = signFbLoginTicket(tenantId, requiresTwoFactor);
+    res.redirect(`${frontendUrl}/?fbTicket=${encodeURIComponent(ticket)}`);
+  } catch (err) {
+    console.error('[Facebook Login] Erro no callback:', err);
+    res.redirect(`${frontendUrl}/?fbAuthError=${encodeURIComponent('Erro inesperado ao ligar com o Facebook')}`);
+  }
+}));
+
+// POST /api/auth/facebook/exchange — troca o ticket de curta duração pelos tokens
+// de sessão reais (ou pelo twoFactorToken, se a conta tiver 2FA ativo).
+router.post('/facebook/exchange', authLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const { ticket } = req.body as { ticket?: string };
+  if (!ticket) throw new BadRequestError('ticket obrigatório');
+
+  let payload: { tenantId: string; requiresTwoFactor: boolean };
+  try {
+    payload = verifyFbLoginTicket(ticket);
+  } catch {
+    throw new UnauthorizedError('Ticket inválido ou expirado — tenta o login novamente');
+  }
+
+  const result = await authService.completeFacebookLogin(payload.tenantId, payload.requiresTwoFactor);
+  res.json(result);
 }));
 
 export default router;
