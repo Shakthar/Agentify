@@ -133,7 +133,7 @@ export async function subscribeInstagramAccount(
           { method: 'POST' },
         );
         const diagData = await diagResp.json() as { success?: boolean; error?: unknown };
-        console.log(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData).slice(0, 300));
+        console.log(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData));
       } catch (diagErr) {
         console.error(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> exceção:`, diagErr);
       }
@@ -145,7 +145,7 @@ export async function subscribeInstagramAccount(
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
-      console.error(`[Instagram] Falha ao subscrever webhooks da Página ${pageId} (conta Instagram ${igAccountId}):`, JSON.stringify(data).slice(0, 300));
+      console.error(`[Instagram] Falha ao subscrever webhooks da Página ${pageId} (conta Instagram ${igAccountId}):`, JSON.stringify(data));
       return false;
     }
     console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita para webhooks (messages, comments).`);
