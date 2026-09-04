@@ -69,9 +69,13 @@ export async function subscribeInstagramAccount(
   if (!igAccountId || !systemUserToken) return false;
   try {
     const pageToken = (pageId ? await getPageAccessToken(pageId, systemUserToken) : null) ?? systemUserToken;
+    // graph.instagram.com devolve "(#190) Invalid OAuth access token - Cannot parse
+    // access token" quando o token é passado no cabeçalho Authorization: Bearer — este
+    // host só reconhece o token como parâmetro de query (access_token=...), tal como no
+    // exemplo curl da doc oficial. Por isso passamos aqui via querystring, não via header.
     const resp = await fetch(
-      `${IG_PLATFORM_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments`,
-      { method: 'POST', headers: { Authorization: `Bearer ${pageToken}` } },
+      `${IG_PLATFORM_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
+      { method: 'POST' },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
