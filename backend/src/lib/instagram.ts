@@ -4,6 +4,15 @@
  */
 
 const IG_GRAPH = 'https://graph.facebook.com';
+// Host dedicado da "Instagram Platform" API (graph.instagram.com). A doc oficial da Meta
+// (developers.facebook.com/docs/instagram-platform/webhooks/) mostra o exemplo de
+// POST /{ig-id}/subscribed_apps sempre neste host, mesmo quando o token usado é um
+// Facebook Page Access Token (o host aceita ambos). Isolamos esta chamada porque o
+// erro "(#3) Application does not have the capability to make this API call." só
+// ocorre ao chamar subscribed_apps via graph.facebook.com para uma Instagram
+// Business Account ID — a hipótese é que esta edge não está exposta nesse host
+// para contas ligadas via Login do Facebook para Empresas, só em graph.instagram.com.
+const IG_PLATFORM_GRAPH = 'https://graph.instagram.com';
 
 function igVersion(): string {
   return process.env.INSTAGRAM_API_VERSION ?? process.env.WHATSAPP_API_VERSION ?? 'v20.0';
@@ -61,7 +70,7 @@ export async function subscribeInstagramAccount(
   try {
     const pageToken = (pageId ? await getPageAccessToken(pageId, systemUserToken) : null) ?? systemUserToken;
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments`,
+      `${IG_PLATFORM_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments`,
       { method: 'POST', headers: { Authorization: `Bearer ${pageToken}` } },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
