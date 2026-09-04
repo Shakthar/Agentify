@@ -49,23 +49,27 @@ export async function getPageAccessToken(pageId: string, systemUserToken: string
 }
 
 /**
- * Subscreve a conta profissional do Instagram (Instagram Business Account ID)
- * para receber webhooks de mensagens e comentários, via
- * POST /{ig-account-id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments.
+ * Subscreve a Página do Facebook (ligada à conta profissional do Instagram) para
+ * receber webhooks de mensagens e comentários, via
+ * POST /{page-id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments.
  *
- * Porquê subscrever pelo ID da conta Instagram e não pelo Facebook Page ID:
- * - "comments" só é um campo válido no tópico "instagram" da Meta — subscrevê-lo
- *   via /{page-id}/subscribed_apps é rejeitado com
- *   "(#100) Param subscribed_fields[1] must be one of {...}" (lista do tópico "page",
- *   que não inclui "comments").
- * - "messages"/"messaging_postbacks" via /{page-id}/subscribed_apps exigem a
- *   permissão pages_messaging (Messenger), que este app não tem — dá
- *   "(#200) ... permission pages_messaging is needed". Mas esses dois campos
- *   também existem no tópico "instagram", coberto por instagram_manage_messages
- *   (que já temos), por isso subscrevemo-los ali em vez da Página.
- * - A conta Instagram não tem um "access_token" próprio (GET .../instagram-id
- *   ?fields=access_token dá "(#100) Tried accessing nonexisting field") — por
- *   isso o token usado na chamada é sempre o Page Access Token da Página ligada.
+ * NOTA (04/09): esta função usava o ID da conta Instagram (Instagram Business
+ * Account ID) em vez do Page ID, com base em erros #100/#200 observados numa
+ * versão antiga da API (v20.0, antes de definirmos INSTAGRAM_API_VERSION). Isso
+ * dava sempre "(#3) Application does not have the capability to make this API
+ * call.", em TODAS as combinações de campos testadas, mesmo com o token a ter
+ * todas as permissões corretas e a versão certa da API.
+ *
+ * A doc oficial da Meta (developers.facebook.com/docs/instagram-platform/webhooks/,
+ * tabela "Requirements") esclarece isto: para o componente "Facebook Login for
+ * Business" (o que o Agentify usa), o endpoint correto é sempre
+ * `/<PAGE_ID> ou /me` — nunca o ID da conta Instagram diretamente — mesmo para os
+ * campos de mensagens e comentários. O ID da conta Instagram só se usa como
+ * endpoint quando o login é feito via "Business Login for Instagram"
+ * (graph.instagram.com, tokens IGAA..., uma integração diferente que o Agentify
+ * não usa). A mesma tabela confirma: Advanced Access é exigido especificamente
+ * para receber notificações de "comments" e "live_comments" (mesmo testando com a
+ * própria conta) — "messages"/"messaging_postbacks" não têm essa exigência extra.
  */
 export async function subscribeInstagramAccount(
   igAccountId: string,
@@ -73,8 +77,12 @@ export async function subscribeInstagramAccount(
   systemUserToken: string,
 ): Promise<boolean> {
   if (!igAccountId || !systemUserToken) return false;
+  if (!pageId) {
+    console.error(`[Instagram] Sem pageId para subscrever webhooks da conta ${igAccountId} — endpoint correto (Facebook Login for Business) é sempre /{page-id}/subscribed_apps.`);
+    return false;
+  }
   try {
-    const pageToken = (pageId ? await getPageAccessToken(pageId, systemUserToken) : null) ?? systemUserToken;
+    const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
 
     // Diagnóstico temporário: imprime a versão da API resolvida e os scopes concedidos
     // ao pageToken antes de tentar subscribed_apps, para percebermos exatamente o que
@@ -113,30 +121,34 @@ export async function subscribeInstagramAccount(
     // erro #3, antes da chamada real combinada. Cada chamada a subscribed_apps
     // substitui a lista de campos anterior, por isso o resultado real é o da ÚLTIMA
     // chamada (a combinada, como já estava) — isto só serve para log.
+    // Diagnóstico temporário: agora a testar contra o PAGE ID (endpoint correto para
+    // Facebook Login for Business, ver nota acima), campo a campo, para confirmar que
+    // o erro #3 desaparece e para vermos separadamente se "comments" continua a exigir
+    // Advanced Access (deve dar um erro diferente, tipo #200, não #3).
     const diagnosticCombos = ['comments', 'messages', 'messaging_postbacks', 'messages,comments'];
     for (const combo of diagnosticCombos) {
       try {
         const diagResp = await fetch(
-          `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=${combo}&access_token=${encodeURIComponent(pageToken)}`,
+          `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=${combo}&access_token=${encodeURIComponent(pageToken)}`,
           { method: 'POST' },
         );
         const diagData = await diagResp.json() as { success?: boolean; error?: unknown };
-        console.log(`[Instagram][debug] subscribed_apps fields="${combo}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData).slice(0, 300));
+        console.log(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> ok=${diagResp.ok && !!diagData.success}`, JSON.stringify(diagData).slice(0, 300));
       } catch (diagErr) {
-        console.error(`[Instagram][debug] subscribed_apps fields="${combo}" -> exceção:`, diagErr);
+        console.error(`[Instagram][debug] subscribed_apps (pageId=${pageId}) fields="${combo}" -> exceção:`, diagErr);
       }
     }
 
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
+      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
       { method: 'POST' },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
-      console.error(`[Instagram] Falha ao subscrever webhooks da conta ${igAccountId}:`, JSON.stringify(data).slice(0, 300));
+      console.error(`[Instagram] Falha ao subscrever webhooks da Página ${pageId} (conta Instagram ${igAccountId}):`, JSON.stringify(data).slice(0, 300));
       return false;
     }
-    console.log(`[Instagram] Conta ${igAccountId} subscrita para webhooks (messages, comments).`);
+    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita para webhooks (messages, comments).`);
     return true;
   } catch (err) {
     console.error('[Instagram] Erro ao subscrever webhooks da conta Instagram:', err);
