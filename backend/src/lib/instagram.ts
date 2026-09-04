@@ -4,15 +4,13 @@
  */
 
 const IG_GRAPH = 'https://graph.facebook.com';
-// Host dedicado da "Instagram Platform" API (graph.instagram.com). A doc oficial da Meta
-// (developers.facebook.com/docs/instagram-platform/webhooks/) mostra o exemplo de
-// POST /{ig-id}/subscribed_apps sempre neste host, mesmo quando o token usado é um
-// Facebook Page Access Token (o host aceita ambos). Isolamos esta chamada porque o
-// erro "(#3) Application does not have the capability to make this API call." só
-// ocorre ao chamar subscribed_apps via graph.facebook.com para uma Instagram
-// Business Account ID — a hipótese é que esta edge não está exposta nesse host
-// para contas ligadas via Login do Facebook para Empresas, só em graph.instagram.com.
-const IG_PLATFORM_GRAPH = 'https://graph.instagram.com';
+// NOTA (04/09): tentei mudar esta chamada para graph.instagram.com (é o host usado no
+// exemplo da doc "Instagram Platform"), mas esse host devolve
+// "(#190) Invalid OAuth access token - Cannot parse access token" para QUALQUER token
+// desta app — porque o nosso token é um Facebook Page Access Token (obtido via Login do
+// Facebook para Empresas), e graph.instagram.com só reconhece tokens da "Instagram Login"
+// (formato IGAA..., de uma app Instagram distinta). Por isso voltámos a usar
+// graph.facebook.com aqui, que é o host correto para o tipo de token que este app usa.
 
 function igVersion(): string {
   return process.env.INSTAGRAM_API_VERSION ?? process.env.WHATSAPP_API_VERSION ?? 'v20.0';
@@ -69,12 +67,30 @@ export async function subscribeInstagramAccount(
   if (!igAccountId || !systemUserToken) return false;
   try {
     const pageToken = (pageId ? await getPageAccessToken(pageId, systemUserToken) : null) ?? systemUserToken;
-    // graph.instagram.com devolve "(#190) Invalid OAuth access token - Cannot parse
-    // access token" quando o token é passado no cabeçalho Authorization: Bearer — este
-    // host só reconhece o token como parâmetro de query (access_token=...), tal como no
-    // exemplo curl da doc oficial. Por isso passamos aqui via querystring, não via header.
+
+    // Diagnóstico temporário: imprime os scopes concedidos ao pageToken antes de tentar
+    // subscribed_apps, para percebermos exatamente que permissão falta quando o erro #3
+    // aparecer de novo. Ver backend/src/routes/integrations.ts para o mesmo padrão de
+    // debug_token já usado ali. Remover depois de confirmarmos a causa.
+    try {
+      const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
+      const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
+      if (appId && appSecret) {
+        const appToken = `${appId}|${appSecret}`;
+        const debugResp = await fetch(
+          `${IG_GRAPH}/${igVersion()}/debug_token?input_token=${encodeURIComponent(pageToken)}&access_token=${encodeURIComponent(appToken)}`,
+        );
+        const debugData = await debugResp.json() as {
+          data?: { scopes?: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }>; type?: string; app_id?: string };
+        };
+        console.log(`[Instagram][debug_token] pageToken info para ${igAccountId}:`, JSON.stringify(debugData?.data).slice(0, 500));
+      }
+    } catch (debugErr) {
+      console.error('[Instagram][debug_token] Falha ao inspecionar pageToken:', debugErr);
+    }
+
     const resp = await fetch(
-      `${IG_PLATFORM_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
+      `${IG_GRAPH}/${igVersion()}/${igAccountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${encodeURIComponent(pageToken)}`,
       { method: 'POST' },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
