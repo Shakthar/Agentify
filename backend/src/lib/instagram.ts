@@ -11,6 +11,28 @@ function igVersion(): string {
 
 // ─── DMs ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Troca um token de System User (ou qualquer token com acesso ao ativo) por um
+ * verdadeiro Page Access Token da Página indicada. A Graph API exige este tipo
+ * de token especificamente para POST /{PAGE-ID}/messages — um token de System
+ * User "genérico", mesmo com as permissões corretas, é rejeitado com
+ * "(#190) This method must be called with a Page Access Token".
+ */
+async function getPageAccessToken(pageId: string, systemUserToken: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${pageId}?fields=access_token&access_token=${systemUserToken}`);
+    const data = await resp.json() as { access_token?: string; error?: unknown };
+    if (!resp.ok || !data.access_token) {
+      console.error('[Instagram] Falha ao obter Page Access Token:', JSON.stringify(data).slice(0, 300));
+      return null;
+    }
+    return data.access_token;
+  } catch (err) {
+    console.error('[Instagram] Erro ao trocar por Page Access Token:', err);
+    return null;
+  }
+}
+
 export async function sendInstagramDM(
   recipientId: string,
   text: string,
@@ -25,9 +47,12 @@ export async function sendInstagramDM(
   if (!token) { console.warn('[Instagram] Token em falta — DM não enviada para', recipientId); return; }
   if (!pageId) { console.warn('[Instagram] Facebook Page ID em falta (instagramPageId) — DM não enviada para', recipientId); return; }
   try {
+    // O token guardado é normalmente um token de System User — trocar por um
+    // Page Access Token antes de enviar (exigido por este endpoint específico).
+    const pageToken = await getPageAccessToken(pageId, token) ?? token;
     const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${pageId}/messages`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${pageToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
     });
     const body = await resp.text();
