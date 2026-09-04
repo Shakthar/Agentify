@@ -76,10 +76,13 @@ export async function subscribeInstagramAccount(
   try {
     const pageToken = (pageId ? await getPageAccessToken(pageId, systemUserToken) : null) ?? systemUserToken;
 
-    // Diagnóstico temporário: imprime os scopes concedidos ao pageToken antes de tentar
-    // subscribed_apps, para percebermos exatamente que permissão falta quando o erro #3
-    // aparecer de novo. Ver backend/src/routes/integrations.ts para o mesmo padrão de
-    // debug_token já usado ali. Remover depois de confirmarmos a causa.
+    // Diagnóstico temporário: imprime a versão da API resolvida e os scopes concedidos
+    // ao pageToken antes de tentar subscribed_apps, para percebermos exatamente o que
+    // está a acontecer quando o erro #3 aparecer de novo. Remover depois de confirmarmos
+    // a causa.
+    console.log(
+      `[Instagram][debug] igVersion()=${igVersion()} INSTAGRAM_API_VERSION=${process.env.INSTAGRAM_API_VERSION ?? '(unset)'} WHATSAPP_API_VERSION=${process.env.WHATSAPP_API_VERSION ?? '(unset)'}`,
+    );
     try {
       const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
       const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET;
