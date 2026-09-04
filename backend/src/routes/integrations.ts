@@ -22,6 +22,7 @@ import {
 import prisma from '../lib/prisma.js';
 import { encrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
+import { subscribeInstagramPage } from '../lib/instagram.js';
 
 const router = Router();
 
@@ -327,6 +328,16 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
     },
   });
 
+  // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
+  // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
+  // configurado no dashboard.
+  if (igPageId) {
+    const subscribed = await subscribeInstagramPage(igPageId, longToken);
+    if (!subscribed) {
+      console.warn(`[Instagram] Não foi possível subscrever a Página ${igPageId} aos webhooks — mensagens/comentários podem não chegar.`);
+    }
+  }
+
   console.log(`[Instagram] Conta ligada: igAccountId=${igAccountId} name=${igName} agentId=${agentId}`);
   res.json({ success: true, igAccountId, name: igName });
 }));
@@ -437,6 +448,16 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
         instagramEnabled: !!igAccountId,
       },
     });
+
+    // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
+    // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
+    // configurado no dashboard.
+    if (igPageId) {
+      const subscribed = await subscribeInstagramPage(igPageId, longToken);
+      if (!subscribed) {
+        console.warn(`[Facebook OAuth] Não foi possível subscrever a Página ${igPageId} aos webhooks — mensagens/comentários podem não chegar.`);
+      }
+    }
 
     return res.redirect(
       `${frontendUrl}/dashboard/${agentId}?fb=success&igId=${igAccountId}&name=${encodeURIComponent(igName)}`,

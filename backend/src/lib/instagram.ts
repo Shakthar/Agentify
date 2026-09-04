@@ -18,7 +18,7 @@ function igVersion(): string {
  * User "genérico", mesmo com as permissões corretas, é rejeitado com
  * "(#190) This method must be called with a Page Access Token".
  */
-async function getPageAccessToken(pageId: string, systemUserToken: string): Promise<string | null> {
+export async function getPageAccessToken(pageId: string, systemUserToken: string): Promise<string | null> {
   try {
     const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${pageId}?fields=access_token&access_token=${systemUserToken}`);
     const data = await resp.json() as { access_token?: string; error?: unknown };
@@ -30,6 +30,36 @@ async function getPageAccessToken(pageId: string, systemUserToken: string): Prom
   } catch (err) {
     console.error('[Instagram] Erro ao trocar por Page Access Token:', err);
     return null;
+  }
+}
+
+/**
+ * Subscreve a Página do Facebook (ligada à conta do Instagram) para receber
+ * eventos de webhook (mensagens e comentários) através deste app.
+ *
+ * Sem esta chamada, a Meta não entrega webhooks para esta Página especificamente
+ * — mesmo que o app esteja configurado no dashboard com os campos "messages" e
+ * "comments" do tópico "instagram" — porque cada Página tem de ser explicitamente
+ * subscrita ao app via POST /{page-id}/subscribed_apps.
+ */
+export async function subscribeInstagramPage(pageId: string, systemUserToken: string): Promise<boolean> {
+  if (!pageId || !systemUserToken) return false;
+  try {
+    const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
+    const resp = await fetch(
+      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=messages,comments,messaging_postbacks`,
+      { method: 'POST', headers: { Authorization: `Bearer ${pageToken}` } },
+    );
+    const data = await resp.json() as { success?: boolean; error?: unknown };
+    if (!resp.ok || !data.success) {
+      console.error(`[Instagram] Falha ao subscrever webhooks da Página ${pageId}:`, JSON.stringify(data).slice(0, 300));
+      return false;
+    }
+    console.log(`[Instagram] Página ${pageId} subscrita para webhooks (messages, comments).`);
+    return true;
+  } catch (err) {
+    console.error('[Instagram] Erro ao subscrever webhooks da Página:', err);
+    return false;
   }
 }
 
