@@ -236,12 +236,12 @@ export default function PromptsPage() {
               <div>
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{p.name}</h3>
-                  <span className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full shrink-0">{p.sector}</span>
+                  <span className="text-[14px] px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full shrink-0">{p.sector}</span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{p.description}</p>
                 <div className="flex flex-wrap gap-1 mt-2">
                   {p.tags.map(t => (
-                    <span key={t} className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded">{t}</span>
+                    <span key={t} className="text-[14px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded">{t}</span>
                   ))}
                 </div>
               </div>

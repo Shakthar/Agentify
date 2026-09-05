@@ -137,14 +137,14 @@ export default function PublicOrdersPage() {
           )}
           <div>
             <p className="font-bold text-base leading-tight">{info.companyName}</p>
-            <p className="text-[11px] text-gray-400">{info.agentName}</p>
+            <p className="text-[15px] text-gray-400">{info.agentName}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[15px] text-gray-500">
             ⟳ {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </p>
-          <p className="text-[10px] text-gray-600">Atualiza a cada {REFRESH_SEC}s</p>
+          <p className="text-[14px] text-gray-600">Atualiza a cada {REFRESH_SEC}s</p>
         </div>
       </header>
 
@@ -186,7 +186,7 @@ export default function PublicOrdersPage() {
                             href={`/order-status/${order.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[10px] text-gray-500 hover:text-gray-300 font-mono truncate max-w-[120px]"
+                            className="text-[14px] text-gray-500 hover:text-gray-300 font-mono truncate max-w-[120px]"
                             title="Ver detalhes do pedido"
                           >
                             #{order.id.slice(-6)}

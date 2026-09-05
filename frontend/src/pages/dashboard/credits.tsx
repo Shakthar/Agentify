@@ -157,16 +157,16 @@ export default function CreditsPage() {
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium truncate">{au.agentName}</p>
-                                  <p className="text-[10px] text-gray-400">{au.totalCreditsUsed.toLocaleString()} créditos total · {pct}%</p>
+                                  <p className="text-[14px] text-gray-400">{au.totalCreditsUsed.toLocaleString()} créditos total · {pct}%</p>
                                 </div>
                               </div>
                               <div className="text-right">
                                 <span className="text-sm font-semibold">{au.creditsUsed.toLocaleString()}</span>
-                                <p className="text-[10px] text-gray-400">créditos</p>
+                                <p className="text-[14px] text-gray-400">créditos</p>
                               </div>
                               <div className="text-right">
                                 <span className="text-sm font-semibold text-green-600 dark:text-green-400">{au.waMsgsSent.toLocaleString()}</span>
-                                <p className="text-[10px] text-gray-400">{au.waCreditsUsed.toLocaleString()} créd.</p>
+                                <p className="text-[14px] text-gray-400">{au.waCreditsUsed.toLocaleString()} créd.</p>
                               </div>
                             </div>
                             <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">

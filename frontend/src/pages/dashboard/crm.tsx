@@ -187,7 +187,7 @@ export default function CrmPage() {
                       <td className="px-4 py-3 hidden lg:table-cell">
                         <div className="flex flex-wrap gap-1">
                           {(c.tags ?? []).slice(0, 3).map(t => (
-                            <span key={t} className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                            <span key={t} className="text-[14px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
                               {t}
                             </span>
                           ))}
@@ -221,15 +221,15 @@ export default function CrmPage() {
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
                   <div className="text-lg font-bold text-gray-900 dark:text-white">{selected.totalConversations}</div>
-                  <div className="text-[10px] text-gray-400">Conversas</div>
+                  <div className="text-[14px] text-gray-400">Conversas</div>
                 </div>
                 <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
                   <div className="text-lg font-bold text-gray-900 dark:text-white">{selected.totalMessages}</div>
-                  <div className="text-[10px] text-gray-400">Mensagens</div>
+                  <div className="text-[14px] text-gray-400">Mensagens</div>
                 </div>
                 <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
                   <div className="text-xs font-medium text-gray-900 dark:text-white">{sentimentLabel(selected.avgSentiment)}</div>
-                  <div className="text-[10px] text-gray-400">Sentiment</div>
+                  <div className="text-[14px] text-gray-400">Sentiment</div>
                 </div>
               </div>
 

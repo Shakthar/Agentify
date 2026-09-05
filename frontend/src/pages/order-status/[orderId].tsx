@@ -108,7 +108,7 @@ export default function OrderStatusPage() {
             <div className="text-center space-y-0.5">
               {order.agentName && <p className="text-sm text-gray-400">{order.agentName}</p>}
               <h1 className="text-xl font-bold">O teu pedido</h1>
-              <p className="text-[11px] text-gray-600 font-mono">#{order.id.slice(-10).toUpperCase()}</p>
+              <p className="text-[15px] text-gray-600 font-mono">#{order.id.slice(-10).toUpperCase()}</p>
             </div>
 
             {/* Summary */}
@@ -134,7 +134,7 @@ export default function OrderStatusPage() {
                   <div className="flex items-center gap-3 pb-3 border-b border-gray-700">
                     <span className="text-3xl">{currentStep.icon}</span>
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-gray-500">Estado atual</p>
+                      <p className="text-[14px] uppercase tracking-wider text-gray-500">Estado atual</p>
                       <p className={`text-base font-bold ${currentStep.text}`}>{currentStep.label}</p>
                     </div>
                   </div>
@@ -173,7 +173,7 @@ export default function OrderStatusPage() {
             )}
 
             {/* Footer */}
-            <p className="text-center text-[10px] text-gray-700">
+            <p className="text-center text-[14px] text-gray-700">
               Atualizado às {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               {!TERMINAL_STATUSES.has(order.status) && ` · auto-refresh ${REFRESH_SEC}s`}
             </p>

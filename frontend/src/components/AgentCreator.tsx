@@ -429,16 +429,16 @@ export default function AgentCreator() {
                           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight">{label}</span>
                             {minPlan === 'free' && (
-                              <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">Grátis</span>
+                              <span className="text-[14px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">Grátis</span>
                             )}
                             {locked && addonPrice && (
-                              <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {addonPrice}</span>
+                              <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {addonPrice}</span>
                             )}
                             {locked && !addonPrice && (
-                              <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
+                              <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
                             )}
                             {!locked && minPlan !== 'free' && (
-                              <span className="text-[10px] bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
+                              <span className="text-[14px] bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
                             )}
                           </div>
                           <button
@@ -456,7 +456,7 @@ export default function AgentCreator() {
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-snug">{desc}</p>
                         {locked && addonPrice && (
-                          <p className="text-[11px] text-orange-500 dark:text-orange-400 mt-1">Podes ativar como addon após criar o agente.</p>
+                          <p className="text-[15px] text-orange-500 dark:text-orange-400 mt-1">Podes ativar como addon após criar o agente.</p>
                         )}
                       </div>
                     </div>

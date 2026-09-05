@@ -342,7 +342,7 @@ export default function Home() {
                       {loading ? 'A processar...' : tab === 'login' ? 'Entrar' : 'Criar conta grátis'}
                     </button>
                     {tab === 'signup' && (
-                      <p className="text-[11px] text-gray-400 text-center">
+                      <p className="text-[15px] text-gray-400 text-center">
                         Ao criar conta aceitas os nossos <Link href="/terms-of-service" className="underline">Termos de Serviço</Link> e <Link href="/privacy-policy" className="underline">Política de Privacidade</Link>.
                       </p>
                     )}
@@ -411,7 +411,7 @@ export default function Home() {
                 ))}
               </div>
               <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                <p className="text-[10px] text-gray-400 text-center">Conversa real → ~25 créditos gastos</p>
+                <p className="text-[14px] text-gray-400 text-center">Conversa real → ~25 créditos gastos</p>
               </div>
             </div>
           </div>
@@ -452,7 +452,7 @@ export default function Home() {
                   <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">"{t.quote}"</p>
                   <div>
                     <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{t.author}</p>
-                    <p className="text-[11px] text-gray-400">{t.role}</p>
+                    <p className="text-[15px] text-gray-400">{t.role}</p>
                   </div>
                 </div>
               ))}
@@ -592,7 +592,7 @@ export default function Home() {
                       : `${plan.color} bg-white dark:bg-gray-900`}`}
                 >
                   {plan.highlight && (
-                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[15px] font-bold px-3 py-1 rounded-full whitespace-nowrap">
                       ⭐ Mais popular
                     </span>
                   )}
@@ -656,7 +656,7 @@ export default function Home() {
                   <div key={a.name} className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-orange-100 dark:border-orange-900">
                     <span className="text-xl">{a.icon}</span>
                     <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mt-1">{a.name}</p>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{a.desc}</p>
+                    <p className="text-[15px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{a.desc}</p>
                   </div>
                 ))}
               </div>

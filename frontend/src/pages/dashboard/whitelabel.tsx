@@ -205,9 +205,9 @@ export default function WhitelabelPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{agent.name}</span>
-                            {!agent.isActive && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Inativo</span>}
+                            {!agent.isActive && <span className="text-[14px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Inativo</span>}
                             {agent.whitelabelEnabled && (
-                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">White-label ativo</span>
+                              <span className="text-[14px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">White-label ativo</span>
                             )}
                           </div>
                           {agent.description && (
@@ -215,14 +215,14 @@ export default function WhitelabelPage() {
                           )}
                           {agent.whitelabelEnabled && (
                             <div className="mt-2 flex items-center gap-2">
-                              <code className="text-[11px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded font-mono break-all">
+                              <code className="text-[15px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded font-mono break-all">
                                 {wlUrl}
                               </code>
                               <a
                                 href={`https://${wlUrl}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[11px] text-brand-600 hover:underline shrink-0"
+                                className="text-[15px] text-brand-600 hover:underline shrink-0"
                               >
                                 Abrir ???
                               </a>

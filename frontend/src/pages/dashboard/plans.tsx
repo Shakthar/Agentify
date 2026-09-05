@@ -194,18 +194,18 @@ function SkillBadge({ avail, addonPrice, creditsPerTx }: { avail: SkillAvail; ad
     return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
   if (avail === 'included')
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">
+      <span className="inline-flex items-center gap-1 text-[15px] font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">
         ✓ Incluído
       </span>
     );
   // addon
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="inline-flex items-center text-[11px] font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span className="inline-flex items-center text-[15px] font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full whitespace-nowrap">
         {addonPrice ? `+€${addonPrice}/mês` : 'Addon'}
       </span>
       {creditsPerTx && (
-        <span className="text-[10px] text-gray-400">{creditsPerTx} crd/tx</span>
+        <span className="text-[14px] text-gray-400">{creditsPerTx} crd/tx</span>
       )}
     </div>
   );
@@ -308,7 +308,7 @@ export default function PlansPage() {
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}>
                 <span className="text-sm font-semibold block">{t.label}</span>
-                <span className="text-[11px] text-gray-400 hidden sm:block">{t.sub}</span>
+                <span className="text-[15px] text-gray-400 hidden sm:block">{t.sub}</span>
               </button>
             ))}
           </div>
@@ -328,7 +328,7 @@ export default function PlansPage() {
                       ${plan.highlight ? 'border-brand-500 shadow-md' : 'border-gray-200 dark:border-gray-700'}
                       ${isCurrent ? 'bg-brand-50 dark:bg-brand-900/10' : 'bg-white dark:bg-gray-900'}`}>
                       {plan.badge && (
-                        <span className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap
+                        <span className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[14px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap
                           ${plan.highlight ? 'bg-brand-600 text-white' : 'bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800'}`}>
                           {plan.badge}
                         </span>
@@ -377,7 +377,7 @@ export default function PlansPage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-2">
+                <p className="text-[15px] text-blue-500 dark:text-blue-400 mt-2">
                   💡 O auto-routing de IA escolhe automaticamente o modelo mais barato para cada mensagem, poupando até 60% dos créditos.
                 </p>
               </div>
@@ -391,7 +391,7 @@ export default function PlansPage() {
                       {PLANS_DATA.map(plan => (
                         <th key={plan.id} className={`py-3 px-3 text-center relative ${currentPlan === plan.id ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}>
                           {currentPlan === plan.id && (
-                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
+                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[14px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
                           )}
                           <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
                         </th>
@@ -406,7 +406,7 @@ export default function PlansPage() {
                             <span className="text-sm mt-0.5">{feature.icon}</span>
                             <div>
                               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{feature.label}</span>
-                              {feature.note && <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{feature.note}</p>}
+                              {feature.note && <p className="text-[14px] text-gray-400 mt-0.5 leading-tight">{feature.note}</p>}
                             </div>
                           </div>
                         </td>
@@ -442,7 +442,7 @@ export default function PlansPage() {
               </div>
 
               {/* Notes */}
-              <div className="text-[11px] text-gray-400 space-y-1">
+              <div className="text-[15px] text-gray-400 space-y-1">
                 <p>¹ Créditos Free são atribuídos uma única vez e não renovam. Faz upgrade para créditos mensais renováveis.</p>
                 <p>² Starter: máx 3 agentes total · Business: máx 10 agentes total · Enterprise: ilimitados.</p>
                 <p>· 1 Agente = 1 número WhatsApp. Um agente pode integrar múltiplas plataformas (Shopify, iFood, etc.) em simultâneo.</p>
@@ -468,7 +468,7 @@ export default function PlansPage() {
                       {PLANS_DATA.map(plan => (
                         <th key={plan.id} className={`py-3 px-3 text-center relative ${currentPlan === plan.id ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}>
                           {currentPlan === plan.id && (
-                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
+                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[14px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
                                                  )}
                           <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
                         </th>
@@ -491,9 +491,9 @@ export default function PlansPage() {
                                 <span className="text-lg mt-0.5">{skill.icon}</span>
                                 <div>
                                   <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{skill.name}</p>
-                                  <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">{skill.desc}</p>
+                                  <p className="text-[15px] text-gray-400 mt-0.5 leading-tight">{skill.desc}</p>
                                   {skill.creditsPerTx && (
-                                    <p className="text-[10px] text-purple-500 dark:text-purple-400 mt-0.5">
+                                    <p className="text-[14px] text-purple-500 dark:text-purple-400 mt-0.5">
                                       + créditos por transação conforme plano
                                     </p>
                                   )}
@@ -520,11 +520,11 @@ export default function PlansPage() {
               {/* Legenda */}
               <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                 <div className="flex items-center gap-1.5">
-                  <span className="inline-block bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[11px] font-semibold">✓ Incluído</span>
+                  <span className="inline-block bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[15px] font-semibold">✓ Incluído</span>
                   <span>Vem com o plano, sem custo extra</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="inline-block bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[11px] font-semibold">+€X/mês</span>
+                  <span className="inline-block bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[15px] font-semibold">+€X/mês</span>
                   <span>Addon — compra no marketplace</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -672,7 +672,7 @@ export default function PlansPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{m.label}</span>
-                          {m.badge && <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">{m.badge}</span>}
+                          {m.badge && <span className="text-[14px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">{m.badge}</span>}
                         </div>
                         <span className="text-xs text-gray-500">{m.sub}</span>
                       </div>
@@ -715,7 +715,7 @@ export default function PlansPage() {
                         {[{ label: 'Entidade', value: instructions.multibancoEntity }, { label: 'Referência', value: instructions.multibancoReference }, { label: 'Montante', value: `€${instructions.amount.toFixed(2)}` }]
                           .map(({ label, value }) => (
                             <div key={label} className="text-center">
-                              <p className="text-[10px] text-blue-500 uppercase tracking-wide">{label}</p>
+                              <p className="text-[14px] text-blue-500 uppercase tracking-wide">{label}</p>
                               <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mt-0.5">{value}</p>
                             </div>
                           ))}

@@ -145,7 +145,7 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string |
 
 function SkillBadge({ label, active, highlight }: { label: string; active: boolean; highlight?: boolean }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+    <span className={`text-[14px] px-1.5 py-0.5 rounded-full font-medium ${
       !active ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 line-through' :
       highlight ? 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300' :
       'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
@@ -462,36 +462,36 @@ export default function AdminPage() {
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Créditos consumidos</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Créditos consumidos</p>
                     <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
                       {(metrics.usage?.creditsConsumed ?? 0).toLocaleString()}
                     </p>
-                    <p className="text-[10px] text-gray-400">unidade virtual</p>
+                    <p className="text-[14px] text-gray-400">unidade virtual</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Tokens enviados</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Tokens enviados</p>
                     <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
                       {((metrics.usage?.inputTokens ?? 0) / 1000).toFixed(1)}K
                     </p>
-                    <p className="text-[10px] text-gray-400">input tokens</p>
+                    <p className="text-[14px] text-gray-400">input tokens</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Tokens recebidos</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Tokens recebidos</p>
                     <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
                       {((metrics.usage?.outputTokens ?? 0) / 1000).toFixed(1)}K
                     </p>
-                    <p className="text-[10px] text-gray-400">output tokens</p>
+                    <p className="text-[14px] text-gray-400">output tokens</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Custo real API</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Custo real API</p>
                     <p className="text-xl font-bold text-red-500">
                       €{(metrics.usage?.realApiCostEur ?? 0).toFixed(4)}
                     </p>
-                    <p className="text-[10px] text-gray-400">EUR pago à Anthropic/OpenAI</p>
+                    <p className="text-[14px] text-gray-400">EUR pago à Anthropic/OpenAI</p>
                   </div>
                 </div>
                 {(metrics.usage?.creditsConsumed ?? 0) > 0 && (
-                  <p className="text-[10px] text-gray-400 mt-3 border-t border-gray-100 dark:border-gray-700 pt-2">
+                  <p className="text-[14px] text-gray-400 mt-3 border-t border-gray-100 dark:border-gray-700 pt-2">
                     💡 Eficiência: €{((metrics.usage?.realApiCostEur ?? 0) / (metrics.usage?.creditsConsumed ?? 1) * 1000).toFixed(4)} por 1 000 créditos consumidos
                     {' · '}Receita mensal por 1 000 créditos: €{(metrics.revenue.mrr / ((metrics.usage?.creditsConsumed ?? 1) / 1000)).toFixed(2)}
                   </p>
@@ -510,10 +510,10 @@ export default function AdminPage() {
                     { label: 'Total',     value: metrics.conversations.total,     accent: 'text-gray-800 dark:text-gray-100' },
                   ].map(({ label, value, accent }) => (
                     <div key={label}>
-                      <p className="text-[11px] text-gray-400 mb-0.5">{label}</p>
+                      <p className="text-[15px] text-gray-400 mb-0.5">{label}</p>
                       <p className={`text-2xl font-bold ${accent}`}>{value.toLocaleString('pt-PT')}</p>
                       {metrics.conversations.total > 0 && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">
+                        <p className="text-[14px] text-gray-400 mt-0.5">
                           {Math.round((value / metrics.conversations.total) * 100)}% do total
                         </p>
                       )}
@@ -572,10 +572,10 @@ export default function AdminPage() {
                           onClick={() => openTenantDetail(t.id)}>
                           <td className="py-2 px-3">
                             <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">{t.name}</p>
-                            <p className="text-[10px] text-gray-400">{t.email}{t.isAdmin && ' 🔑'}</p>
+                            <p className="text-[14px] text-gray-400">{t.email}{t.isAdmin && ' 🔑'}</p>
                           </td>
                           <td className="py-2 px-3">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan] ?? PLAN_COLORS.free}`}>
+                            <span className={`text-[14px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan] ?? PLAN_COLORS.free}`}>
                               {PLAN_LABELS_LOCAL[t.plan] ?? t.plan}
                             </span>
                           </td>
@@ -587,11 +587,11 @@ export default function AdminPage() {
                                 <div className={`h-full rounded-full ${t.creditsUsedPercent >= 90 ? 'bg-red-500' : t.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
                                   style={{ width: `${t.creditsUsedPercent}%` }} />
                               </div>
-                              <span className="text-[10px] text-gray-400">{t.creditsUsedPercent}%</span>
+                              <span className="text-[14px] text-gray-400">{t.creditsUsedPercent}%</span>
                             </div>
                           </td>
                           <td className="py-2 px-3 text-xs font-medium text-green-600">€{t.planPrice}/mês</td>
-                          <td className="py-2 px-3 text-[10px] text-gray-400">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
+                          <td className="py-2 px-3 text-[14px] text-gray-400">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
                           <td className="py-2 px-3 text-xs text-brand-500">{selectedTenant?.id === t.id ? '▲' : '▼'}</td>
                         </tr>
 
@@ -607,30 +607,30 @@ export default function AdminPage() {
                                   <div className="flex flex-wrap gap-4 items-start">
                                     <div className="flex-1 min-w-[200px]">
                                       <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{selectedTenant.companyName || selectedTenant.name}</p>
-                                      <p className="text-[10px] text-gray-400">{selectedTenant.email}</p>
-                                      {selectedTenant.phone && <p className="text-[10px] text-gray-400">📱 {selectedTenant.phone}</p>}
-                                      {selectedTenant.vatNumber && <p className="text-[10px] text-gray-400">NIF: {selectedTenant.vatNumber}</p>}
-                                      {selectedTenant.domain && <p className="text-[10px] text-gray-400">🌐 {selectedTenant.domain}</p>}
+                                      <p className="text-[14px] text-gray-400">{selectedTenant.email}</p>
+                                      {selectedTenant.phone && <p className="text-[14px] text-gray-400">📱 {selectedTenant.phone}</p>}
+                                      {selectedTenant.vatNumber && <p className="text-[14px] text-gray-400">NIF: {selectedTenant.vatNumber}</p>}
+                                      {selectedTenant.domain && <p className="text-[14px] text-gray-400">🌐 {selectedTenant.domain}</p>}
                                       <div className="flex gap-2 mt-1">
-                                        {selectedTenant.twoFactorEnabled && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">2FA ✓</span>}
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedTenant.paymentStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        {selectedTenant.twoFactorEnabled && <span className="text-[14px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">2FA ✓</span>}
+                                        <span className={`text-[14px] px-1.5 py-0.5 rounded-full ${selectedTenant.paymentStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                                           Billing: {selectedTenant.paymentStatus}
                                         </span>
                                       </div>
                                     </div>
                                     {/* Credits */}
                                     <div className="min-w-[160px]">
-                                      <p className="text-[10px] text-gray-500 mb-1">Créditos</p>
+                                      <p className="text-[14px] text-gray-500 mb-1">Créditos</p>
                                       <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden mb-1">
                                         <div className={`h-full rounded-full ${selectedTenant.creditsUsedPercent >= 90 ? 'bg-red-500' : selectedTenant.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
                                           style={{ width: `${selectedTenant.creditsUsedPercent}%` }} />
                                       </div>
-                                      <p className="text-[10px] text-gray-500">{selectedTenant.creditsUsed.toLocaleString()} / {selectedTenant.creditsTotal.toLocaleString()} ({selectedTenant.creditsUsedPercent}%)</p>
-                                      <p className="text-[10px] text-gray-400">Disponível: {selectedTenant.creditsAvailable.toLocaleString()}</p>
+                                      <p className="text-[14px] text-gray-500">{selectedTenant.creditsUsed.toLocaleString()} / {selectedTenant.creditsTotal.toLocaleString()} ({selectedTenant.creditsUsedPercent}%)</p>
+                                      <p className="text-[14px] text-gray-400">Disponível: {selectedTenant.creditsAvailable.toLocaleString()}</p>
                                     </div>
                                     {/* Plan change */}
                                     <div className="min-w-[160px]">
-                                      <p className="text-[10px] text-gray-500 mb-1">Alterar plano</p>
+                                      <p className="text-[14px] text-gray-500 mb-1">Alterar plano</p>
                                       <div className="flex gap-1">
                                         <select
                                           defaultValue={selectedTenant.plan}
@@ -656,7 +656,7 @@ export default function AdminPage() {
                                     {/* Impersonate */}
                                     {!selectedTenant.isAdmin && (
                                       <div className="min-w-[120px]">
-                                        <p className="text-[10px] text-gray-500 mb-1">Acesso direto</p>
+                                        <p className="text-[14px] text-gray-500 mb-1">Acesso direto</p>
                                         <button
                                           disabled={impersonating === selectedTenant.id}
                                           onClick={() => impersonateTenant(selectedTenant.id, selectedTenant.name)}
@@ -670,7 +670,7 @@ export default function AdminPage() {
 
                                   {/* Agents + skills */}
                                   <div>
-                                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                    <p className="text-[14px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
                                       Agentes ({selectedTenant.agents.length}) · Conversas: {selectedTenant._count.conversations} · Pedidos: {selectedTenant._count.orders}
                                     </p>
                                     {selectedTenant.agents.length === 0 && (
@@ -683,9 +683,9 @@ export default function AdminPage() {
                                             <div className="flex items-center gap-2">
                                               <span className={`w-1.5 h-1.5 rounded-full ${agent.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
                                               <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
-                                              <span className="text-[10px] text-gray-400">{agent.model.split('-').slice(0,2).join('-')}</span>
+                                              <span className="text-[14px] text-gray-400">{agent.model.split('-').slice(0,2).join('-')}</span>
                                             </div>
-                                            <div className="flex gap-1 text-[10px]">
+                                            <div className="flex gap-1 text-[14px]">
                                               <span className="text-gray-400">{agent._count.conversations} conv.</span>
                                               {agent._count.orders > 0 && <span className="text-green-600">{agent._count.orders} pedidos</span>}
                                             </div>
@@ -751,33 +751,33 @@ export default function AdminPage() {
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Créditos consumidos</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Créditos consumidos</p>
                     <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
                       {(metrics.usage?.creditsConsumed ?? 0).toLocaleString()}
                     </p>
-                    <p className="text-[10px] text-gray-400">unidades internas</p>
+                    <p className="text-[14px] text-gray-400">unidades internas</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Input tokens</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Input tokens</p>
                     <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
                       {((metrics.usage?.inputTokens ?? 0) / 1000).toFixed(1)}K
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Output tokens</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Output tokens</p>
                     <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
                       {((metrics.usage?.outputTokens ?? 0) / 1000).toFixed(1)}K
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Custo real pago (EUR)</p>
+                    <p className="text-[14px] text-gray-400 mb-0.5">Custo real pago (EUR)</p>
                     <p className="text-lg font-bold text-orange-600">
                       €{(metrics.usage?.realApiCostEur ?? 0).toFixed(4)}
                     </p>
-                    <p className="text-[10px] text-gray-400">à Anthropic / OpenAI</p>
+                    <p className="text-[14px] text-gray-400">à Anthropic / OpenAI</p>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-400 bg-orange-50 dark:bg-orange-900/10 rounded p-2">
+                <p className="text-[14px] text-gray-400 bg-orange-50 dark:bg-orange-900/10 rounded p-2">
                   ℹ️ Os créditos são a moeda interna da plataforma. O custo real EUR é calculado pelos tokens efetivamente processados × preço do modelo.
                   Os planos de Anthropic/OpenAI nas despesas abaixo são estimativas manuais — compare com este valor rastreado.
                 </p>
@@ -817,14 +817,14 @@ export default function AdminPage() {
                           <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
                             {CATEGORY_LABELS[exp.category] ?? exp.category} — {exp.description}
                           </p>
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-[14px] text-gray-400">
                             {exp.recurring ? `Recorrente (${exp.period === 'monthly' ? 'mensal' : 'anual'})` : 'Pontual'}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-red-500">
                             €{exp.period === 'yearly' ? (exp.amount / 12).toFixed(2) : exp.amount.toFixed(2)}/mês
-                            {exp.period === 'yearly' && <span className="text-[10px] text-gray-400 ml-1">(€{exp.amount}/ano)</span>}
+                            {exp.period === 'yearly' && <span className="text-[14px] text-gray-400 ml-1">(€{exp.amount}/ano)</span>}
                           </span>
                           <button onClick={() => removeExpense(exp.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button>
                         </div>
@@ -834,21 +834,21 @@ export default function AdminPage() {
                 )}
                 <form onSubmit={addExpense} className="border-t border-gray-100 dark:border-gray-700 pt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Categoria</label>
+                    <label className="block text-[14px] text-gray-500 mb-1">Categoria</label>
                     <select className="input text-xs" value={expForm.category} onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))}>
                       {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-[10px] text-gray-500 mb-1">Descrição</label>
+                    <label className="block text-[14px] text-gray-500 mb-1">Descrição</label>
                     <input className="input text-xs" placeholder="ex: Railway hosting" value={expForm.description} onChange={(e) => setExpForm((f) => ({ ...f, description: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Valor (€)</label>
+                    <label className="block text-[14px] text-gray-500 mb-1">Valor (€)</label>
                     <input className="input text-xs" type="number" step="0.01" min="0" placeholder="0.00" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="block text-[10px] text-gray-500">Período</label>
+                    <label className="block text-[14px] text-gray-500">Período</label>
                     <div className="flex gap-1.5">
                       <select className="input text-xs flex-1" value={expForm.period} onChange={(e) => setExpForm((f) => ({ ...f, period: e.target.value }))}>
                         <option value="monthly">Mensal</option>
@@ -865,8 +865,8 @@ export default function AdminPage() {
                   </div>
                 </form>
                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 mb-1">💡 Despesas típicas a registar</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[10px] text-blue-600 dark:text-blue-400">
+                  <p className="text-[14px] font-semibold text-blue-700 dark:text-blue-400 mb-1">💡 Despesas típicas a registar</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[14px] text-blue-600 dark:text-blue-400">
                     <span>🖥️ Railway ~€20/mês</span><span>🗄️ Supabase Pro €25/mês</span>
                     <span>🤖 Anthropic API: variável</span><span>🤖 OpenAI API: variável</span>
                     <span>🌐 Vercel Pro €20/mês</span><span>📱 Meta WA: grátis até 1000/mês</span>
@@ -937,7 +937,7 @@ export default function AdminPage() {
                   ] as [string, string, boolean][]).map(([featureKey, featureLabel, hasCredits]) => (
                     <div key={featureKey} className="card">
                       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">{featureLabel}</h3>
-                      <p className="text-[10px] text-gray-400 mb-4">
+                      <p className="text-[14px] text-gray-400 mb-4">
                         {featureKey === 'whitelabel' ? 'Preço = €/agente/mês' :
                          featureKey === 'payments'   ? 'Preço = mensalidade €/mês · Créditos = por transação' :
                          featureKey === 'vendas'     ? 'Sempre addon — inclui Pedidos/KDS. Preço = €/mês (mesmo para business/enterprise)' :
@@ -961,7 +961,7 @@ export default function AdminPage() {
                               return (
                                 <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
                                   <td className="py-1.5 pr-3">
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
+                                    <span className={`text-[14px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
                                   </td>
                                   <td className="py-1.5 pr-3">
                                     <select

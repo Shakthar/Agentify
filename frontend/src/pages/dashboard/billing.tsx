@@ -202,7 +202,7 @@ export default function BillingPage() {
                                   <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
                                     <div className="h-full bg-brand-600 rounded-full" style={{ width: `${pct}%` }} />
                                   </div>
-                                  <span className="text-[10px] text-gray-400 shrink-0">{pct}% do total</span>
+                                  <span className="text-[14px] text-gray-400 shrink-0">{pct}% do total</span>
                                 </div>
                               </div>
                               <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 shrink-0">

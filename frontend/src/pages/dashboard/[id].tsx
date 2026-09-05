@@ -725,7 +725,7 @@ export default function AgentDetailPage() {
               const cls = p === 'free'    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                 : p === 'starter'         ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400'
                 : 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400';
-              return <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+              return <span className={`text-[14px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
             }
 
             const SKILLS_DEF = [
@@ -819,16 +819,16 @@ export default function AgentDetailPage() {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{sk.label}</span>
                                 {sk.minPlan === 'free' && <PlanBadge plan="free" label="Grátis" />}
-                                {locked && sk.addonPrice && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {sk.addonPrice}</span>}
-                                {locked && !sk.addonPrice && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 {sk.minPlan[0].toUpperCase() + sk.minPlan.slice(1)}+</span>}
+                                {locked && sk.addonPrice && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {sk.addonPrice}</span>}
+                                {locked && !sk.addonPrice && <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 {sk.minPlan[0].toUpperCase() + sk.minPlan.slice(1)}+</span>}
                                 {!locked && sk.minPlan !== 'free' && <PlanBadge plan={sk.minPlan} label={sk.minPlan[0].toUpperCase() + sk.minPlan.slice(1) + '+'} />}
-                                {active && !locked && <span className="text-[10px] text-green-600 dark:text-green-400">● Ativa</span>}
+                                {active && !locked && <span className="text-[14px] text-green-600 dark:text-green-400">● Ativa</span>}
                               </div>
                               <TogglePill active={active} locked={locked} disabled={skillsSaving} onClick={() => handleToggleSkill(sk.field, active)} label={(active ? 'Desativar ' : 'Ativar ') + sk.label} />
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{sk.desc}</p>
-                            {locked && sk.addonPrice && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon {sk.addonPrice} →</button>}
-                            {locked && !sk.addonPrice && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para {sk.minPlan} →</button>}
+                            {locked && sk.addonPrice && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon {sk.addonPrice} →</button>}
+                            {locked && !sk.addonPrice && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para {sk.minPlan} →</button>}
                           </div>
                         </div>
                       );
@@ -841,15 +841,15 @@ export default function AgentDetailPage() {
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Pagamentos MB Way</span>
-                            {!mbwayAvail && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
-                            {mbwayAvail && mbway.monthly !== 'Incluído' && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">{mbway.monthly}</span>}
+                            {!mbwayAvail && <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
+                            {mbwayAvail && mbway.monthly !== 'Incluído' && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">{mbway.monthly}</span>}
                             {mbwayAvail && mbway.monthly === 'Incluído' && <PlanBadge plan="enterprise" label="Incluído" />}
-                            {mbwayAvail && mbway.credits && <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded-full">{mbway.credits}</span>}
+                            {mbwayAvail && mbway.credits && <span className="text-[14px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded-full">{mbway.credits}</span>}
                           </div>
                           <TogglePill active={mbwayAvail} locked={!isAdmin && !mbwayAvail} disabled={!isAdmin && !mbwayAvail} onClick={() => { if (!mbwayAvail && !isAdmin) router.push('/dashboard/plans'); }} label="Pagamentos MB Way" />
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">Cobra via MB Way diretamente na conversa. Mensalidade + créditos por transação.</p>
-                        {!mbwayAvail && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline">Ativar no Starter+ →</button>}
+                        {!mbwayAvail && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar no Starter+ →</button>}
                       </div>
                     </div>
 
@@ -865,9 +865,9 @@ export default function AgentDetailPage() {
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Vendas + Pedidos/KDS</span>
-                                {!vendasAvail && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
-                                {vendasAvail && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon +€15/mês</span>}
-                                {vendasActive && <span className="text-[10px] text-green-600 dark:text-green-400">● Ativa</span>}
+                                {!vendasAvail && <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
+                                {vendasAvail && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon +€15/mês</span>}
+                                {vendasActive && <span className="text-[14px] text-green-600 dark:text-green-400">● Ativa</span>}
                               </div>
                               <TogglePill
                                 active={vendasActive}
@@ -881,15 +881,15 @@ export default function AgentDetailPage() {
                               Perfil completo de vendas: trata o cliente pelo nome, sugere o habitual dos recorrentes, upselling natural e cross-sell. Inclui painel KDS em tempo real.
                             </p>
                             {!vendasAvail && (
-                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para Starter+ →</button>
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para Starter+ →</button>
                             )}
                             {vendasAvail && !vendasActive && (
-                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon +€15/mês →</button>
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon +€15/mês →</button>
                             )}
                             {vendasActive && (
                               <div className="flex flex-wrap gap-3 mt-1">
-                                <button onClick={() => setActiveTab('orders')} className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Abrir aba Pedidos →</button>
-                                <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[11px] text-gray-500 dark:text-gray-400 hover:underline">KDS autenticado ↗</a>
+                                <button onClick={() => setActiveTab('orders')} className="text-[15px] text-brand-600 dark:text-brand-400 hover:underline">Abrir aba Pedidos →</button>
+                                <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[15px] text-gray-500 dark:text-gray-400 hover:underline">KDS autenticado ↗</a>
                               </div>
                             )}
                           </div>
@@ -904,17 +904,17 @@ export default function AgentDetailPage() {
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Portal White-label</span>
-                            {!wlAvail && <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
-                            {wlAvail && !wlIncl && wlAddon && <span className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {wlAddon}/agente</span>}
+                            {!wlAvail && <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
+                            {wlAvail && !wlIncl && wlAddon && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {wlAddon}/agente</span>}
                             {wlIncl && <PlanBadge plan="business" label="Incluído" />}
-                            {wlActive && <span className="text-[10px] text-green-600 dark:text-green-400">● Ativa</span>}
+                            {wlActive && <span className="text-[14px] text-green-600 dark:text-green-400">● Ativa</span>}
                           </div>
                           <TogglePill active={wlActive} locked={!wlAvail} disabled={skillsSaving || !wlAvail} onClick={() => handleToggleSkill('whitelabelEnabled', wlActive)} label={wlActive ? 'Desativar White-label' : 'Ativar White-label'} />
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">Página pública do agente com a tua marca, sem branding Agentfy.</p>
-                        {wlActive && <a href={wlUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-[11px] text-brand-600 dark:text-brand-400 hover:underline font-mono">{wlUrl} ↗</a>}
-                        {wlAvail && !wlIncl && !wlActive && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon por {wlAddon}/agente →</button>}
-                        {!wlAvail && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[11px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para Starter+ →</button>}
+                        {wlActive && <a href={wlUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-[15px] text-brand-600 dark:text-brand-400 hover:underline font-mono">{wlUrl} ↗</a>}
+                        {wlAvail && !wlIncl && !wlActive && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon por {wlAddon}/agente →</button>}
+                        {!wlAvail && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para Starter+ →</button>}
                       </div>
                     </div>
 
@@ -1045,7 +1045,7 @@ export default function AgentDetailPage() {
                   <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
                     <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">🔑 KDS com login (ti/equipa)</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Painel autenticado com gestão completa (mover pedidos, filtrar agentes).</p>
-                    <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline font-medium">Abrir KDS →</a>
+                    <a href="/dashboard/orders/live" target="_blank" rel="noopener noreferrer" className="text-[15px] text-brand-600 dark:text-brand-400 hover:underline font-medium">Abrir KDS →</a>
                   </div>
                   <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
                     <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">📺 KDS público (cozinha / staff)</p>
@@ -1273,7 +1273,7 @@ export default function AgentDetailPage() {
                     </button>
                   </div>
                   {agent.ratingEnabled && (
-                    <p className="text-[11px] text-green-600 dark:text-green-400">✓ Ativo — resultados visíveis no Histórico de conversas.</p>
+                    <p className="text-[15px] text-green-600 dark:text-green-400">✓ Ativo — resultados visíveis no Histórico de conversas.</p>
                   )}
                 </div>
 
@@ -1317,7 +1317,7 @@ export default function AgentDetailPage() {
                   </div>
                   <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-500 dark:text-gray-400">
                     💰 Custo estimado: até <strong>€{(agent.proactiveMaxPerDay * COST_PER_MSG * 30).toFixed(0)}/mês</strong> (pelo limite diário) · limite mensal: <strong>€{(agent.proactiveMonthBudget * COST_PER_MSG).toFixed(0)}</strong>
-                    <br/><span className="text-[10px]">Estimativa baseada em €{COST_PER_MSG}/msg · valores reais variam por país e tipo de mensagem</span>
+                    <br/><span className="text-[14px]">Estimativa baseada em €{COST_PER_MSG}/msg · valores reais variam por país e tipo de mensagem</span>
                   </div>
                   <div className="mt-2 text-xs text-gray-400">
                     Este mês: <strong>{agent.proactiveSentMonth}</strong> enviadas · Hoje: <strong>{agent.proactiveSentToday}</strong>
@@ -1348,7 +1348,7 @@ export default function AgentDetailPage() {
                           onChange={(e) => setAgent(a => a ? { ...a, followUpHours: Number(e.target.value) } : a)}
                           onBlur={(e) => handleSaveIntegrations({ followUpHours: Number(e.target.value) })}
                         />
-                        <p className="text-[10px] text-gray-400 mt-1">Máx 23h para ficar dentro da janela gratuita</p>
+                        <p className="text-[14px] text-gray-400 mt-1">Máx 23h para ficar dentro da janela gratuita</p>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mensagem de follow-up</label>
@@ -1357,7 +1357,7 @@ export default function AgentDetailPage() {
                           onChange={(e) => setAgent(a => a ? { ...a, followUpMessage: e.target.value } : a)}
                           onBlur={(e) => handleSaveIntegrations({ followUpMessage: e.target.value })}
                         />
-                        <p className="text-[10px] text-gray-400 mt-1">Usa {'{nome}'} para personalizar com o nome do cliente</p>
+                        <p className="text-[14px] text-gray-400 mt-1">Usa {'{nome}'} para personalizar com o nome do cliente</p>
                       </div>
                     </div>
                   )}
@@ -1590,7 +1590,7 @@ export default function AgentDetailPage() {
                         {wpTokenVisible ? 'Ocultar' : 'Mostrar'}
                       </button>
                     </div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-[15px] text-gray-400 dark:text-gray-500 mt-1">
                       Usa isto quando este número pertence a uma conta Meta diferente do servidor principal. Gera em: Meta for Developers → App → WhatsApp → API Setup.
                     </p>
                   </div>
@@ -1780,7 +1780,7 @@ export default function AgentDetailPage() {
                       Facebook Page ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID da Página ligada a esta conta — obrigatório para enviar DMs)</span>
                     </label>
                     <input className="input" placeholder="ex: 1281854898348672" value={igPageId} onChange={(e) => setIgPageId(e.target.value)} />
-                    <p className="text-[11px] text-gray-400 mt-1">É diferente do Instagram Account ID. Encontra-o em Meta Business Suite → Configurações → Páginas → (a tua página) → Identificação.</p>
+                    <p className="text-[15px] text-gray-400 mt-1">É diferente do Instagram Account ID. Encontra-o em Meta Business Suite → Configurações → Páginas → (a tua página) → Identificação.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1809,7 +1809,7 @@ export default function AgentDetailPage() {
                       Número de notificação WhatsApp <span className="text-gray-400 dark:text-gray-500 font-normal">(recebe alerta de handoff + pedidos)</span>
                     </label>
                     <input className="input" placeholder="ex: 351912345678" value={notifyPhone} onChange={(e) => setNotifyPhone(e.target.value)} />
-                    <p className="text-[11px] text-gray-400 mt-1">Quando o agente transferir para humano, envias uma mensagem WhatsApp para este número com o resumo da conversa.</p>
+                    <p className="text-[15px] text-gray-400 mt-1">Quando o agente transferir para humano, envias uma mensagem WhatsApp para este número com o resumo da conversa.</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
@@ -1938,7 +1938,7 @@ export default function AgentDetailPage() {
                       </button>
                     </div>
                     {tgUsername && (
-                      <p className="text-[11px] text-green-600 dark:text-green-400 mt-1">Bot ligado: @{tgUsername}</p>
+                      <p className="text-[15px] text-green-600 dark:text-green-400 mt-1">Bot ligado: @{tgUsername}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-3">

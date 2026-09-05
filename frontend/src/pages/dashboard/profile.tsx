@@ -296,7 +296,7 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                 <input className="input bg-gray-50 dark:bg-gray-700 cursor-not-allowed" value={tenant.email} readOnly />
-                <p className="text-[10px] text-gray-400 mt-0.5">O email não pode ser alterado aqui.</p>
+                <p className="text-[14px] text-gray-400 mt-0.5">O email não pode ser alterado aqui.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Telefone</label>
@@ -305,7 +305,7 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">NIF / VAT</label>
                 <input className="input" placeholder="PT123456789" value={profile.vatNumber} onChange={(e) => setProfile(f => ({ ...f, vatNumber: e.target.value }))} />
-                <p className="text-[10px] text-gray-400 mt-0.5">Necessário para emissão de fatura fiscal.</p>
+                <p className="text-[14px] text-gray-400 mt-0.5">Necessário para emissão de fatura fiscal.</p>
               </div>
             </div>
 
@@ -533,11 +533,11 @@ export default function ProfilePage() {
             {/* Current subscription details */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-                <p className="text-[11px] text-gray-500 uppercase tracking-wide">Plano</p>
+                <p className="text-[15px] text-gray-500 uppercase tracking-wide">Plano</p>
                 <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mt-0.5 capitalize">{tenant.plan}</p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-                <p className="text-[11px] text-gray-500 uppercase tracking-wide">Método</p>
+                <p className="text-[15px] text-gray-500 uppercase tracking-wide">Método</p>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">
                   {tenant.subscriptionMethod === 'stripe' && '💳 Cartão (Stripe)'}
                   {tenant.subscriptionMethod === 'ifthenpay_mbway' && '📱 MB Way'}
@@ -546,7 +546,7 @@ export default function ProfilePage() {
                 </p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-                <p className="text-[11px] text-gray-500 uppercase tracking-wide">Próxima renovação</p>
+                <p className="text-[15px] text-gray-500 uppercase tracking-wide">Próxima renovação</p>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">
                   {tenant.subscriptionExpiresAt
                     ? new Date(tenant.subscriptionExpiresAt).toLocaleDateString('pt-PT')
@@ -555,8 +555,8 @@ export default function ProfilePage() {
                 {tenant.subscriptionExpiresAt && (() => {
                   const days = Math.ceil((new Date(tenant.subscriptionExpiresAt).getTime() - Date.now()) / 86400000);
                   return days > 0
-                    ? <p className="text-[10px] text-gray-400">{days} dias restantes</p>
-                    : <p className="text-[10px] text-red-500">Expirado há {Math.abs(days)} dias</p>;
+                    ? <p className="text-[14px] text-gray-400">{days} dias restantes</p>
+                    : <p className="text-[14px] text-red-500">Expirado há {Math.abs(days)} dias</p>;
                 })()}
               </div>
             </div>
@@ -602,7 +602,7 @@ export default function ProfilePage() {
                             {inv.method === 'manual' && '🔧 Manual'}
                           </td>
                           <td className="py-2 px-3">
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                            <span className={`px-1.5 py-0.5 rounded-full text-[14px] font-medium ${
                               inv.status === 'paid'    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                               inv.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                               inv.status === 'failed' || inv.status === 'expired' ? 'bg-red-100 text-red-700' :
@@ -621,7 +621,7 @@ export default function ProfilePage() {
                               <button
                                 onClick={() => testConfirm(inv.id)}
                                 disabled={confirmingId === inv.id}
-                                className="text-[10px] bg-brand-600 hover:bg-brand-700 text-white px-2 py-1 rounded-lg disabled:opacity-50 whitespace-nowrap"
+                                className="text-[14px] bg-brand-600 hover:bg-brand-700 text-white px-2 py-1 rounded-lg disabled:opacity-50 whitespace-nowrap"
                               >
                                 {confirmingId === inv.id ? '…' : '🧪 Confirmar'}
                               </button>

@@ -155,7 +155,7 @@ export default function Navigation() {
         <div className="pt-2 px-2 border-t border-gray-100 dark:border-gray-800 mt-2">
           <div className="flex flex-wrap gap-x-2 gap-y-1">
             {[['Privacidade', '/privacy-policy'], ['Termos', '/terms-of-service'], ['Dados', '/data-deletion']].map(([label, href]) => (
-              <Link key={href} href={href} className="text-[10px] text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors">
+              <Link key={href} href={href} className="text-[14px] text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400 transition-colors">
                 {label}
               </Link>
             ))}
@@ -178,7 +178,7 @@ export default function Navigation() {
               }`}
             >
               <item.icon className={`w-5 h-5 ${active ? '' : 'opacity-70'}`} strokeWidth={active ? 2.25 : 2} />
-              <span className={`text-[10px] font-medium leading-none ${active ? 'font-semibold' : ''}`}>{item.label}</span>
+              <span className={`text-[14px] font-medium leading-none ${active ? 'font-semibold' : ''}`}>{item.label}</span>
               {active && <span className="w-1 h-1 rounded-full bg-brand-600 dark:bg-brand-400 mt-0.5" />}
             </Link>
           );

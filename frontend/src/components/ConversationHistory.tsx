@@ -33,7 +33,7 @@ function urgencyBadge(u?: string) {
   };
   if (!u) return null;
   return (
-    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${map[u] ?? map.low}`}>
+    <span className={`text-[14px] font-medium px-1.5 py-0.5 rounded ${map[u] ?? map.low}`}>
       {u}
     </span>
   );
@@ -182,7 +182,7 @@ export default function ConversationHistory({ agentId }: Props) {
               <button
                 key={f}
                 onClick={() => { setFilter(f); loadConversations(0, true); }}
-                className={`flex-1 min-w-[2.5rem] text-[10px] py-1 rounded font-medium transition-colors ${
+                className={`flex-1 min-w-[2.5rem] text-[14px] py-1 rounded font-medium transition-colors ${
                   filter === f
                     ? f === 'handoff' ? 'bg-orange-500 text-white' : 'bg-brand-600 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -223,24 +223,24 @@ export default function ConversationHistory({ agentId }: Props) {
                     {channelTag(conv.channelType)}
                     {conv.visitorId ?? 'Anonimo'}
                   </span>
-                  <span className="text-[10px] text-gray-400 shrink-0">{formatDate(conv.createdAt)}</span>
+                  <span className="text-[14px] text-gray-400 shrink-0">{formatDate(conv.createdAt)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className={`text-xs ${sentimentColor(conv.sentiment)}`}>{sentimentLabel(conv.sentiment)}</span>
                   {urgencyBadge(conv.urgency)}
                   {conv.resolved && (
-                    <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">ok</span>
+                    <span className="text-[14px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">ok</span>
                   )}
                   {conv.handedOffToHuman && (
-                    <span className="text-[10px] bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">🤝 handoff</span>
+                    <span className="text-[14px] bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">🤝 handoff</span>
                   )}
                   {conv.needsReview && (
-                    <span className="text-[10px] bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1.5 py-0.5 rounded" title={conv.reviewReason}>🔎 revisão</span>
+                    <span className="text-[14px] bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1.5 py-0.5 rounded" title={conv.reviewReason}>🔎 revisão</span>
                   )}
                   {conv.rating != null && (
-                    <span className="text-[10px] text-yellow-500">{'★'.repeat(conv.rating)}{'☆'.repeat(5 - conv.rating)}</span>
+                    <span className="text-[14px] text-yellow-500">{'★'.repeat(conv.rating)}{'☆'.repeat(5 - conv.rating)}</span>
                   )}
-                  <span className="ml-auto text-[10px] text-gray-400">
+                  <span className="ml-auto text-[14px] text-gray-400">
                     {(conv._count?.messages ?? 0)} msg
                   </span>
                 </div>
@@ -274,7 +274,7 @@ export default function ConversationHistory({ agentId }: Props) {
                   {channelTag(selected.channelType)}
                   {selected.visitorId ?? 'Anonimo'}
                 </p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[14px] text-gray-400">
                   Iniciada em {new Date(selected.createdAt).toLocaleString('pt-PT')}
                   {selected.closedAt && ` - Encerrada ${new Date(selected.closedAt).toLocaleString('pt-PT')}`}
                 </p>
@@ -341,7 +341,7 @@ export default function ConversationHistory({ agentId }: Props) {
                     )}
                     <button
                       onClick={() => fetchCopilot(selected)}
-                      className="text-[10px] text-brand-600 dark:text-brand-400 hover:underline"
+                      className="text-[14px] text-brand-600 dark:text-brand-400 hover:underline"
                     >
                       ↻ Gerar novas sugestões
                     </button>
@@ -370,7 +370,7 @@ export default function ConversationHistory({ agentId }: Props) {
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                      <p className={`text-[10px] mt-1 text-right ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'}`}>
+                      <p className={`text-[14px] mt-1 text-right ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'}`}>
                         {formatTime(msg.timestamp)}
                         {msg.tokens > 0 && ` - ${msg.tokens}t`}
                       </p>

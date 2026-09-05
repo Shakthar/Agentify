@@ -258,7 +258,7 @@ export default function AgencyPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[a.subscriptionStatus] ?? 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`text-[14px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[a.subscriptionStatus] ?? 'bg-gray-100 text-gray-500'}`}>
                           {a.subscriptionStatus === 'active' ? '✓ Ativa' :
                            a.subscriptionStatus === 'suspended' ? '⛔ Suspensa' :
                            a.subscriptionStatus === 'trial' ? '🆓 Trial' :
@@ -275,7 +275,7 @@ export default function AgencyPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleToggleActive(a.id, !a.isActive)}
-                            className={`text-[10px] px-2 py-1 rounded font-medium transition-colors ${a.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400' : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400'}`}
+                            className={`text-[14px] px-2 py-1 rounded font-medium transition-colors ${a.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400' : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400'}`}
                           >
                             {a.isActive ? '⏸ Suspender' : '▶ Ativar'}
                           </button>

@@ -120,10 +120,10 @@ export default function ObservePage() {
                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                           {c.visitorName ?? c.visitorId ?? 'Visitante'}
                         </div>
-                        <div className="text-[10px] text-gray-400">{elapsed(c.createdAt)}</div>
+                        <div className="text-[14px] text-gray-400">{elapsed(c.createdAt)}</div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-gray-400 shrink-0">{c.messages.length} msgs</span>
+                    <span className="text-[14px] text-gray-400 shrink-0">{c.messages.length} msgs</span>
                   </div>
                   {c.messages[0] && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">
@@ -160,7 +160,7 @@ export default function ObservePage() {
                           : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs italic border border-yellow-200 dark:border-yellow-800 rounded'
                       }`}>
                         {m.content}
-                        <div className={`text-[10px] mt-1 ${m.role === 'user' ? 'text-brand-200' : 'text-gray-400'}`}>
+                        <div className={`text-[14px] mt-1 ${m.role === 'user' ? 'text-brand-200' : 'text-gray-400'}`}>
                           {new Date(m.createdAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -171,7 +171,7 @@ export default function ObservePage() {
 
                 {/* Read-only notice */}
                 <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 shrink-0">
-                  <p className="text-[11px] text-gray-400 text-center">👁️ Modo observação — só leitura. O agente IA está a responder automaticamente.</p>
+                  <p className="text-[15px] text-gray-400 text-center">👁️ Modo observação — só leitura. O agente IA está a responder automaticamente.</p>
                 </div>
               </div>
             )}

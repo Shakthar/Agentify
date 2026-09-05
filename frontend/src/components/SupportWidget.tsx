@@ -144,7 +144,7 @@ export default function SupportWidget() {
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-base">🤖</div>
               <div>
                 <p className="text-white text-sm font-semibold leading-tight">Suporte Agentfy</p>
-                <p className="text-brand-200 text-[10px]">Responde em segundos</p>
+                <p className="text-brand-200 text-[14px]">Responde em segundos</p>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white text-xl leading-none">×</button>
@@ -205,7 +205,7 @@ export default function SupportWidget() {
       >
         {open ? '×' : '💬'}
         {!open && unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[14px] font-bold flex items-center justify-center">
             {unread}
           </span>
         )}

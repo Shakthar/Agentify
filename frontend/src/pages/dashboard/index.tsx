@@ -39,11 +39,11 @@ function KpiCard({
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">{label}</p>
+        <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">{label}</p>
         <p className={`text-xl font-bold leading-tight ${accent ?? 'text-gray-900 dark:text-gray-100'}`}>
           {value}
         </p>
-        {sub && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 leading-tight">{sub}</p>}
+        {sub && <p className="text-[15px] text-gray-400 dark:text-gray-500 mt-0.5 leading-tight">{sub}</p>}
       </div>
     </div>
   );
@@ -132,7 +132,7 @@ export default function Dashboard() {
                 ⚡
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">Créditos</p>
+                <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-0.5">Créditos</p>
                 <p className={`text-xl font-bold leading-tight ${
                   usedPercent >= 90 ? 'text-red-500' : usedPercent >= 70 ? 'text-yellow-600' : 'text-gray-900 dark:text-gray-100'
                 }`}>
@@ -146,7 +146,7 @@ export default function Dashboard() {
                     style={{ width: `${Math.min(usedPercent, 100)}%` }}
                   />
                 </div>
-                <p className="text-[11px] text-gray-400 mt-0.5">{usedPercent}% usado</p>
+                <p className="text-[15px] text-gray-400 mt-0.5">{usedPercent}% usado</p>
               </div>
             </div>
             <KpiCard
@@ -188,7 +188,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-3 shrink-0">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                    <span className={`px-2 py-0.5 rounded-full text-[15px] font-medium ${
                       agent.isActive
                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                         : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'

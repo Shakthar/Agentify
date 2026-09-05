@@ -125,7 +125,7 @@ function SLAModal({ config, onSave, onClose }: { config: SLAConfig; onSave: (c: 
             <div className="grid grid-cols-2 gap-2">
               {([['yellowMin', '🟡 Alerta (min)', 'text-yellow-400'], ['redMin', '🔴 Crítico (min)', 'text-red-400']] as const).map(([field, lbl, cls]) => (
                 <div key={field}>
-                  <label className={`text-[10px] ${cls} block mb-1`}>{lbl}</label>
+                  <label className={`text-[14px] ${cls} block mb-1`}>{lbl}</label>
                   <input type="number" min="1"
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-2.5 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
                     value={d.stages[key][field]}
@@ -169,7 +169,7 @@ function CopyLinkButton({ orderId }: { orderId: string }) {
   }
   return (
     <button onClick={copy} title="Copiar link de rastreio para o cliente"
-      className={`text-[10px] px-2.5 py-1 rounded-lg transition-all ${copied ? 'bg-green-700 text-green-200' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
+      className={`text-[14px] px-2.5 py-1 rounded-lg transition-all ${copied ? 'bg-green-700 text-green-200' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
       {copied ? '✓ Copiado!' : '🔗 Link'}
     </button>
   );
@@ -195,7 +195,7 @@ function OrderCard({ order, colKey, sla, advancing, onAdvance }: {
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className={`text-2xl font-extrabold leading-none ${styles.amount}`}>€{order.amount.toFixed(2)}</p>
-          <p className="text-[10px] text-gray-500 mt-0.5 font-mono">#{order.id.slice(-8).toUpperCase()}</p>
+          <p className="text-[14px] text-gray-500 mt-0.5 font-mono">#{order.id.slice(-8).toUpperCase()}</p>
         </div>
         {!isFinished && slac ? (
           <div className="flex items-center gap-1.5 bg-gray-900/40 rounded-lg px-2 py-1">
@@ -370,7 +370,7 @@ export default function OrdersLivePage() {
             <span className="text-lg">🍽️</span>
             <div className="min-w-0">
               <h1 className="font-bold text-white text-sm leading-none">Fila de Pedidos</h1>
-              <p className="text-[10px] text-gray-500 mt-0.5 hidden sm:block">
+              <p className="text-[14px] text-gray-500 mt-0.5 hidden sm:block">
                 ⟳ {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 {totalActive > 0 && <span className="ml-2 text-orange-400 font-semibold">{totalActive} activos</span>}
               </p>
@@ -385,7 +385,7 @@ export default function OrdersLivePage() {
           )}
         </div>
 
-        <div className="hidden xl:flex items-center gap-3 text-[11px] text-gray-500">
+        <div className="hidden xl:flex items-center gap-3 text-[15px] text-gray-500">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400" /> no prazo</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400" /> atenção</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> crítico</span>
@@ -430,7 +430,7 @@ export default function OrdersLivePage() {
                   <span>{col.icon}</span>
                   <span>{col.label}</span>
                   {count > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${col.badge}`}>{count}</span>
+                    <span className={`text-[14px] font-bold px-1.5 py-0.5 rounded-full text-white ${col.badge}`}>{count}</span>
                   )}
                 </button>
               );
@@ -471,7 +471,7 @@ export default function OrdersLivePage() {
       {/* MOBILE: bottom bar */}
       {!loading && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 px-4 py-2.5 flex items-center justify-between">
-          <span className="text-[11px] text-gray-500">
+          <span className="text-[15px] text-gray-500">
             ⟳ {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
           </span>
           {totalActive > 0 ? (
