@@ -12,6 +12,7 @@ import {
   UpstreamError,
 } from '../lib/errors.js';
 import { writeAuditLog } from './admin.service.js';
+import { sendHandoffAlertEmail } from './email.service.js';
 
 interface ListConversationsParams {
   skip?: number;
@@ -234,7 +235,7 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { encryptionKey: true, creditsTotal: true, creditsUsed: true, plan: true },
+    select: { encryptionKey: true, creditsTotal: true, creditsUsed: true, plan: true, email: true },
   });
   if (!tenant) {
     throw new NotFoundError('Tenant not found');
@@ -720,6 +721,23 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
       },
     }),
   ]);
+
+  // Alerta por email: dispara em fire-and-forget (nunca bloqueia nem falha a
+  // resposta ao utilizador final por causa de um problema no envio de email).
+  // Destinatário: "Email para alertas" do agente, com fallback para o email
+  // de login da conta (decisão do Eduardo, 05/09).
+  if (handoffSummary) {
+    const alertTo = (conversation.agent as any).alertEmail || tenant?.email;
+    if (alertTo) {
+      sendHandoffAlertEmail({
+        to: alertTo,
+        agentName: conversation.agent.name,
+        agentId: conversation.agentId,
+        conversationId: conversation.id,
+        summary: handoffSummary,
+      }).catch((err) => console.error('[Email] Falha ao enviar alerta de handoff:', err));
+    }
+  }
 
   return {
     id: assistantMsg.id,
