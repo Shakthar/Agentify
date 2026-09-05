@@ -7,24 +7,28 @@ import { Plan, PLAN_LABELS, PLAN_COLORS } from '../types';
 import LanguageSwitcher from './LanguageSwitcher';
 import Logo from './Logo';
 import { exitImpersonation, getImpersonationInfo } from '../utils/auth';
+import {
+  LayoutDashboard, Bot, Zap, Rocket, Palette, ShieldCheck, User,
+  Building2, Users, BookOpen, KeyRound, type LucideIcon,
+} from 'lucide-react';
 
-const BASE_NAV_ITEMS = [
-  { href: ROUTES.dashboard,          label: 'Dashboard',   icon: '◈'  },
-  { href: ROUTES.agents,             label: 'Agentes',     icon: '🤖' },
-  { href: ROUTES.credits,            label: 'Créditos',    icon: '⚡' },
-  { href: ROUTES.plans,              label: 'Planos',      icon: '🚀' },
-  { href: ROUTES.whitelabelDashboard,label: 'White-label', icon: '🎨' },
-  { href: ROUTES.admin,              label: 'Admin',       icon: '🛡️' },
-  { href: ROUTES.profile,            label: 'Perfil',      icon: '👤' },
+const BASE_NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: ROUTES.dashboard,          label: 'Dashboard',   icon: LayoutDashboard },
+  { href: ROUTES.agents,             label: 'Agentes',     icon: Bot             },
+  { href: ROUTES.credits,            label: 'Créditos',    icon: Zap             },
+  { href: ROUTES.plans,              label: 'Planos',      icon: Rocket          },
+  { href: ROUTES.whitelabelDashboard,label: 'White-label', icon: Palette         },
+  { href: ROUTES.admin,              label: 'Admin',       icon: ShieldCheck     },
+  { href: ROUTES.profile,            label: 'Perfil',      icon: User            },
 ];
 
 // Items shown in the mobile bottom bar (max 5)
-const mobileItems = [
-  { href: ROUTES.dashboard, label: 'Início',   icon: '◈'  },
-  { href: ROUTES.agents,    label: 'Agentes',  icon: '🤖' },
-  { href: ROUTES.credits,   label: 'Créditos', icon: '⚡' },
-  { href: ROUTES.plans,     label: 'Planos',   icon: '🚀' },
-  { href: ROUTES.profile,   label: 'Perfil',   icon: '👤' },
+const mobileItems: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: ROUTES.dashboard, label: 'Início',   icon: LayoutDashboard },
+  { href: ROUTES.agents,    label: 'Agentes',  icon: Bot             },
+  { href: ROUTES.credits,   label: 'Créditos', icon: Zap             },
+  { href: ROUTES.plans,     label: 'Planos',   icon: Rocket          },
+  { href: ROUTES.profile,   label: 'Perfil',   icon: User            },
 ];
 
 export default function Navigation() {
@@ -44,9 +48,9 @@ export default function Navigation() {
   }
   const navItems = [
     ...BASE_NAV_ITEMS,
-    ...(tenant?.isAgency || tenant?.isAdmin ? [{ href: ROUTES.agency, label: 'Agência', icon: '🏢' }] : []),
-    { href: ROUTES.crm, label: 'CRM', icon: '👥' },
-    { href: ROUTES.prompts, label: 'Prompts', icon: '📚' },
+    ...(tenant?.isAgency || tenant?.isAdmin ? [{ href: ROUTES.agency, label: 'Agência', icon: Building2 }] : []),
+    { href: ROUTES.crm, label: 'CRM', icon: Users },
+    { href: ROUTES.prompts, label: 'Prompts', icon: BookOpen },
   ];
 
   const handleLogout = async () => {
@@ -66,7 +70,7 @@ export default function Navigation() {
       {/* ═══ IMPERSONATION BANNER ══════════════════════════════════════════ */}
       {impersonation.active && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-xs flex items-center justify-between px-4 py-2 shadow-md">
-          <span>🔑 A gerir como: <strong>{impersonation.tenantName}</strong></span>
+          <span className="flex items-center gap-1.5"><KeyRound className="w-3.5 h-3.5 shrink-0" /> A gerir como: <strong>{impersonation.tenantName}</strong></span>
           <button
             onClick={handleExitImpersonation}
             className="ml-4 bg-white text-amber-700 font-semibold px-3 py-0.5 rounded-full hover:bg-amber-100 transition-colors"
@@ -95,7 +99,7 @@ export default function Navigation() {
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
               }`}
             >
-              <span className="text-base w-5 text-center shrink-0">{item.icon}</span>
+              <item.icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
               <span>{item.label}</span>
             </Link>
           ))}
@@ -173,7 +177,7 @@ export default function Navigation() {
                   : 'text-gray-500 dark:text-gray-400'
               }`}
             >
-              <span className={`text-xl leading-none ${active ? '' : 'opacity-70'}`}>{item.icon}</span>
+              <item.icon className={`w-5 h-5 ${active ? '' : 'opacity-70'}`} strokeWidth={active ? 2.25 : 2} />
               <span className={`text-[10px] font-medium leading-none ${active ? 'font-semibold' : ''}`}>{item.label}</span>
               {active && <span className="w-1 h-1 rounded-full bg-brand-600 dark:bg-brand-400 mt-0.5" />}
             </Link>

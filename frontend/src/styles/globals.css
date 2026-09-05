@@ -24,7 +24,7 @@
       dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500;
   }
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm p-6
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm p-6 transition-shadow duration-200 hover:shadow-md
       dark:bg-gray-900 dark:border-gray-700;
   }
 }
