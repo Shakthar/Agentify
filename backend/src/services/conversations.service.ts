@@ -57,10 +57,11 @@ export async function listConversations(tenantId: string, params: ListConversati
         id: true, agentId: true, channelType: true, visitorId: true, visitorName: true,
         sentiment: true, urgency: true, resolved: true,
         handedOffToHuman: true, tokensUsed: true, creditsUsed: true,
+        rating: true, needsReview: true,
         createdAt: true, closedAt: true,
         agent: { select: { name: true } },
         _count: { select: { messages: true } },
-      },
+      } as any,
     }),
     prisma.conversation.count({ where }),
   ]);
@@ -153,6 +154,80 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   if (!conversation) {
     throw new NotFoundError('Conversation not found');
   }
+
+  // ── Avaliação pós-atendimento: captura da nota do cliente ─────────────────
+  // O agente pede a nota através do marcador [RESOLVED] (mais abaixo) SEM
+  // fechar a conversa nesse momento — fica "awaitingRating" e só fechamos
+  // quando o cliente responder com um número. Por isso este bloco corre
+  // ANTES do guard de "conversa fechada" logo a seguir.
+  if ((conversation as any).awaitingRating && !conversation.resolved && !conversation.closedAt) {
+    const ratingMatch = content.match(/[1-5]/);
+    if (ratingMatch) {
+      const rating = parseInt(ratingMatch[0], 10);
+      const ratingTextRaw = content.replace(ratingMatch[0], '').trim();
+      const ratingText = ratingTextRaw ? ratingTextRaw.slice(0, 500) : null;
+
+      const tenantForRating = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { encryptionKey: true },
+      });
+      const dataKeyForRating = unwrapDataKey(tenantForRating?.encryptionKey);
+
+      let ratingUserContent = content;
+      let ratingUserIV: string | undefined;
+      if (dataKeyForRating) {
+        const enc = encrypt(content, dataKeyForRating);
+        ratingUserContent = enc.ciphertext;
+        ratingUserIV = enc.iv;
+      }
+      await prisma.message.create({
+        data: { conversationId: conversation.id, role: 'user', content: ratingUserContent, contentIV: ratingUserIV },
+      });
+
+      const thankYou = 'Obrigado pelo teu feedback! 🙌';
+      let ratingAssistantContent = thankYou;
+      let ratingAssistantIV: string | undefined;
+      if (dataKeyForRating) {
+        const enc = encrypt(thankYou, dataKeyForRating);
+        ratingAssistantContent = enc.ciphertext;
+        ratingAssistantIV = enc.iv;
+      }
+      const ratingAssistantMsg = await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: ratingAssistantContent,
+          contentIV: ratingAssistantIV,
+          tokens: 0,
+        },
+      });
+
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { rating, ratingText, awaitingRating: false } as any,
+      });
+      // Fecho automático + recálculo da taxa de resolução real (item partilhado com closeConversation).
+      await finalizeConversationClosure(tenantId, conversation.agentId, conversation.id);
+
+      // NOTA: sem chamada ao LLM — não gasta créditos nem tokens.
+      return {
+        id: ratingAssistantMsg.id,
+        role: 'assistant',
+        content: thankYou,
+        tokens: 0,
+        creditsUsed: 0,
+        sentiment: null,
+        timestamp: ratingAssistantMsg.timestamp,
+        docAttachment: null,
+        mbwayCharge: null,
+        handoff: null,
+        ratingRequested: false,
+      };
+    }
+    // Sem número reconhecível nesta mensagem — segue o fluxo normal (o cliente
+    // pode ter escrito outra coisa); continuamos "awaitingRating" para a próxima.
+  }
+
   if (conversation.resolved || conversation.closedAt) {
     throw new BadRequestError('Conversation is closed');
   }
@@ -295,6 +370,27 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
       + '\nNOTA: Usa este marcador APENAS UMA VEZ por conversa, quando tiveres a certeza que o handoff é necessário.';
   }
 
+  // Injeta skill de avaliação pós-atendimento — só pede nota se ainda não estiver à espera de uma
+  if ((conversation.agent as any).ratingEnabled && !(conversation as any).awaitingRating) {
+    systemPrompt += '\n\n---\nSKILL: AVALIAÇÃO PÓS-ATENDIMENTO'
+      + '\nQuando sentires que o pedido/dúvida do cliente ficou totalmente resolvido e a conversa está a terminar naturalmente'
+      + ' (despedida, agradecimento, ou já não há mais nada a tratar):'
+      + '\n1. Termina a tua resposta despedindo-te normalmente'
+      + '\n2. Inclui o marcador [RESOLVED] no final da resposta'
+      + '\nExemplo: "Fico feliz por ter ajudado! Qualquer coisa estou por aqui. [RESOLVED]"'
+      + '\nNOTA: usa [RESOLVED] no máximo uma vez por conversa, só quando tiveres a certeza que terminou.';
+  }
+
+  // Autoavaliação de qualidade (QA automático) — invisível ao cliente, sempre ativa.
+  systemPrompt += '\n\n---\nAUTOAVALIAÇÃO DE QUALIDADE (obrigatório, marcador invisível ao cliente):'
+    + '\nSe nesta resposta não conseguires ajudar com confiança — pergunta fora do teu âmbito, respostas repetidas sem'
+    + ' resolver o problema, cliente a parecer frustrado ou confuso, ou falta de informação — inclui'
+    + ' [REVIEW:razão breve em português, máx 100 carateres].'
+    + '\nExemplo: "Peço desculpa, não tenho essa informação disponível. [REVIEW:Cliente perguntou sobre devoluções, não está na KB]"'
+    + '\nAlém disso, sempre que não encontrares a resposta na tua base de conhecimento, inclui também'
+    + ' [UNKNOWN:pergunta original do cliente, resumida] — serve para o dono do negócio saber o que falta documentar.'
+    + '\nAmbos os marcadores são invisíveis para o cliente e podes usá-los mais que uma vez por conversa.';
+
   // Injeta skill de captura de leads (dataCollection)
   if ((conversation.agent as any).skillDataCollection && !(conversation as any).flaggedForOwner) {
     systemPrompt += '\n\n---\nSKILL: CAPTURA DE LEADS'
@@ -415,6 +511,37 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
   const handoffMatch = llmResponse.content.match(/\[HANDOFF:([^\]]+)\]/i);
   const handoffSummary = handoffMatch?.[1]?.trim().slice(0, 200) ?? null;
 
+  // Parseia [REVIEW:razão] — QA automático (falha silenciosa do agente, item "roubado" ao Watchtower da Decagon)
+  const reviewMatch = llmResponse.content.match(/\[REVIEW:([^\]]+)\]/i);
+  const reviewReason = reviewMatch?.[1]?.trim().slice(0, 200) ?? null;
+
+  // Parseia [UNKNOWN:pergunta] — lacuna na base de conhecimento (item "roubado" às Suggestions da Decagon)
+  const unknownMatch = llmResponse.content.match(/\[UNKNOWN:([^\]]+)\]/i);
+  const unknownQuestion = unknownMatch?.[1]?.trim().slice(0, 300) ?? null;
+  if (unknownQuestion) {
+    (prisma as any).knowledgeGap.findFirst({
+      where: { agentId: conversation.agentId, question: { equals: unknownQuestion, mode: 'insensitive' } },
+    }).then((existing: { id: string; status: string } | null) => {
+      if (existing) {
+        return (prisma as any).knowledgeGap.update({
+          where: { id: existing.id },
+          data: {
+            occurrences: { increment: 1 },
+            ...(existing.status === 'dismissed' ? { status: 'open' } : {}),
+          },
+        });
+      }
+      return (prisma as any).knowledgeGap.create({
+        data: { tenantId, agentId: conversation.agentId, conversationId: conversation.id, question: unknownQuestion },
+      });
+    }).catch((e: unknown) => console.error('[KnowledgeGap] Falha ao registar lacuna:', e));
+  }
+
+  // Marcador [RESOLVED] — pedido de avaliação pós-atendimento (só se a skill estiver ativa)
+  const ratingRequested = (conversation.agent as any).ratingEnabled
+    && !(conversation as any).awaitingRating
+    && /\[RESOLVED\]/i.test(llmResponse.content);
+
   // Parseia [LEAD:nome|telefone|email|necessidade] — captura de lead para o dono
   const leadMatch = llmResponse.content.match(/\[LEAD:([^\]]+)\]/i);
   if (leadMatch) {
@@ -464,13 +591,22 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     }
   }
 
-  const cleanContent = llmResponse.content
+  let cleanContent = llmResponse.content
     .replace(/\[SEND_DOC:[a-z0-9]+\]/gi, '')
     .replace(/\[MBWAY:[^\]]+\]/gi, '')
     .replace(/\[VISITOR_NAME:[^\]]+\]/gi, '')
     .replace(/\[HANDOFF:[^\]]+\]/gi, '')
     .replace(/\[LEAD:[^\]]+\]/gi, '')
+    .replace(/\[REVIEW:[^\]]+\]/gi, '')
+    .replace(/\[UNKNOWN:[^\]]+\]/gi, '')
+    .replace(/\[RESOLVED\]/gi, '')
     .trim();
+
+  // Anexa a pergunta de avaliação em texto natural (o marcador já foi removido acima)
+  // — funciona em todos os canais porque todos reenviam `result.content` tal e qual.
+  if (ratingRequested) {
+    cleanContent = `${cleanContent}\n\nAntes de terminarmos: de 1 a 5, como avalias este atendimento? 🙂`.trim();
+  }
 
   let docAttachment: { id: string; name: string; url: string } | null = null;
   if (docId) {
@@ -550,8 +686,10 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
         creditsUsed: { increment: llmResponse.creditsUsed },
         modelUsed: llmResponse.model,
         sentiment,
-        ...(handoffSummary ? { handedOffToHuman: true } : {}),
-      },
+        ...(handoffSummary ? { handedOffToHuman: true, handoffSummary } : {}),
+        ...(reviewReason ? { needsReview: true, reviewReason } : {}),
+        ...(ratingRequested ? { awaitingRating: true } : {}),
+      } as any,
     }),
     // Devolver créditos reservados em excesso (refund ≥ 0 quase sempre)
     creditRefund > 0
@@ -594,7 +732,120 @@ export async function sendMessage(tenantId: string, conversationId: string, cont
     docAttachment,
     mbwayCharge,
     handoff: handoffSummary ? { triggered: true as const, summary: handoffSummary } : null,
+    ratingRequested,
   };
+}
+
+/**
+ * Marca a conversa como resolvida, incrementa o contador de conversas do
+ * agente e recalcula a taxa de resolução real: percentagem de conversas
+ * fechadas que NÃO precisaram de handoff para um humano (substitui o antigo
+ * `averageResolution`, que nunca era calculado). Partilhado pelo fecho manual
+ * (botão no dashboard) e pelo fecho automático após a avaliação pós-atendimento.
+ */
+async function finalizeConversationClosure(tenantId: string, agentId: string, conversationId: string) {
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { resolved: true, closedAt: new Date() },
+  });
+
+  await prisma.agent.update({
+    where: { id: agentId },
+    data: { totalConversations: { increment: 1 } },
+  });
+
+  try {
+    const [totalClosed, resolvedWithoutHandoff] = await Promise.all([
+      prisma.conversation.count({ where: { agentId, resolved: true } }),
+      prisma.conversation.count({ where: { agentId, resolved: true, handedOffToHuman: false } }),
+    ]);
+    if (totalClosed > 0) {
+      await prisma.agent.update({
+        where: { id: agentId },
+        data: { averageResolution: resolvedWithoutHandoff / totalClosed },
+      });
+    }
+  } catch (e) {
+    console.error('[Resolution] Falha ao recalcular averageResolution:', e);
+  }
+
+  writeAuditLog(tenantId, 'conversation_closed', 'conversation', conversationId);
+}
+
+const COPILOT_MODEL = 'claude-haiku-4-5-20251001';
+const COPILOT_MAX_CREDITS_ESTIMATE = 6;
+
+/**
+ * Copiloto de IA para o atendente humano que recebe um handoff: gera um resumo
+ * curto + 2-3 respostas sugeridas com base no histórico recente da conversa.
+ * Pode ser chamado a qualquer momento (não só logo após o handoff), para o
+ * humano pedir sugestões atualizadas enquanto continua a conversa.
+ */
+export async function getHandoffCopilot(tenantId: string, conversationId: string) {
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: conversationId, tenantId },
+    include: {
+      agent: { select: { systemPrompt: true, name: true } },
+      messages: { orderBy: { timestamp: 'desc' }, take: 12 },
+    },
+  });
+  if (!conversation) throw new NotFoundError('Conversation not found');
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { encryptionKey: true, creditsTotal: true, creditsUsed: true },
+  });
+  if (!tenant) throw new NotFoundError('Tenant not found');
+
+  const available = tenant.creditsTotal - tenant.creditsUsed;
+  if (available < COPILOT_MAX_CREDITS_ESTIMATE) {
+    throw new PaymentRequiredError('Créditos insuficientes para gerar sugestões de resposta.');
+  }
+
+  const dataKey = unwrapDataKey(tenant.encryptionKey);
+  const history = conversation.messages
+    .slice()
+    .reverse()
+    .map((m) => `${m.role === 'user' ? 'Cliente' : 'Agente'}: ${decryptContent(m.content, m.contentIV, dataKey)}`)
+    .join('\n');
+
+  const prompt = 'És um copiloto de apoio a um atendente humano que recebeu (ou pode vir a receber) uma conversa transferida'
+    + ' por um agente de IA. Lê o histórico e devolve APENAS JSON válido, exatamente neste formato:\n'
+    + '{"summary": "resumo em 1-2 frases do que se passou e o que falta resolver", "suggestedReplies": ["resposta sugerida 1", "resposta sugerida 2", "resposta sugerida 3"]}\n'
+    + 'As respostas sugeridas devem estar na mesma língua da conversa, ser curtas (1-3 frases) e prontas a enviar tal como estão.';
+
+  let result;
+  try {
+    result = await callLLM(
+      COPILOT_MODEL,
+      prompt,
+      [{ role: 'user', content: `Contexto do agente (system prompt):\n${conversation.agent.systemPrompt.slice(0, 500)}\n\nHistórico da conversa (mais antiga primeiro):\n${history}` }],
+      600,
+      0.5,
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    throw new UpstreamError(`LLM error: ${msg}`);
+  }
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { creditsUsed: { increment: result.creditsUsed } } });
+  await prisma.creditLog.create({ data: { tenantId, amount: -result.creditsUsed, reason: 'handoff_copilot' } });
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+    const parsed = JSON.parse(jsonMatch[0]);
+    const suggestedReplies = Array.isArray(parsed.suggestedReplies)
+      ? parsed.suggestedReplies.slice(0, 3).map((s: unknown) => String(s))
+      : [];
+    return {
+      summary: String(parsed.summary ?? (conversation as any).handoffSummary ?? ''),
+      suggestedReplies,
+      creditsUsed: result.creditsUsed,
+    };
+  } catch {
+    throw new UpstreamError('Falha ao gerar sugestões. Tenta novamente.');
+  }
 }
 
 export async function closeConversation(tenantId: string, conversationId: string) {
@@ -605,18 +856,9 @@ export async function closeConversation(tenantId: string, conversationId: string
     throw new NotFoundError('Conversation not found');
   }
 
-  const conversation = await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { resolved: true, closedAt: new Date() },
-  });
+  await finalizeConversationClosure(tenantId, existing.agentId, conversationId);
 
-  await prisma.agent.update({
-    where: { id: existing.agentId },
-    data: { totalConversations: { increment: 1 } },
-  });
-
-  writeAuditLog(tenantId, 'conversation_closed', 'conversation', conversationId);
-  return conversation;
+  return prisma.conversation.findUnique({ where: { id: conversationId } });
 }
 
 export async function returnToAgent(tenantId: string, conversationId: string) {

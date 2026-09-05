@@ -73,6 +73,9 @@ export default function ConversationHistory({ agentId }: Props) {
   const [filter, setFilter] = useState<'all' | 'whatsapp' | 'instagram' | 'telegram' | 'web' | 'handoff'>('all');
   const [returningHandoff, setReturningHandoff] = useState(false);
   const [search, setSearch] = useState('');
+  const [copilot, setCopilot] = useState<{ summary: string; suggestedReplies: string[] } | null>(null);
+  const [loadingCopilot, setLoadingCopilot] = useState(false);
+  const [copilotError, setCopilotError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const TAKE = 30;
@@ -111,6 +114,8 @@ export default function ConversationHistory({ agentId }: Props) {
 
   async function openConversation(conv: Conversation) {
     setLoadingMessages(true);
+    setCopilot(null);
+    setCopilotError(null);
     setSelected({ ...conv, messages: [] });
     try {
       const { data } = await api.get(`/api/conversations/${conv.id}`);
@@ -119,6 +124,20 @@ export default function ConversationHistory({ agentId }: Props) {
       /* ignore */
     } finally {
       setLoadingMessages(false);
+    }
+  }
+
+  async function fetchCopilot(conv: ConversationWithMessages) {
+    setLoadingCopilot(true);
+    setCopilotError(null);
+    try {
+      const { data } = await api.post(`/api/conversations/${conv.id}/copilot`);
+      setCopilot({ summary: data.summary, suggestedReplies: data.suggestedReplies ?? [] });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setCopilotError(msg ?? 'Erro ao gerar sugestões');
+    } finally {
+      setLoadingCopilot(false);
     }
   }
 
@@ -215,6 +234,12 @@ export default function ConversationHistory({ agentId }: Props) {
                   {conv.handedOffToHuman && (
                     <span className="text-[10px] bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">🤝 handoff</span>
                   )}
+                  {conv.needsReview && (
+                    <span className="text-[10px] bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1.5 py-0.5 rounded" title={conv.reviewReason}>🔎 revisão</span>
+                  )}
+                  {conv.rating != null && (
+                    <span className="text-[10px] text-yellow-500">{'★'.repeat(conv.rating)}{'☆'.repeat(5 - conv.rating)}</span>
+                  )}
                   <span className="ml-auto text-[10px] text-gray-400">
                     {(conv._count?.messages ?? 0)} msg
                   </span>
@@ -260,6 +285,16 @@ export default function ConversationHistory({ agentId }: Props) {
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {selected.tokensUsed} tokens
                 </span>
+                {selected.rating != null && (
+                  <span className="text-xs text-yellow-500" title={selected.ratingText}>
+                    {'★'.repeat(selected.rating)}{'☆'.repeat(5 - selected.rating)}
+                  </span>
+                )}
+                {selected.needsReview && (
+                  <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded-full" title={selected.reviewReason}>
+                    🔎 A rever
+                  </span>
+                )}
                 {selected.resolved && (
                   <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Resolvida</span>
                 )}
@@ -274,6 +309,46 @@ export default function ConversationHistory({ agentId }: Props) {
                 )}
               </div>
             </div>
+
+            {/* Copiloto de IA — resumo + respostas sugeridas para quem está a atender */}
+            {(selected.handedOffToHuman || copilot) && (
+              <div className="px-4 py-2.5 bg-brand-50 dark:bg-brand-900/10 border-b border-brand-100 dark:border-brand-900/30">
+                {!copilot && !loadingCopilot && (
+                  <button
+                    onClick={() => fetchCopilot(selected)}
+                    className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:underline"
+                  >
+                    🤖 Pedir sugestões ao copiloto de IA
+                  </button>
+                )}
+                {loadingCopilot && (
+                  <p className="text-xs text-brand-600 dark:text-brand-400 animate-pulse">A gerar sugestões...</p>
+                )}
+                {copilotError && (
+                  <p className="text-xs text-red-600">{copilotError}</p>
+                )}
+                {copilot && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-gray-700 dark:text-gray-300"><span className="font-medium">Resumo:</span> {copilot.summary}</p>
+                    {copilot.suggestedReplies.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        {copilot.suggestedReplies.map((r, i) => (
+                          <p key={i} className="text-xs bg-white dark:bg-gray-800 border border-brand-100 dark:border-brand-900/40 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-200">
+                            {r}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => fetchCopilot(selected)}
+                      className="text-[10px] text-brand-600 dark:text-brand-400 hover:underline"
+                    >
+                      ↻ Gerar novas sugestões
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">

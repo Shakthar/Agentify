@@ -87,6 +87,7 @@ model Tenant {
   agentDocs             AgentDoc[]
   orders                Order[]
   platformInvoices      PlatformInvoice[]
+  knowledgeGaps         KnowledgeGap[]
 }
 
 // ===== PLATFORM EXPENSES (superadmin) =====
@@ -217,6 +218,7 @@ model Agent {
   knowledgeBase         KnowledgeBase?
   agentDocs             AgentDoc[]
   orders                Order[]
+  knowledgeGaps         KnowledgeGap[]
 
   @@index([tenantId])
 }
@@ -260,6 +262,7 @@ model Conversation {
   // Avaliação pós-conversa
   rating                Int?       // 1-5 estrelas
   ratingText            String?    @db.Text
+  awaitingRating        Boolean    @default(false) // true entre o [RESOLVED] do agente e a resposta do cliente com a nota
 
   // Follow-up automático
   followUpSent          Boolean    @default(false)
@@ -274,7 +277,12 @@ model Conversation {
   urgency               String?    // low, medium, high, critical
   resolved              Boolean    @default(false)
   handedOffToHuman      Boolean    @default(false)
+  handoffSummary        String?    @db.Text // resumo IA no momento do handoff (alimenta o copiloto do humano)
   humanAgent            String?
+
+  // QA automático — sinaliza conversas em que o agente pode estar a falhar
+  needsReview           Boolean    @default(false)
+  reviewReason          String?    @db.Text
   
   // Metadata
   modelUsed             String?
@@ -300,6 +308,29 @@ model Conversation {
   @@index([agentId])
   @@index([visitorId])
   @@index([customerId])
+}
+
+// ===== KNOWLEDGE GAPS (deteção automática de lacunas na base de conhecimento) =====
+// Criado quando o agente responde com o marcador [UNKNOWN:pergunta] — ou seja,
+// quando não encontrou contexto suficiente na KB para responder com confiança.
+// "occurrences" agrega perguntas repetidas (mesmo texto normalizado) para o
+// dono do negócio priorizar o que mais vale a pena adicionar à KB.
+model KnowledgeGap {
+  id             String    @id @default(cuid())
+  tenantId       String
+  agentId        String
+  conversationId String?
+  question       String    @db.Text
+  occurrences    Int       @default(1)
+  status         String    @default("open") // open | added | dismissed
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agent          Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([agentId])
 }
 
 // ===== MESSAGES =====

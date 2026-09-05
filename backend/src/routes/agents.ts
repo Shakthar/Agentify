@@ -360,4 +360,25 @@ router.get('/:id/observe', asyncHandler(async (req: AuthenticatedRequest, res: R
   res.json({ conversations: open, agentId: req.params.id });
 }));
 
+// ── Lacunas da base de conhecimento (deteção automática via [UNKNOWN:...]) ──
+
+// GET /api/agents/:id/knowledge-gaps
+router.get('/:id/knowledge-gaps', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const result = await agentsService.listKnowledgeGaps(req.tenant!.id, req.params.id);
+  res.json(result);
+}));
+
+const knowledgeGapActionSchema = z.object({
+  action: z.enum(['dismiss', 'reopen', 'add_to_kb']),
+  answer: z.string().max(5000).optional(),
+});
+
+// PATCH /api/agents/:id/knowledge-gaps/:gapId
+router.patch('/:id/knowledge-gaps/:gapId', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = knowledgeGapActionSchema.safeParse(req.body);
+  if (!parsed.success) throw new BadRequestError('Validation failed');
+  const result = await agentsService.updateKnowledgeGap(req.tenant!.id, req.params.id, req.params.gapId, parsed.data);
+  res.json(result);
+}));
+
 export default router;

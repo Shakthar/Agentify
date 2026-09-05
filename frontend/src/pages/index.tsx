@@ -137,6 +137,10 @@ const FAQS = [
     q: 'Posso definir um horário em que o agente não trabalha?',
     a: 'Sim. Na aba de cada canal (WhatsApp, Instagram e Telegram) existe um bloco "Horário de funcionamento" onde defines dias de semana e fins de semana com janelas diferentes (ex: só ativo das 9h às 18h) e, opcionalmente, uma mensagem automática para quando alguém escrever fora desse horário (ex: "Estamos fechados, respondemos às 9h 🙏"). Fora da janela definida, o agente não responde normalmente — fica em silêncio ou envia essa mensagem, consoante configures.',
   },
+  {
+    q: 'O meu número de WhatsApp corre o risco de ser banido?',
+    a: 'Não. O Agentfy liga-se ao teu número através da API oficial da Meta para empresas (WhatsApp Cloud API) — nunca através de automações não-oficiais que simulam o WhatsApp Web e que são a causa mais comum de bloqueios. O número fica sempre registado em teu nome na Meta, e as mensagens proativas (iniciadas pelo agente) respeitam os limites diário/mensal que tu defines, para nunca gerar picos que pareçam spam.',
+  },
 ];
 
 export default function Home() {
@@ -452,6 +456,49 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Proteção do número de WhatsApp ─── */}
+        <section className="py-14 px-4 bg-gradient-to-br from-green-50 via-white to-brand-50 dark:from-green-950/20 dark:via-gray-900 dark:to-gray-950 border-y border-green-100 dark:border-green-900/30">
+          <div className="max-w-4xl mx-auto text-center">
+            <span className="inline-block text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-3 py-1 rounded-full mb-4">
+              🛡️ O teu número está seguro
+            </span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white mb-3">
+              Zero risco de ficares banido do WhatsApp
+            </h2>
+            <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+              Ao contrário de automações não-oficiais que simulam um telemóvel, o Agentfy liga-se ao teu número
+              através da API oficial da Meta para empresas — a mesma que a Meta disponibiliza a grandes marcas.
+              Não há truques nem simulação de app: é o canal aprovado, e o teu número fica protegido.
+            </p>
+            <div className="grid md:grid-cols-3 gap-5 text-left">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-green-100 dark:border-green-900/30 shadow-sm">
+                <span className="text-2xl mb-2 block">✅</span>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">API oficial da Meta</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Usamos exclusivamente a WhatsApp Cloud API oficial — nunca automações não-oficiais que replicam
+                  o WhatsApp Web e arriscam bloqueios.
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-green-100 dark:border-green-900/30 shadow-sm">
+                <span className="text-2xl mb-2 block">⏱️</span>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">Limites de envio automáticos</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Nas mensagens iniciadas pelo agente (proativas), defines um limite diário e mensal — o Agentfy
+                  respeita-os sempre, para nunca haver picos de envio que pareçam spam.
+                </p>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-green-100 dark:border-green-900/30 shadow-sm">
+                <span className="text-2xl mb-2 block">🔒</span>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">O número continua teu</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  O número fica sempre registado em teu nome na Meta. Não guardamos credenciais paralelas nem
+                  dependemos de sessões que possam expirar ou ser detetadas como automação.
+                </p>
+              </div>
             </div>
           </div>
         </section>

@@ -59,4 +59,11 @@ router.patch('/:id/handoff', asyncHandler(async (req: AuthenticatedRequest, res:
   res.json(conversation);
 }));
 
+// POST /api/conversations/:id/copilot
+// Copiloto de IA para o humano: resumo + respostas sugeridas com base no histórico recente.
+router.post('/:id/copilot', chatLimiter, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const result = await conversationsService.getHandoffCopilot(req.tenant!.id, req.params.id);
+  res.json(result);
+}));
+
 export default router;

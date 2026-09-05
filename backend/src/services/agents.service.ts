@@ -7,6 +7,7 @@ import { unwrapDataKey } from '../lib/keyVault.js';
 import { subscribeInstagramAccount } from '../lib/instagram.js';
 import crypto from 'crypto';
 import { getTelegramBotInfo, setTelegramWebhook, deleteTelegramWebhook } from '../lib/telegram.js';
+import { addTextDocument } from './knowledge.service.js';
 
 interface ChannelSchedule {
   enabled: boolean;
@@ -196,6 +197,24 @@ export async function getAgent(tenantId: string, agentId: string) {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { whatsappToken: _omitWA, instagramToken: _omitIG, telegramBotToken: _omitTG, ...safeAgent } = agent as any;
+
+  // Estatísticas calculadas em tempo real (revenue, avaliação média, QA e lacunas de KB) —
+  // mais fiáveis do que campos persistidos que podem ficar desatualizados.
+  const [revenueAgg, ratingAgg, needsReviewCount, knowledgeGapCount] = await Promise.all([
+    prisma.order.aggregate({
+      where: { agentId, status: 'paid' },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+    prisma.conversation.aggregate({
+      where: { agentId, rating: { not: null } },
+      _avg: { rating: true },
+      _count: { rating: true },
+    }),
+    prisma.conversation.count({ where: { agentId, needsReview: true } as any }),
+    (prisma as any).knowledgeGap.count({ where: { agentId, status: 'open' } }).catch(() => 0),
+  ]);
+
   return {
     ...safeAgent,
     testMode: agent.testMode,
@@ -213,8 +232,24 @@ export async function getAgent(tenantId: string, agentId: string) {
     statistics: {
       totalConversations: agent.totalConversations,
       totalMessages: agent.totalMessages,
+      // Taxa de resolução real: % de conversas fechadas sem handoff para humano
+      // (recalculada a cada fecho de conversa — ver finalizeConversationClosure).
       averageResolution: agent.averageResolution,
+      revenueGenerated: revenueAgg._sum.amount ?? 0,
+      paidOrdersCount: revenueAgg._count.id ?? 0,
+      averageRating: ratingAgg._avg.rating ?? null,
+      ratingCount: ratingAgg._count.rating ?? 0,
+      needsReviewCount,
+      knowledgeGapCount,
     },
+    // Tambem disponiveis no nivel de topo, para consistencia com o resto do objeto
+    // (o frontend ja le agent.totalConversations / agent.averageResolution diretamente).
+    revenueGenerated: revenueAgg._sum.amount ?? 0,
+    paidOrdersCount: revenueAgg._count.id ?? 0,
+    averageRating: ratingAgg._avg.rating ?? null,
+    ratingCount: ratingAgg._count.rating ?? 0,
+    needsReviewCount,
+    knowledgeGapCount,
   };
 }
 
@@ -429,4 +464,47 @@ export async function toggleAgent(tenantId: string, agentId: string) {
 
   writeAuditLog(tenantId, agent.isActive ? 'agent_activated' : 'agent_deactivated', 'agent', agentId, { isActive: agent.isActive });
   return agent;
+}
+
+// ===== LACUNAS DA BASE DE CONHECIMENTO (deteção automática via marcador [UNKNOWN:...]) =====
+
+export async function listKnowledgeGaps(tenantId: string, agentId: string) {
+  const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId }, select: { id: true } });
+  if (!agent) throw new NotFoundError('Agent not found');
+
+  const gaps = await (prisma as any).knowledgeGap.findMany({
+    where: { agentId },
+    orderBy: [{ occurrences: 'desc' }, { updatedAt: 'desc' }],
+  });
+  return { gaps };
+}
+
+interface KnowledgeGapAction {
+  action: 'dismiss' | 'reopen' | 'add_to_kb';
+  answer?: string;
+}
+
+export async function updateKnowledgeGap(tenantId: string, agentId: string, gapId: string, input: KnowledgeGapAction) {
+  const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId }, select: { id: true } });
+  if (!agent) throw new NotFoundError('Agent not found');
+
+  const gap = await (prisma as any).knowledgeGap.findFirst({ where: { id: gapId, agentId } });
+  if (!gap) throw new NotFoundError('Knowledge gap not found');
+
+  if (input.action === 'dismiss') {
+    return (prisma as any).knowledgeGap.update({ where: { id: gapId }, data: { status: 'dismissed' } });
+  }
+  if (input.action === 'reopen') {
+    return (prisma as any).knowledgeGap.update({ where: { id: gapId }, data: { status: 'open' } });
+  }
+
+  // add_to_kb — cria um documento de texto na KB com a pergunta + a resposta dada pelo dono do negócio
+  const answer = (input.answer ?? '').trim();
+  if (!answer) throw new BadRequestError('answer é obrigatório para adicionar à base de conhecimento');
+
+  await addTextDocument({ id: tenantId }, agentId, {
+    title: `Pergunta: ${gap.question.slice(0, 100)}`,
+    text: `Pergunta: ${gap.question}\nResposta: ${answer}`,
+  });
+  return (prisma as any).knowledgeGap.update({ where: { id: gapId }, data: { status: 'added' } });
 }

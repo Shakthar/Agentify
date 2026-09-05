@@ -14,7 +14,8 @@
  */
 
 import prisma from '../lib/prisma.js';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../lib/errors.js';
+import { BadRequestError, ForbiddenError, NotFoundError, PaymentRequiredError, UpstreamError } from '../lib/errors.js';
+import { callLLM } from '../lib/llm.js';
 import { chunkText } from '../lib/chunking.js';
 import {
   embedText,
@@ -194,6 +195,102 @@ interface AddTextInput {
 }
 
 /** Adiciona um documento de texto livre. */
+// ── Enriquecer com IA ──────────────────────────────────────────────────────
+// A IA lê o system prompt do agente + toda a base de conhecimento atual e gera
+// perguntas de esclarecimento para o dono do negócio; as respostas são guardadas
+// como um novo documento de texto (reaproveitando addTextDocument abaixo).
+
+const ENRICH_MODEL = 'claude-sonnet-4-5-20250929';
+const ENRICH_MAX_CREDITS_ESTIMATE = 15;
+
+export async function generateEnrichmentQuestions(tenant: TenantCtx, agentId: string) {
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, tenantId: tenant.id },
+    select: { systemPrompt: true, name: true },
+  });
+  if (!agent) throw new NotFoundError('Agent not found');
+
+  const tenantCredits = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { creditsTotal: true, creditsUsed: true },
+  });
+  if (!tenantCredits) throw new NotFoundError('Tenant not found');
+  const available = tenantCredits.creditsTotal - tenantCredits.creditsUsed;
+  if (available < ENRICH_MAX_CREDITS_ESTIMATE) {
+    throw new PaymentRequiredError('Créditos insuficientes para gerar perguntas de enriquecimento.');
+  }
+
+  const kb = await prisma.knowledgeBase.findUnique({ where: { agentId } });
+  const documents = kb
+    ? await prisma.document.findMany({
+        where: { knowledgeBaseId: kb.id },
+        select: { fileName: true, content: true },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      })
+    : [];
+
+  const kbText = documents
+    .map((d) => `--- ${d.fileName ?? 'Documento'} ---\n${d.content.slice(0, 4000)}`)
+    .join('\n\n')
+    .slice(0, 40000);
+
+  const prompt = 'Lê o system prompt do agente e a base de conhecimento atual de um negócio. A tua tarefa é identificar'
+    + ' LACUNAS de informação que um cliente provavelmente vai perguntar mas que ainda não estão documentadas, e gerar'
+    + ' perguntas diretas ao dono do negócio para preencher essas lacunas.\n'
+    + 'Devolve APENAS JSON válido: {"questions": ["pergunta 1", "pergunta 2", ...]}\n'
+    + 'Gera entre 5 e 8 perguntas específicas e práticas (ex: horários, política de trocas/devoluções, formas de pagamento,'
+    + ' prazos de entrega, exceções e casos especiais), na mesma língua do system prompt. Não repitas informação que já'
+    + ' existe na base de conhecimento.';
+
+  let result;
+  try {
+    result = await callLLM(
+      ENRICH_MODEL,
+      prompt,
+      [{ role: 'user', content: `SYSTEM PROMPT DO AGENTE:\n${agent.systemPrompt.slice(0, 3000)}\n\nBASE DE CONHECIMENTO ATUAL:\n${kbText || '(vazia)'}` }],
+      1200,
+      0.6,
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    throw new UpstreamError(`LLM error: ${msg}`);
+  }
+
+  await prisma.tenant.update({ where: { id: tenant.id }, data: { creditsUsed: { increment: result.creditsUsed } } });
+  await prisma.creditLog.create({ data: { tenantId: tenant.id, amount: -result.creditsUsed, reason: 'kb_enrich_questions' } });
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+    const parsed = JSON.parse(jsonMatch[0]);
+    const questions = Array.isArray(parsed.questions)
+      ? parsed.questions.slice(0, 10).map((q: unknown) => String(q).slice(0, 300))
+      : [];
+    if (questions.length === 0) throw new Error('Empty questions');
+    return { questions, creditsUsed: result.creditsUsed };
+  } catch {
+    throw new UpstreamError('Falha ao gerar perguntas de enriquecimento. Tenta novamente.');
+  }
+}
+
+export async function submitEnrichmentAnswers(
+  tenant: TenantCtx,
+  agentId: string,
+  answers: { question: string; answer: string }[],
+) {
+  const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId: tenant.id }, select: { id: true } });
+  if (!agent) throw new NotFoundError('Agent not found');
+
+  const filled = answers.filter((a) => a.answer && a.answer.trim().length > 0);
+  if (filled.length === 0) throw new BadRequestError('Nenhuma resposta preenchida');
+
+  const text = filled.map((a) => `Pergunta: ${a.question.trim()}\nResposta: ${a.answer.trim()}`).join('\n\n');
+  const title = `Enriquecimento IA — ${new Date().toLocaleDateString('pt-PT')}`;
+
+  return addTextDocument(tenant, agentId, { title, text });
+}
+
 export async function addTextDocument(tenant: TenantCtx, agentId: string, input: AddTextInput) {
   const kb = await getOrCreateKnowledgeBase(tenant.id, agentId);
   await assertDocumentQuota(kb.id);

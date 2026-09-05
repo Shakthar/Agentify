@@ -79,6 +79,12 @@ export interface Agent {
   totalConversations: number;
   totalMessages: number;
   averageResolution: number;
+  revenueGenerated?: number;
+  paidOrdersCount?: number;
+  averageRating?: number | null;
+  ratingCount?: number;
+  needsReviewCount?: number;
+  knowledgeGapCount?: number;
   offHoursMessage?: string;
   offHourStart?: string;
   offHourEnd?: string;
@@ -103,6 +109,12 @@ export interface Conversation {
   urgency?: string;
   resolved: boolean;
   handedOffToHuman: boolean;
+  handoffSummary?: string;
+  needsReview?: boolean;
+  reviewReason?: string;
+  rating?: number | null;
+  ratingText?: string;
+  awaitingRating?: boolean;
   tokensUsed: number;
   creditsUsed: number;
   createdAt: string;

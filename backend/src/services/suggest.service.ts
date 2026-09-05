@@ -46,6 +46,69 @@ Rules:
 - suggestedModel: use "claude-haiku-4-5-20251001" for simple support, "claude-sonnet-4-5-20250929" for complex/sales
 - Do NOT leave any unfilled placeholders — if information is missing, use a sensible default or omit that line`;
 
+const DOCUMENT_SUGGESTION_PROMPT = `You are an expert AI assistant builder. You were given the extracted text of a real business document (an SOP, FAQ, price list, menu, policy document, etc). Build a professional AI agent configuration based ONLY on the real information in this document — do not invent facts that aren't present in the text.
+
+Return ONLY valid JSON with these exact fields:
+{
+  "name": "short agent name (max 40 chars)",
+  "description": "one-line description (max 120 chars)",
+  "systemPrompt": "detailed system prompt (300-600 words) that defines the agent personality, tone, goals, how it handles edge cases, and includes the concrete facts (prices, hours, policies, contact info) found in the document",
+  "suggestedModel": "claude-haiku-4-5-20251001",
+  "temperature": 0.7
+}
+
+Rules:
+- Infer the business language from the document and write the system prompt in that language
+- Ground every concrete fact (prices, schedules, policies, contact info) in what's actually in the document — never invent numbers
+- suggestedModel: use "claude-haiku-4-5-20251001" for simple support, "claude-sonnet-4-5-20250929" for complex/sales
+- Include how the agent should handle: greetings, questions not covered by the document, escalation to human
+- Do NOT include placeholder text like [Company Name] — infer from the document`;
+
+/** Igual a suggestAgent, mas a partir do texto extraído de um documento real (SOP, FAQ, etc). */
+export async function suggestAgentFromDocument(tenantId: string, documentText: string, language: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { creditsTotal: true, creditsUsed: true },
+  });
+  if (!tenant) throw new PaymentRequiredError('Tenant not found');
+
+  const available = tenant.creditsTotal - tenant.creditsUsed;
+  if (available < SUGGEST_MAX_CREDITS_ESTIMATE) {
+    throw new PaymentRequiredError('Cr\u00e9ditos insuficientes para gerar sugest\u00e3o. Compra mais cr\u00e9ditos ou faz upgrade do plano.');
+  }
+
+  const userMessage = `Document text (language hint: ${language}):\n\n${documentText.slice(0, 12000)}\n\nGenerate the agent configuration JSON now.`;
+
+  let result;
+  try {
+    result = await callLLM(SUGGEST_MODEL, DOCUMENT_SUGGESTION_PROMPT, [{ role: 'user', content: userMessage }], 1500, 0.7);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    throw new UpstreamError(`LLM error: ${msg}`);
+  }
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { creditsUsed: { increment: result.creditsUsed } } });
+  await prisma.creditLog.create({ data: { tenantId, amount: -result.creditsUsed, reason: 'suggest_from_document' } });
+
+  try {
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+    const suggestion = JSON.parse(jsonMatch[0]);
+    if (!suggestion.name || !suggestion.systemPrompt) throw new Error('Missing required fields in suggestion');
+    return {
+      name: String(suggestion.name).slice(0, 40),
+      description: String(suggestion.description ?? '').slice(0, 120),
+      systemPrompt: String(suggestion.systemPrompt),
+      suggestedModel: String(suggestion.suggestedModel ?? 'claude-haiku-4-5-20251001'),
+      temperature: Number(suggestion.temperature ?? 0.7),
+      creditsUsed: result.creditsUsed,
+      documentText: documentText.slice(0, 8000),
+    };
+  } catch {
+    throw new UpstreamError('Failed to parse AI suggestion. Please try again.');
+  }
+}
+
 export async function suggestAgent(tenantId: string, businessDescription: string, language: string, templateSystemPrompt?: string) {
   // SECURITY: Verificar e reservar cr\u00e9ditos antes de chamar o LLM.
   // Sem este check, qualquer tenant pode chamar claude-sonnet infinitamente

@@ -84,8 +84,15 @@ export default function KnowledgeBase({ agentId }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // Tabs de adição
-  type AddMode = 'file' | 'url' | 'text';
+  type AddMode = 'file' | 'url' | 'text' | 'enrich';
   const [addMode, setAddMode] = useState<AddMode>('file');
+
+  // Enriquecer com IA — a IA lê o system prompt + a KB atual e gera perguntas de esclarecimento
+  const [enrichQuestions, setEnrichQuestions] = useState<string[] | null>(null);
+  const [enrichAnswers, setEnrichAnswers] = useState<Record<number, string>>({});
+  const [enrichLoading, setEnrichLoading] = useState(false);
+  const [enrichSubmitting, setEnrichSubmitting] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
 
   // File upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -197,6 +204,48 @@ export default function KnowledgeBase({ agentId }: Props) {
     }
   };
 
+  // ── Enriquecer com IA ───────────────────────────────────────────────────
+
+  const handleGenerateEnrichQuestions = async () => {
+    setEnrichLoading(true);
+    setEnrichMsg(null);
+    try {
+      const { data } = await api.post<{ questions: string[] }>(`/api/agents/${agentId}/knowledge/enrich/questions`);
+      setEnrichQuestions(data.questions);
+      setEnrichAnswers({});
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setEnrichMsg(`Erro: ${msg ?? 'falha ao gerar perguntas'}`);
+    } finally {
+      setEnrichLoading(false);
+    }
+  };
+
+  const handleSubmitEnrichAnswers = async () => {
+    if (!enrichQuestions) return;
+    const answers = enrichQuestions
+      .map((question, i) => ({ question, answer: (enrichAnswers[i] ?? '').trim() }))
+      .filter((a) => a.answer.length > 0);
+    if (answers.length === 0) {
+      setEnrichMsg('Responde a pelo menos uma pergunta antes de guardar.');
+      return;
+    }
+    setEnrichSubmitting(true);
+    setEnrichMsg(null);
+    try {
+      await api.post(`/api/agents/${agentId}/knowledge/enrich/answers`, { answers });
+      setEnrichMsg('✓ Respostas adicionadas à base de conhecimento');
+      setEnrichQuestions(null);
+      setEnrichAnswers({});
+      await refresh();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setEnrichMsg(`Erro: ${msg ?? 'falha ao guardar respostas'}`);
+    } finally {
+      setEnrichSubmitting(false);
+    }
+  };
+
   // ── Ações sobre documentos ──────────────────────────────────────────────
 
   const handleDelete = async (docId: string) => {
@@ -250,8 +299,8 @@ export default function KnowledgeBase({ agentId }: Props) {
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-gray-100 dark:border-gray-700">
-          {(['file', 'url', 'text'] as AddMode[]).map((m) => {
-            const labels: Record<AddMode, string> = { file: '📎 Ficheiro', url: '🔗 URL', text: '✏️ Texto' };
+          {(['file', 'url', 'text', 'enrich'] as AddMode[]).map((m) => {
+            const labels: Record<AddMode, string> = { file: '📎 Ficheiro', url: '🔗 URL', text: '✏️ Texto', enrich: '🧠 Enriquecer com IA' };
             return (
               <button
                 key={m}
@@ -353,6 +402,63 @@ export default function KnowledgeBase({ agentId }: Props) {
               </div>
               {textMsg && (
                 <p className={`text-xs ${textMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{textMsg}</p>
+              )}
+            </div>
+          )}
+
+          {/* Enriquecer com IA */}
+          {addMode === 'enrich' && (
+            <div className="space-y-3">
+              {!enrichQuestions && (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    A IA lê o system prompt do agente e tudo o que já está na base de conhecimento, e gera perguntas
+                    para te ajudar a preencher lacunas que os clientes provavelmente vão perguntar.
+                  </p>
+                  <button
+                    onClick={handleGenerateEnrichQuestions}
+                    disabled={enrichLoading}
+                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {enrichLoading ? '✨ A gerar perguntas…' : '✨ Gerar perguntas com IA'}
+                  </button>
+                </>
+              )}
+
+              {enrichQuestions && (
+                <div className="space-y-3">
+                  {enrichQuestions.map((q, i) => (
+                    <div key={i}>
+                      <label className="block text-sm text-gray-700 dark:text-gray-200 mb-1">{i + 1}. {q}</label>
+                      <textarea
+                        value={enrichAnswers[i] ?? ''}
+                        onChange={(e) => setEnrichAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
+                        placeholder="A tua resposta…"
+                        rows={2}
+                        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
+                      />
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSubmitEnrichAnswers}
+                      disabled={enrichSubmitting}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {enrichSubmitting ? '…' : 'Guardar respostas na base de conhecimento'}
+                    </button>
+                    <button
+                      onClick={() => { setEnrichQuestions(null); setEnrichAnswers({}); setEnrichMsg(null); }}
+                      className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {enrichMsg && (
+                <p className={`text-xs ${enrichMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{enrichMsg}</p>
               )}
             </div>
           )}

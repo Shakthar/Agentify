@@ -70,6 +70,8 @@ export default function AgentCreator() {
 
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [documentText, setDocumentText] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +125,34 @@ export default function AgentCreator() {
     }
   };
 
+  const handleGenerateFromDocument = async (file: File) => {
+    setUploadingDoc(true);
+    setGenerateError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('language', 'pt');
+      const { data } = await api.post('/api/suggest/suggest-from-document', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setForm((prev) => ({
+        ...prev,
+        name: data.name,
+        description: data.description,
+        systemPrompt: data.systemPrompt,
+        model: models.find((m) => m.value === data.suggestedModel) ? data.suggestedModel : models[0].value,
+        temperature: data.temperature ?? 0.7,
+      }));
+      setDocumentText(data.documentText ?? null);
+      setStep(1);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao gerar agente a partir do documento';
+      setGenerateError(msg);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -137,6 +167,14 @@ export default function AgentCreator() {
         maxTokens: form.maxTokens,
         skills: form.skills,
       });
+      // Se o agente foi criado a partir de um documento, semeia a base de conhecimento com
+      // o texto original — melhor esforço, não bloqueia a navegação se falhar.
+      if (documentText) {
+        api.post(`/api/agents/${agent.id}/knowledge/text`, {
+          title: 'Documento original',
+          text: documentText,
+        }).catch(() => { /* a KB pode ser preenchida manualmente depois, se isto falhar */ });
+      }
       router.push(ROUTES.agentDetail(agent.id));
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao criar agente';
@@ -217,6 +255,37 @@ export default function AgentCreator() {
                   </span>
                 ) : '✨ Gerar agente com IA'}
               </button>
+            </div>
+
+            {/* Criar a partir de um documento real (SOP, FAQ, lista de preços, etc) */}
+            <div className="card">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-base">📄</span>
+                <h2 className="text-base font-semibold">Ou cria a partir de um documento</h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-3">
+                Carrega um documento real do teu negócio (PDF, Word, CSV ou texto — ex: um manual de procedimentos,
+                FAQ, lista de preços ou catálogo) e a IA constrói o agente com base apenas na informação real que lá está.
+              </p>
+              <label className={`btn-secondary w-full py-3 flex items-center justify-center gap-2 cursor-pointer ${uploadingDoc ? 'opacity-60 pointer-events-none' : ''}`}>
+                {uploadingDoc ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+                    A ler o documento...
+                  </span>
+                ) : '📤 Carregar documento'}
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.csv,.txt,.md"
+                  className="hidden"
+                  disabled={uploadingDoc}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) handleGenerateFromDocument(file);
+                  }}
+                />
+              </label>
             </div>
 
             {/* Templates */}

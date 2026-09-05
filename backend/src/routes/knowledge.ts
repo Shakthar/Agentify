@@ -131,6 +131,31 @@ router.post('/text', asyncHandler(async (req: AuthenticatedRequest, res: Respons
   res.status(202).json(doc);
 }));
 
+// ── Enriquecer com IA ───────────────────────────────────────────────────────
+// A IA lê o system prompt + a KB atual e gera perguntas de esclarecimento;
+// as respostas do dono do negócio são guardadas como um novo documento de texto.
+
+// POST /api/agents/:agentId/knowledge/enrich/questions
+router.post('/enrich/questions', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const result = await kb.generateEnrichmentQuestions(req.tenant!, req.params.agentId);
+  res.json(result);
+}));
+
+const enrichAnswersSchema = z.object({
+  answers: z.array(z.object({
+    question: z.string().max(500),
+    answer: z.string().max(5000),
+  })).min(1).max(20),
+});
+
+// POST /api/agents/:agentId/knowledge/enrich/answers
+router.post('/enrich/answers', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = enrichAnswersSchema.safeParse(req.body);
+  if (!parsed.success) throw new BadRequestError('Validation failed', parsed.error.flatten());
+  const doc = await kb.submitEnrichmentAnswers(req.tenant!, req.params.agentId, parsed.data.answers);
+  res.status(202).json(doc);
+}));
+
 // ── Listar ──────────────────────────────────────────────────────────────────
 
 // GET /api/agents/:agentId/knowledge
