@@ -918,6 +918,38 @@ export default function AgentDetailPage() {
                       </div>
                     </div>
 
+                    {/* Recolha de Feedback — addon no Free/Starter, incluida no Business/Enterprise */}
+                    {(() => {
+                      const fbIncl = isAdmin || planIdx >= planOrder.indexOf('business');
+                      const fbActive = !!agent.ratingEnabled;
+                      return (
+                        <div className="flex items-start gap-3 py-3">
+                          <span className="text-lg shrink-0 w-7 text-center mt-0.5">⭐</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Recolha de Feedback</span>
+                                {!fbIncl && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon €4/mês</span>}
+                                {fbIncl && <PlanBadge plan="business" label="Incluído" />}
+                                {fbActive && <span className="text-[14px] text-green-600 dark:text-green-400">● Ativa</span>}
+                              </div>
+                              <TogglePill
+                                active={fbActive}
+                                locked={false}
+                                disabled={skillsSaving}
+                                onClick={() => handleToggleSkill('ratingEnabled', fbActive)}
+                                label={fbActive ? 'Desativar Recolha de Feedback' : 'Ativar Recolha de Feedback'}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
+                              Após fechar uma conversa, o agente pede avaliação (1-5 estrelas) ao cliente via WhatsApp/webchat e agrega os resultados no Histórico.
+                            </p>
+                            {!fbIncl && !fbActive && <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon €4/mês →</button>}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   </div>
                 </div>
 
@@ -1255,26 +1287,6 @@ export default function AgentDetailPage() {
                     <option value="de">🇩🇪 Deutsch</option>
                     <option value="it">🇮🇹 Italiano</option>
                   </select>
-                </div>
-
-                {/* Avaliacao */}
-                <div className="card">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">⭐ Avaliação pós-conversa</h3>
-                      <p className="text-xs text-gray-400 mt-0.5">Após fechar uma conversa, o agente pede avaliação (1-5 estrelas) ao cliente via WhatsApp/webchat.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSaveIntegrations({ ratingEnabled: !agent.ratingEnabled })}
-                      className={`shrink-0 w-11 h-6 rounded-full transition-colors ${agent.ratingEnabled ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'} flex items-center px-0.5`}
-                    >
-                      <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${agent.ratingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </button>
-                  </div>
-                  {agent.ratingEnabled && (
-                    <p className="text-[15px] text-green-600 dark:text-green-400">✓ Ativo — resultados visíveis no Histórico de conversas.</p>
-                  )}
                 </div>
 
                 {/* Notificacoes Proativas */}

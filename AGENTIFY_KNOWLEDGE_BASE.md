@@ -194,9 +194,9 @@ O cliente pode enviar documentos, fotos ou ficheiros diretamente no WhatsApp e o
 *Disponível:* incluído no Starter+
 
 ### Skill Recolha de Feedback
-O agente pede feedback no fim de cada interação e agrega os resultados no dashboard.
+O agente pede feedback no fim de cada interação (avaliação 1-5 estrelas via WhatsApp/webchat) e agrega os resultados no dashboard (Histórico de conversas).
 
-*Disponível:* addon
+*Disponível:* addon €4/mês no Free e Starter · incluído sem custo no Business e Enterprise
 
 ---
 

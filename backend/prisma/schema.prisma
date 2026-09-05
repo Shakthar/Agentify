@@ -154,8 +154,10 @@ model Agent {
   // Multi-língua
   languageMode          String     @default("auto") // auto | pt | en | es | fr
 
-  // Avaliação pós-conversa
-  ratingEnabled         Boolean    @default(true)
+  // Avaliação pós-conversa — skill "Recolha de Feedback": addon pago no Free/Starter,
+  // incluída sem custo a partir do Business (ver frontend SKILLS UI). Novos agentes
+  // nascem desligados; precisa de ser ativada.
+  ratingEnabled         Boolean    @default(false)
 
   // Notificações proativas
   proactiveEnabled      Boolean    @default(false)
