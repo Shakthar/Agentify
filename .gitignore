@@ -67,6 +67,7 @@ tmp/
 
 # Database backups
 *.sql
+!backend/prisma/migrations/*.sql
 *.dump
 
 # Redis dump
