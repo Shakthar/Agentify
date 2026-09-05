@@ -577,29 +577,31 @@ export default function AgentDetailPage() {
             const modelInfo = modelList.find((m) => m.value === agent.model);
             return (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Conversas</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.totalConversations}</p></div>
-              <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Mensagens</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.totalMessages}</p></div>
-              <div className="card" title="% de conversas fechadas sem transferência para um humano"><p className="text-sm text-gray-500 dark:text-gray-400">Taxa de resolução</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Math.round((agent.averageResolution ?? 0) * 100)}%</p></div>
-              <div className="card">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Avaliação média</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {agent.averageRating != null ? `${agent.averageRating.toFixed(1)} ★` : '—'}
-                </p>
-                {(agent.ratingCount ?? 0) > 0 && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agent.ratingCount} avaliaç{agent.ratingCount === 1 ? 'ão' : 'ões'}</p>
-                )}
-              </div>
-              <div className="card">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Receita gerada</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{(agent.revenueGenerated ?? 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</p>
-                {(agent.paidOrdersCount ?? 0) > 0 && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agent.paidOrdersCount} pedido{agent.paidOrdersCount === 1 ? '' : 's'} pago{agent.paidOrdersCount === 1 ? '' : 's'}</p>
-                )}
+              <div className="col-span-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Conversas</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.totalConversations}</p></div>
+                <div className="card"><p className="text-sm text-gray-500 dark:text-gray-400">Mensagens</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{agent.totalMessages}</p></div>
+                <div className="card" title="% de conversas fechadas sem transferência para um humano"><p className="text-sm text-gray-500 dark:text-gray-400">Taxa de resolução</p><p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Math.round((agent.averageResolution ?? 0) * 100)}%</p></div>
+                <div className="card">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Avaliação média</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    {agent.averageRating != null ? `${agent.averageRating.toFixed(1)} ★` : '—'}
+                  </p>
+                  {(agent.ratingCount ?? 0) > 0 && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agent.ratingCount} avaliaç{agent.ratingCount === 1 ? 'ão' : 'ões'}</p>
+                  )}
+                </div>
+                <div className="card">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Receita gerada</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{(agent.revenueGenerated ?? 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</p>
+                  {(agent.paidOrdersCount ?? 0) > 0 && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agent.paidOrdersCount} pedido{agent.paidOrdersCount === 1 ? '' : 's'} pago{agent.paidOrdersCount === 1 ? '' : 's'}</p>
+                  )}
+                </div>
               </div>
               {((agent.needsReviewCount ?? 0) > 0 || (agent.knowledgeGapCount ?? 0) > 0) && (
-                <div className="card border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10">
+                <div className="card col-span-full border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10">
                   <p className="text-sm text-gray-500 dark:text-gray-400">A precisar de atenção</p>
-                  <div className="mt-1 flex flex-col gap-1">
+                  <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1">
                     {(agent.needsReviewCount ?? 0) > 0 && (
                       <button onClick={() => setActiveTab('history')} className="text-left text-sm font-medium text-orange-700 dark:text-orange-400 hover:underline">
                         🔎 {agent.needsReviewCount} conversa{agent.needsReviewCount === 1 ? '' : 's'} sinalizada{agent.needsReviewCount === 1 ? '' : 's'} para revisão
