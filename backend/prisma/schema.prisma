@@ -119,6 +119,9 @@ model Agent {
   whatsappEnabled       Boolean    @default(false)
   whatsappNumber        String?    // phone_number_id do Meta
   whatsappToken         String?    // System User Access Token do cliente (encriptado)
+  whatsappRegisterPin   String?    // PIN de registo/2FA do número na Meta (encriptado) — gerado
+                                    // automaticamente no Embedded Signup, guardado para o dono do
+                                    // negócio conseguir recuperá-lo se um dia migrar de fornecedor
   whatsappWebhookUrl    String?
   notifyPhone           String?    // Número WA do dono do negócio para notificações de pedidos (ex: 351912345678)
   webChatEnabled        Boolean    @default(true)

@@ -355,11 +355,16 @@ export default function AgentDetailPage() {
               setPhoneId(result.phoneNumberId);
               phoneIdRef.current = result.phoneNumberId;
             }
-            setEsMsg(
-              result.phoneNumberId
-                ? '✅ WhatsApp ligado e número associado! Confirma no Passo 3 e depois ativa no Passo 4 com o PIN.'
-                : '⚠️ WhatsApp ligado, mas não recebemos o Phone Number ID automaticamente — confirma-o no Passo 3 (abre "ou configura manualmente") e clica em Guardar antes de avançares para o Passo 4.'
-            );
+            // O backend já trata do Passo 4 sozinho (gera um PIN e ativa o número na
+            // Meta API assim que recebe o Phone Number ID) — não é preciso pedir ao
+            // dono do negócio para fazer mais nada manualmente.
+            if (!result.phoneNumberId) {
+              setEsMsg('⚠️ WhatsApp ligado, mas não recebemos o Phone Number ID automaticamente — confirma-o no Passo 3 (abre "ou configura manualmente"), clica em Guardar e depois em Registar número no Passo 4.');
+            } else if (result.registered) {
+              setEsMsg(`✅ WhatsApp ligado e ativado! Guarda este PIN num sítio seguro — só é preciso se um dia migrares este número para outro fornecedor: ${result.pin}`);
+            } else {
+              setEsMsg(`⚠️ WhatsApp ligado e número associado, mas a ativação automática falhou (${result.registerError ?? 'erro desconhecido'}). Abre "ou configura manualmente" e usa o Passo 4 para tentar registar com um PIN à tua escolha.`);
+            }
             setWpEnabled(true);
           })
           .catch((err: unknown) => {

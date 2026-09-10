@@ -7,6 +7,8 @@ import { BadRequestError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import * as agentsService from '../services/agents.service.js';
 import * as validationService from '../services/validation.service.js';
+import { encrypt, decrypt } from '../lib/encryption.js';
+import { unwrapDataKey } from '../lib/keyVault.js';
 
 const router = Router();
 router.use(authenticate);
@@ -177,11 +179,25 @@ router.post('/:id/whatsapp/register', asyncHandler(async (req: AuthenticatedRequ
   const prismaD = await import('../lib/prisma.js');
   const agent = await prismaD.default.agent.findFirst({
     where: { id: req.params.id, tenantId: req.tenant!.id },
+    include: { tenant: { select: { encryptionKey: true } } },
   });
   if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
   const phoneNumberId = (agent as any).whatsappNumber;
   if (!phoneNumberId) throw new BadRequestError('Phone Number ID não configurado neste agente');
-  const token: string | undefined = (agent as any).whatsappToken ?? process.env.WHATSAPP_TOKEN;
+
+  // O token vem sempre cifrado ("iv:ciphertext", ver agents.service.ts/webhooks.ts) —
+  // antes lia-se agent.whatsappToken directamente como se fosse o token em bruto, o
+  // que nunca funcionava para tokens guardados pelo caminho normal (Passo 3 manual).
+  let token: string | undefined;
+  const storedToken = (agent as any).whatsappToken as string | undefined;
+  if (storedToken && agent.tenant.encryptionKey) {
+    const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
+    const [iv, ciphertext] = storedToken.split(':');
+    try { if (dataKey) token = decrypt(ciphertext, iv, dataKey); } catch (err) {
+      console.error('[WhatsApp] Erro ao desencriptar token para registo:', err);
+    }
+  }
+  token = token ?? process.env.WHATSAPP_TOKEN;
   if (!token) throw new BadRequestError('Token WhatsApp não configurado');
 
   const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
@@ -206,6 +222,7 @@ router.post('/:id/whatsapp/embedded-signup', asyncHandler(async (req: Authentica
   const prismaD = await import('../lib/prisma.js');
   const agent = await prismaD.default.agent.findFirst({
     where: { id: req.params.id, tenantId: req.tenant!.id },
+    include: { tenant: { select: { encryptionKey: true } } },
   });
   if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
 
@@ -224,22 +241,80 @@ router.post('/:id/whatsapp/embedded-signup', asyncHandler(async (req: Authentica
   }
   const accessToken = tokenBody.access_token;
 
-  // Guardar token no agente
+  // Cifrar o token antes de guardar — mesmo formato "iv:ciphertext" usado em toda a
+  // app (agents.service.ts/webhooks.ts). Antes gravava-se o token em bruto aqui, o
+  // que quebrava silenciosamente o envio/receção de mensagens em produção: o
+  // webhook tenta sempre desencriptar agent.whatsappToken, falha com um token em
+  // bruto, e cai para o token global do servidor (WHATSAPP_TOKEN) — que não tem
+  // acesso a este número específico.
+  const dataKey = unwrapDataKey(agent.tenant.encryptionKey);
+  let encryptedToken: string | undefined;
+  if (dataKey) {
+    const { ciphertext, iv } = encrypt(accessToken, dataKey);
+    encryptedToken = `${iv}:${ciphertext}`;
+  } else {
+    console.warn(`[WhatsApp] Sem encryptionKey no tenant ${agent.tenantId} — token do Embedded Signup guardado sem cifrar.`);
+  }
+
   await (prismaD.default.agent as any).update({
     where: { id: agent.id },
-    data: { whatsappToken: accessToken, whatsappEnabled: true },
+    data: { whatsappToken: encryptedToken ?? accessToken, whatsappEnabled: true },
   });
 
   // Devolver phoneNumberId se conhecido (pode vir no body do frontend)
   const { phoneNumberId } = req.body as { phoneNumberId?: string };
+  let registered = false;
+  let registerError: string | undefined;
+  let pin: string | undefined;
+
   if (phoneNumberId) {
     await (prismaD.default.agent as any).update({
       where: { id: agent.id },
       data: { whatsappNumber: phoneNumberId },
     });
+
+    // Passo 4 automático: a Meta exige uma chamada a /register com um PIN de 6
+    // dígitos para tirar o número do estado "pending", quer o token/ID tenham vindo
+    // do Embedded Signup quer de configuração manual. Como aqui já temos o token
+    // fresco (em memória, ainda não cifrado) e o phone_number_id, geramos o PIN
+    // nós próprios e fazemos essa chamada de imediato — o dono do negócio não
+    // precisa de saber que este passo existe.
+    pin = String(Math.floor(100000 + Math.random() * 900000));
+    const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+    try {
+      const metaRegisterRes = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/register`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', pin }),
+      });
+      const metaRegisterBody = await metaRegisterRes.json() as { error?: { message?: string } };
+      if (metaRegisterRes.ok) {
+        registered = true;
+        // Guarda o PIN cifrado — o dono do negócio pode precisar dele se um dia
+        // migrar este número para outro fornecedor (é o 2FA da Meta para o número).
+        const pinDataKey = dataKey ?? unwrapDataKey(agent.tenant.encryptionKey);
+        if (pinDataKey) {
+          const { ciphertext, iv } = encrypt(pin, pinDataKey);
+          await (prismaD.default.agent as any).update({
+            where: { id: agent.id },
+            data: { whatsappRegisterPin: `${iv}:${ciphertext}` },
+          });
+        }
+      } else {
+        registerError = metaRegisterBody.error?.message ?? 'Erro desconhecido ao ativar o número na Meta API';
+      }
+    } catch (err) {
+      registerError = (err as Error).message;
+    }
   }
 
-  res.json({ success: true, phoneNumberId: phoneNumberId ?? null });
+  res.json({
+    success: true,
+    phoneNumberId: phoneNumberId ?? null,
+    registered,
+    registerError: registered ? undefined : registerError,
+    pin: registered ? pin : undefined,
+  });
 }));
 
 // POST /api/agents/:id/briefing
