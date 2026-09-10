@@ -56,6 +56,11 @@ export default function AgentDetailPage() {
   // obsoleta do React — necessário porque o callback do FB.login() é criado antes do
   // evento postMessage do Embedded Signup atualizar o state.
   const phoneIdRef = useRef('');
+  // Mesma lógica para o waba_id (WhatsApp Business Account ID) — necessário para o
+  // backend subscrever a app aos webhooks desta WABA específica (sem isto, a Meta
+  // nunca envia eventos de mensagens recebidas para o nosso endpoint, mesmo com o
+  // número já registado/ativo — o número liga "com sucesso" mas ninguém responde).
+  const wabaIdRef = useRef('');
   const [notifyPhone, setNotifyPhone] = useState('');
   const [wpEnabled, setWpEnabled] = useState(false);
   const [wpToken, setWpToken] = useState('');
@@ -248,6 +253,9 @@ export default function AgentDetailPage() {
               setPhoneId(d.data.phone_number_id);
               phoneIdRef.current = d.data.phone_number_id;
             }
+            if (d.data?.waba_id) {
+              wabaIdRef.current = d.data.waba_id;
+            }
           }
         }
       } catch {}
@@ -346,10 +354,17 @@ export default function AgentDetailPage() {
     win.FB!.login((response) => {
       if (response.authResponse) {
         const code = response.authResponse.code;
-        // Envia também o phone_number_id capturado pelo listener de postMessage
-        // (onFbMessage) — sem isto o backend nunca gravava o número no agente,
-        // e o Passo 4 (Registar número) falhava por falta de Phone Number ID.
-        api.post(`/api/agents/${agent.id}/whatsapp/embedded-signup`, { code, phoneNumberId: phoneIdRef.current || undefined })
+        // Envia também o phone_number_id e o waba_id capturados pelo listener de
+        // postMessage (onFbMessage) — sem o phone_number_id o backend nunca gravava
+        // o número no agente (Passo 4 falhava); sem o waba_id o backend nunca
+        // subscrevia a app aos webhooks desta WABA, e por isso a Meta nunca envia
+        // notificações de mensagens recebidas (o número liga e ativa, mas ninguém
+        // responde a quem escreve).
+        api.post(`/api/agents/${agent.id}/whatsapp/embedded-signup`, {
+          code,
+          phoneNumberId: phoneIdRef.current || undefined,
+          wabaId: wabaIdRef.current || undefined,
+        })
           .then(({ data: result }) => {
             if (result.phoneNumberId) {
               setPhoneId(result.phoneNumberId);
@@ -360,6 +375,8 @@ export default function AgentDetailPage() {
             // dono do negócio para fazer mais nada manualmente.
             if (!result.phoneNumberId) {
               setEsMsg('⚠️ WhatsApp ligado, mas não recebemos o Phone Number ID automaticamente — confirma-o no Passo 3 (abre "ou configura manualmente"), clica em Guardar e depois em Registar número no Passo 4.');
+            } else if (!result.subscribed) {
+              setEsMsg(`⚠️ WhatsApp ligado e número ativado, mas não foi possível subscrever os webhooks (${result.subscribeError ?? 'erro desconhecido'}) — o agente não vai receber mensagens. Tenta ligar novamente ou contacta o suporte.`);
             } else if (result.registered) {
               setEsMsg(`✅ WhatsApp ligado e ativado! Guarda este PIN num sítio seguro — só é preciso se um dia migrares este número para outro fornecedor: ${result.pin}`);
             } else {

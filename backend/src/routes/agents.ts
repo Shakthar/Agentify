@@ -262,10 +262,42 @@ router.post('/:id/whatsapp/embedded-signup', asyncHandler(async (req: Authentica
   });
 
   // Devolver phoneNumberId se conhecido (pode vir no body do frontend)
-  const { phoneNumberId } = req.body as { phoneNumberId?: string };
+  const { phoneNumberId, wabaId } = req.body as { phoneNumberId?: string; wabaId?: string };
   let registered = false;
   let registerError: string | undefined;
   let pin: string | undefined;
+  let subscribed = false;
+  let subscribeError: string | undefined;
+
+  const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
+
+  // Subscrever a app aos webhooks desta WABA — passo obrigatório e separado do
+  // /register do número. Sem esta chamada a Meta NUNCA envia notificações de
+  // mensagens recebidas para o nosso webhook, mesmo com o app já configurado
+  // globalmente com o campo "messages" subscrito e o número já ativo/registado:
+  // cada WABA tem de ser explicitamente ligada à app via /{waba_id}/subscribed_apps.
+  // Sintoma sem isto: o número liga e fica ativo, mas ninguém recebe resposta —
+  // só chegam eventos genéricos (ex.: "account_update"), nunca "messages".
+  if (wabaId) {
+    try {
+      const subscribeRes = await fetch(`https://graph.facebook.com/${version}/${wabaId}/subscribed_apps`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      const subscribeBody = await subscribeRes.json() as { success?: boolean; error?: { message?: string } };
+      if (subscribeRes.ok && subscribeBody.success) {
+        subscribed = true;
+      } else {
+        subscribeError = subscribeBody.error?.message ?? 'Erro desconhecido ao subscrever webhooks da WABA';
+        console.error(`[WhatsApp] Falha ao subscrever app à WABA ${wabaId}:`, subscribeBody);
+      }
+    } catch (err) {
+      subscribeError = (err as Error).message;
+      console.error(`[WhatsApp] Erro de rede ao subscrever app à WABA ${wabaId}:`, err);
+    }
+  } else {
+    console.warn(`[WhatsApp] Embedded Signup sem waba_id (agente ${agent.id}) — não foi possível subscrever webhooks automaticamente.`);
+  }
 
   if (phoneNumberId) {
     await (prismaD.default.agent as any).update({
@@ -280,7 +312,6 @@ router.post('/:id/whatsapp/embedded-signup', asyncHandler(async (req: Authentica
     // nós próprios e fazemos essa chamada de imediato — o dono do negócio não
     // precisa de saber que este passo existe.
     pin = String(Math.floor(100000 + Math.random() * 900000));
-    const version = process.env.WHATSAPP_API_VERSION ?? 'v20.0';
     try {
       const metaRegisterRes = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/register`, {
         method: 'POST',
@@ -314,6 +345,8 @@ router.post('/:id/whatsapp/embedded-signup', asyncHandler(async (req: Authentica
     registered,
     registerError: registered ? undefined : registerError,
     pin: registered ? pin : undefined,
+    subscribed,
+    subscribeError: subscribed ? undefined : subscribeError,
   });
 }));
 
