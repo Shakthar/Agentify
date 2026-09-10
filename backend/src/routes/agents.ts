@@ -1,10 +1,12 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction, type Request } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { BadRequestError } from '../lib/errors.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import * as agentsService from '../services/agents.service.js';
+import * as validationService from '../services/validation.service.js';
 
 const router = Router();
 router.use(authenticate);
@@ -48,6 +50,9 @@ const createAgentSchema = z.object({
   skillFileUpload:     z.boolean().optional(),
   skillHumorDetection: z.boolean().optional(),
   skillVendas:         z.boolean().optional(),
+  // Skill "Validação" — allow-list de contactos (WhatsApp + Telegram)
+  skillValidationEnabled:   z.boolean().optional(),
+  validationBlockedMessage: z.string().max(500).optional(),
   testMode:            z.boolean().optional(),
   languageMode:        z.string().optional(),
   ratingEnabled:       z.boolean().optional(),
@@ -378,6 +383,80 @@ router.patch('/:id/knowledge-gaps/:gapId', asyncHandler(async (req: Authenticate
   const parsed = knowledgeGapActionSchema.safeParse(req.body);
   if (!parsed.success) throw new BadRequestError('Validation failed');
   const result = await agentsService.updateKnowledgeGap(req.tenant!.id, req.params.id, req.params.gapId, parsed.data);
+  res.json(result);
+}));
+
+// ── Skill "Validação" — allow-list de contactos aprovados ────────────────────
+
+// GET /api/agents/:id/validation/contacts
+router.get('/:id/validation/contacts', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const result = await validationService.listAllowedContacts(req.tenant!.id, req.params.id, {
+    skip: parseInt(req.query.skip as string) || 0,
+    take: parseInt(req.query.take as string) || 50,
+  });
+  res.json(result);
+}));
+
+const addContactSchema = z.object({
+  phone: z.string().min(6).max(30),
+  label: z.string().max(100).optional(),
+});
+
+// POST /api/agents/:id/validation/contacts
+router.post('/:id/validation/contacts', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = addContactSchema.safeParse(req.body);
+  if (!parsed.success) throw new BadRequestError('Validation failed', parsed.error.flatten());
+  const contact = await validationService.addAllowedContact(req.tenant!.id, req.params.id, parsed.data);
+  res.status(201).json(contact);
+}));
+
+// DELETE /api/agents/:id/validation/contacts/:contactId
+router.delete('/:id/validation/contacts/:contactId', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  await validationService.deleteAllowedContact(req.tenant!.id, req.params.id, req.params.contactId);
+  res.status(204).send();
+}));
+
+// Upload do ficheiro de importação — mesmo padrão do multer usado em knowledge.ts,
+// mas restrito a .csv/.txt (formato aceite pela importação de contactos).
+const CONTACTS_IMPORT_MAX_BYTES = 2 * 1024 * 1024; // 2 MB — só números + etiquetas, não precisa de mais
+
+function contactsFileExt(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+}
+
+const contactsImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: CONTACTS_IMPORT_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ext = contactsFileExt(file.originalname);
+    if (ext !== 'csv' && ext !== 'txt') {
+      return cb(new Error('Tipo de ficheiro não suportado (use .csv ou .txt — exporte o Excel/Sheets como CSV)'));
+    }
+    cb(null, true);
+  },
+});
+
+function handleContactsImportUpload(req: Request, res: Response, next: NextFunction) {
+  contactsImportUpload.single('file')(req, res, (err: unknown) => {
+    if (err instanceof multer.MulterError) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Ficheiro excede 2 MB' : err.message;
+      return next(new BadRequestError(msg));
+    }
+    if (err instanceof Error) return next(new BadRequestError(err.message));
+    next();
+  });
+}
+
+// POST /api/agents/:id/validation/contacts/import
+router.post('/:id/validation/contacts/import', handleContactsImportUpload, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) throw new BadRequestError('Nenhum ficheiro enviado (campo "file")');
+
+  const result = await validationService.importAllowedContacts(req.tenant!.id, req.params.id, {
+    buffer: file.buffer,
+    fileName: file.originalname,
+  });
   res.json(result);
 }));
 

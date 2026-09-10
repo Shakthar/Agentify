@@ -88,6 +88,7 @@ model Tenant {
   orders                Order[]
   platformInvoices      PlatformInvoice[]
   knowledgeGaps         KnowledgeGap[]
+  allowedContacts       AgentAllowedContact[]
 }
 
 // ===== PLATFORM EXPENSES (superadmin) =====
@@ -133,6 +134,13 @@ model Agent {
   skillVendas           Boolean    @default(false) // Addon — inclui Pedidos/KDS
   skillCRM              String?    // HubSpot, Salesforce, etc
   skillTicketing        String?
+
+  // Skill "Validação" — allow-list de contactos aprovados (WhatsApp + Telegram;
+  // Instagram fica de fora, a Graph API do Instagram só expõe o PSID do remetente,
+  // nunca um número de telefone). Mensagens de contactos fora da lista recebem uma
+  // recusa fixa sem chegar ao LLM (não consomem créditos) — ver validation.service.ts.
+  skillValidationEnabled   Boolean  @default(false)
+  validationBlockedMessage String?  @db.Text // se vazio, usa a mensagem padrão em pt (ver validation.service.ts)
   
   // Settings
   // offHoursMessage é a mensagem fora de horário do WhatsApp especificamente —
@@ -221,7 +229,28 @@ model Agent {
   agentDocs             AgentDoc[]
   orders                Order[]
   knowledgeGaps         KnowledgeGap[]
+  allowedContacts       AgentAllowedContact[]
 
+  @@index([tenantId])
+}
+
+// ===== AGENT ALLOWED CONTACTS (skill "Validação" — allow-list por agente) =====
+// Um número de telefone (normalizado, ver normalizePhone em customer.service.ts)
+// autorizado a falar com este agente. Preenchida manualmente pelo dono do negócio
+// ou por importação em massa via CSV/TXT (ver validation.service.ts).
+model AgentAllowedContact {
+  id        String   @id @default(cuid())
+  agentId   String
+  tenantId  String
+  phone     String   // normalizado E.164 sem + (mesma convenção de Customer.phone)
+  label     String?  // nome/etiqueta opcional (ex: "Cliente VIP")
+  createdAt DateTime @default(now())
+
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, phone])
+  @@index([agentId])
   @@index([tenantId])
 }
 
@@ -573,6 +602,12 @@ model Customer {
   externalIds Json?    // { "instagram": "senderId", "whatsapp": "phone", "shopify": "id" }
   metadata    Json?
 
+  // Skill "Validação" — throttle de mensagens automáticas (máx. 1x/24h cada, ver
+  // validation.service.ts): recusa por contacto fora da allow-list, e pedido de
+  // partilha de contacto no Telegram (só aqui, o número não é conhecido à partida).
+  lastValidationBlockedAt DateTime?
+  lastValidationPromptAt  DateTime?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -587,9 +622,16 @@ model Customer {
 }
 
 // ===== PLATFORM CONFIG (pricing & feature flags — editable by superadmin) =====
+// NOTA (10/09/2026): esta tabela nunca teve coluna `id` na base de dados viva —
+// foi sempre acedida só por `key` (ver platformConfig.ts: findUnique/upsert
+// usam sempre { key: ... }, nunca .id). O modelo tinha um `id String @id
+// @default(cuid())` que nunca chegou a ser aplicado com sucesso via
+// `prisma db push` (havia 1 linha existente e o Prisma recusa adicionar uma
+// coluna obrigatória sem valor por omissão ao nível da base de dados nesse
+// caso, exigindo reset). Como nada no código usa `.id` aqui, a correção é usar
+// `key` como chave primária diretamente — sem perda de dados, sem reset.
 model PlatformConfig {
-  id        String   @id @default(cuid())
-  key       String   @unique
+  key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
 }

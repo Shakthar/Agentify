@@ -12,9 +12,18 @@ import { decrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
 import { sendWhatsAppText, sendWhatsAppDocument } from '../lib/whatsapp.js';
 import { sendInstagramDM, replyToInstagramComment } from '../lib/instagram.js';
-import { sendTelegramMessage } from '../lib/telegram.js';
+import { sendTelegramMessage, sendTelegramContactRequest } from '../lib/telegram.js';
 import { deductWaMsgCredit } from '../services/billing.service.js';
 import { isWithinSchedule } from '../utils/schedule.js';
+import {
+  isPhoneAllowed,
+  getBlockedMessage,
+  getContactPromptMessage,
+  shouldSendBlockedMessage,
+  markBlockedMessageSent,
+  shouldSendContactPrompt,
+  markContactPromptSent,
+} from '../services/validation.service.js';
 
 /**
  * Verifica a assinatura X-Hub-Signature-256 enviada pelo Meta.
@@ -273,6 +282,21 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
           channel: 'whatsapp',
           channelId: from,
         }).catch(err => { console.error('[WhatsApp] Erro ao identificar customer:', err); return null; });
+
+        // Skill "Validação": o WhatsApp entrega sempre o número real do remetente,
+        // por isso basta verificar a allow-list — sem fluxo de "partilhar contacto"
+        // como no Telegram. Mensagem nunca chega ao LLM nem consome créditos.
+        if ((agent as any).skillValidationEnabled) {
+          const allowed = await isPhoneAllowed(agent.id, from);
+          if (!allowed) {
+            console.log(`[WhatsApp] Contacto ${from} fora da allow-list do agente ${agent.id} — recusado sem passar pelo LLM`);
+            if (customer && shouldSendBlockedMessage(customer as any)) {
+              await sendWhatsAppText(phoneId, from, getBlockedMessage(agent as any), effectiveToken);
+              await markBlockedMessageSent(customer.id).catch(() => {});
+            }
+            continue;
+          }
+        }
 
         // Reutilizar conversa aberta deste contacto ou criar nova
         let conversation = await prisma.conversation.findFirst({
@@ -683,16 +707,17 @@ router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Reque
 
   const update = req.body as TelegramUpdate;
   const message = update.message;
-  if (!message || typeof message.text !== 'string' || !message.text) {
-    // Ignora silenciosamente updates que não sejam mensagens de texto simples
-    // (fotos, stickers, edited_message, callback_query, etc.) — fora do âmbito por agora.
+  if (!message) {
+    // Ignora updates que não sejam mensagens (edited_message, callback_query, etc.)
     return;
   }
 
   const chatId = message.chat.id;
   const from = String(chatId);
 
-  // Desencriptar o token do bot para poder responder
+  // Desencriptar o token do bot para poder responder — feito já aqui (antes de
+  // sabermos se a mensagem tem texto) porque a partilha de contacto da skill de
+  // Validação também precisa de responder e chega sem texto (ver abaixo).
   let botToken: string | undefined;
   const encryptedBotToken = (agent as any).telegramBotToken as string | undefined;
   if (encryptedBotToken && agent.tenant.encryptionKey) {
@@ -704,6 +729,23 @@ router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Reque
   }
   if (!botToken) {
     console.error(`[Telegram] Sem token utilizável para agentId=${agentId} — não é possível responder.`);
+    return;
+  }
+
+  const skillValidationEnabled = !!(agent as any).skillValidationEnabled;
+
+  // Skill "Validação" — partilha de contacto: chega como update SEM texto (só o
+  // objeto `contact`, preenchido quando o utilizador toca no botão nativo
+  // "partilhar contacto"). Tem de ser tratada ANTES do "ignora updates sem
+  // texto" abaixo, ou o contacto partilhado seria descartado em silêncio.
+  if (skillValidationEnabled && message.contact?.phone_number) {
+    await handleTelegramContactShared(agent, chatId, from, message.contact.phone_number, botToken);
+    return;
+  }
+
+  if (typeof message.text !== 'string' || !message.text) {
+    // Ignora silenciosamente updates que não sejam mensagens de texto simples
+    // (fotos, stickers, edited_message, callback_query, etc.) — fora do âmbito por agora.
     return;
   }
 
@@ -725,6 +767,29 @@ router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Reque
     channel: 'telegram',
     channelId: from,
   }).catch(err => { console.error('[Telegram] Erro ao identificar customer:', err); return null; });
+
+  // Skill "Validação": só prossegue se já soubermos o telefone deste chat E ele
+  // estiver na allow-list do agente — caso contrário pede o contacto (se ainda
+  // não o conhecemos) ou recusa (se o conhecemos mas não está aprovado).
+  if (skillValidationEnabled) {
+    const phone = (customer as any)?.phone as string | undefined;
+    if (!phone) {
+      if (!customer || shouldSendContactPrompt(customer as any)) {
+        await sendTelegramContactRequest(chatId, getContactPromptMessage(), botToken);
+        if (customer) await markContactPromptSent(customer.id).catch(() => {});
+      }
+      return;
+    }
+    const allowed = await isPhoneAllowed(agent.id, phone);
+    if (!allowed) {
+      console.log(`[Telegram] Contacto ${phone} (chat=${chatId}) fora da allow-list do agente ${agent.id} — recusado sem passar pelo LLM`);
+      if (shouldSendBlockedMessage(customer as any)) {
+        await sendTelegramMessage(chatId, getBlockedMessage(agent as any), botToken);
+        await markBlockedMessageSent(customer!.id).catch(() => {});
+      }
+      return;
+    }
+  }
 
   // Reutilizar conversa aberta deste chat ou criar nova
   let conversation = await prisma.conversation.findFirst({
@@ -784,6 +849,41 @@ router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Reque
   }
 }));
 
+/**
+ * Skill "Validação" — trata a partilha de contacto do utilizador (botão nativo
+ * request_contact do Telegram): associa o telefone ao Customer deste chat e
+ * responde de acordo com a allow-list do agente.
+ */
+async function handleTelegramContactShared(
+  agent: { id: string; tenantId: string; validationBlockedMessage?: string | null },
+  chatId: number,
+  channelId: string,
+  rawPhone: string,
+  botToken: string,
+): Promise<void> {
+  const customer = await identifyCustomer({
+    tenantId: agent.tenantId,
+    phone: rawPhone,
+    channel: 'telegram',
+    channelId,
+  }).catch(err => { console.error('[Telegram] Erro ao identificar customer (partilha de contacto):', err); return null; });
+
+  const phone = (customer as any)?.phone as string | undefined;
+  const allowed = !!phone && await isPhoneAllowed(agent.id, phone);
+
+  if (allowed) {
+    await sendTelegramMessage(chatId, 'Obrigado! O teu número foi confirmado ✅ Podes escrever a tua pergunta.', botToken);
+    console.log(`[Telegram] Contacto partilhado e validado para chat=${chatId} (agente=${agent.id})`);
+    return;
+  }
+
+  console.log(`[Telegram] Contacto partilhado por chat=${chatId} não está na allow-list do agente ${agent.id}`);
+  if (!customer || shouldSendBlockedMessage(customer as any)) {
+    await sendTelegramMessage(chatId, getBlockedMessage(agent as any), botToken);
+    if (customer) await markBlockedMessageSent(customer.id).catch(() => {});
+  }
+}
+
 // ─── Tipos locais (Telegram) ──────────────────────────────────────────────────
 
 interface TelegramUpdate {
@@ -793,6 +893,9 @@ interface TelegramUpdate {
     from?: { id: number; username?: string; first_name?: string };
     chat: { id: number; type: string };
     text?: string;
+    // Presente quando o utilizador partilha o contacto via botão nativo
+    // request_contact (skill "Validação" — ver handleTelegramContactShared).
+    contact?: { phone_number: string; first_name?: string; last_name?: string; user_id?: number };
   };
 }
 

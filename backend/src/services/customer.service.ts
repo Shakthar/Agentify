@@ -12,7 +12,7 @@
 import prisma from '../lib/prisma.js';
 
 /** Normaliza número de telefone para E.164 sem o + */
-function normalizePhone(phone: string): string {
+export function normalizePhone(phone: string): string {
   // Remove tudo que não seja dígito
   return phone.replace(/\D/g, '');
 }
@@ -51,12 +51,25 @@ export async function identifyCustomer(input: IdentifyCustomerInput): Promise<Cu
     },
   });
   if (byExternalId) {
-    // Atualizar nome se aprendemos algo novo
-    if (name && !byExternalId.name) {
-      await (prisma as any).customer.update({
-        where: { id: byExternalId.id },
-        data: { name },
-      });
+    // Atualizar nome/telefone se aprendemos algo novo neste pedido (ex.: nome
+    // que ainda não tínhamos, ou telefone partilhado agora no Telegram pela
+    // skill de Validação — no WhatsApp o telefone já vem sempre desde a criação).
+    const patch: Record<string, unknown> = {};
+    if (name && !byExternalId.name) patch.name = name;
+    if (phone && !byExternalId.phone) patch.phone = phone;
+    if (Object.keys(patch).length > 0) {
+      try {
+        const updated = await (prisma as any).customer.update({
+          where: { id: byExternalId.id },
+          data: patch,
+        });
+        return updated as CustomerRecord;
+      } catch (err) {
+        // Este telefone já pertence a outro Customer do mesmo tenant (ex.: contactou
+        // primeiro por WhatsApp) — viola o @@unique([tenantId, phone]). Não fazemos
+        // merge de identidades aqui; mantém o registo atual sem o telefone.
+        console.warn(`[Customer] Não foi possível associar telefone a customer ${byExternalId.id} (provável duplicado):`, err);
+      }
     }
     return byExternalId as CustomerRecord;
   }

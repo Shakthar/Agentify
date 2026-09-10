@@ -51,6 +51,9 @@ interface CreateAgentInput {
   skillFileUpload?: boolean;
   skillHumorDetection?: boolean;
   skillVendas?: boolean;
+  // Skill "Validação" — allow-list de contactos (WhatsApp + Telegram)
+  skillValidationEnabled?: boolean;
+  validationBlockedMessage?: string;
   testMode?: boolean;
   // Multi-lingua
   languageMode?: string;
@@ -180,7 +183,7 @@ export async function createAgent(
       crmEnabled: false,
       instagramEnabled: false,
       calendarEnabled: false,
-    },
+    } as any,
   });
 
   writeAuditLog(tenant.id, 'agent_created', 'agent', agent.id, { name: agent.name, model: agent.model });
@@ -198,8 +201,8 @@ export async function getAgent(tenantId: string, agentId: string) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { whatsappToken: _omitWA, instagramToken: _omitIG, telegramBotToken: _omitTG, ...safeAgent } = agent as any;
 
-  // EstatÃ­sticas calculadas em tempo real (revenue, avaliaÃ§Ã£o mÃ©dia, QA e lacunas de KB) â€”
-  // mais fiÃ¡veis do que campos persistidos que podem ficar desatualizados.
+  // Estatísticas calculadas em tempo real (revenue, avaliação média, QA e lacunas de KB) —
+  // mais fiáveis do que campos persistidos que podem ficar desatualizados.
   const [revenueAgg, ratingAgg, needsReviewCount, knowledgeGapCount] = await Promise.all([
     prisma.order.aggregate({
       where: { agentId, status: 'paid' },
@@ -228,12 +231,13 @@ export async function getAgent(tenantId: string, agentId: string) {
       fileUpload: agent.skillFileUpload,
       humorDetection: agent.skillHumorDetection,
       vendas: agent.skillVendas,
+      validationEnabled: (agent as any).skillValidationEnabled,
     },
     statistics: {
       totalConversations: agent.totalConversations,
       totalMessages: agent.totalMessages,
-      // Taxa de resoluÃ§Ã£o real: % de conversas fechadas sem handoff para humano
-      // (recalculada a cada fecho de conversa â€” ver finalizeConversationClosure).
+      // Taxa de resolução real: % de conversas fechadas sem handoff para humano
+      // (recalculada a cada fecho de conversa — ver finalizeConversationClosure).
       averageResolution: agent.averageResolution,
       revenueGenerated: revenueAgg._sum.amount ?? 0,
       paidOrdersCount: revenueAgg._count.id ?? 0,
@@ -270,7 +274,7 @@ export async function updateAgent(
   }
 
   // SECURITY: plan gate para skills e whitelabel no backend
-  // (o frontend jÃ¡ bloqueia, mas um atacante podia chamar a API directamente)
+  // (o frontend já bloqueia, mas um atacante podia chamar a API directamente)
   // Admins bypass all plan gates (test mode)
   if (!tenant.isAdmin) {
     const PLAN_ORDER = ['free', 'starter', 'business', 'enterprise'];
@@ -322,21 +326,21 @@ export async function updateAgent(
   }
 
   // Se um novo token de bot do Telegram foi colado agora, valida-o e regista o
-  // webhook ANTES de gravar â€” ao contrÃ¡rio do Instagram (onde a validaÃ§Ã£o corre em
-  // segundo plano apÃ³s gravar, porque testa vÃ¡rios campos), aqui Ã© uma Ãºnica
-  // chamada rÃ¡pida Ã  API do Telegram, por isso vale a pena ser sÃ­ncrona: um token
-  // errado nunca fica "guardado" sem funcionar, o cliente vÃª logo o erro.
+  // webhook ANTES de gravar — ao contrário do Instagram (onde a validação corre em
+  // segundo plano após gravar, porque testa vários campos), aqui é uma única
+  // chamada rápida à API do Telegram, por isso vale a pena ser síncrona: um token
+  // errado nunca fica "guardado" sem funcionar, o cliente vê logo o erro.
   let telegramConnectData: { telegramUsername?: string; telegramWebhookSecret?: string } = {};
   if (telegramBotToken) {
     const botInfo = await getTelegramBotInfo(telegramBotToken);
     if (!botInfo) {
-      throw new BadRequestError('Token do bot do Telegram invÃ¡lido â€” confirma que copiaste o token certo do @BotFather.');
+      throw new BadRequestError('Token do bot do Telegram inválido — confirma que copiaste o token certo do @BotFather.');
     }
     const webhookSecret = crypto.randomBytes(24).toString('hex');
     const backendUrl = process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app';
     const registered = await setTelegramWebhook(telegramBotToken, `${backendUrl}/api/webhooks/telegram/${agentId}`, webhookSecret);
     if (!registered) {
-      throw new BadRequestError('NÃ£o foi possÃ­vel registar o webhook do Telegram â€” tenta novamente dentro de alguns segundos.');
+      throw new BadRequestError('Não foi possível registar o webhook do Telegram — tenta novamente dentro de alguns segundos.');
     }
     telegramConnectData = { telegramUsername: botInfo.username, telegramWebhookSecret: webhookSecret };
   }
@@ -361,16 +365,16 @@ export async function updateAgent(
       ...(encryptedTelegramBotToken ? { telegramBotToken: encryptedTelegramBotToken } : {}),
       ...telegramConnectData,
       ...skillsUpdate,
-    },
+    } as any,
   });
 
   // Se o Instagram foi ligado/configurado manualmente (Passo 3 do dashboard, sem
-  // passar pelo OAuth /instagram/connect) e agora jÃ¡ temos token + IDs, subscreve
-  // a PÃ¡gina (mensagens) e a conta Instagram (comentÃ¡rios) aos webhooks aqui tambÃ©m
-  // â€” sem isto a Meta nÃ£o entrega mensagens nem comentÃ¡rios desta conta, mesmo com
+  // passar pelo OAuth /instagram/connect) e agora já temos token + IDs, subscreve
+  // a Página (mensagens) e a conta Instagram (comentários) aos webhooks aqui também
+  // — sem isto a Meta não entrega mensagens nem comentários desta conta, mesmo com
   // o token e os IDs certos guardados.
-  // SÃ³ verifica/subscreve quando este pedido tocou de facto em algo do Instagram
-  // (evita chamadas desnecessÃ¡rias Ã  Meta em updates que nada tÃªm a ver, ex.: WhatsApp).
+  // Só verifica/subscreve quando este pedido tocou de facto em algo do Instagram
+  // (evita chamadas desnecessárias à Meta em updates que nada têm a ver, ex.: WhatsApp).
   const touchedInstagram = instagramToken !== undefined
     || (updateData as any).instagramPageId !== undefined
     || (updateData as any).instagramAccountId !== undefined;
@@ -379,8 +383,8 @@ export async function updateAgent(
   if (touchedInstagram && (pageIdForSub || igAccountIdForSub)) {
     let rawTokenForSub = instagramToken; // token novo, em texto simples, se foi enviado agora
     if (!rawTokenForSub && existing.instagramToken) {
-      // Nenhum token novo neste pedido (ex.: sÃ³ se guardou o Page ID agora) â€”
-      // reutiliza o token jÃ¡ guardado, desencriptando-o.
+      // Nenhum token novo neste pedido (ex.: só se guardou o Page ID agora) —
+      // reutiliza o token já guardado, desencriptando-o.
       try {
         const tenantForDecrypt = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
         const dataKeyForDecrypt = unwrapDataKey(tenantForDecrypt?.encryptionKey);
@@ -394,17 +398,17 @@ export async function updateAgent(
     }
     if (rawTokenForSub && igAccountIdForSub) {
       subscribeInstagramAccount(igAccountIdForSub, pageIdForSub ?? '', rawTokenForSub).then((ok) => {
-        if (!ok) console.warn(`[Instagram] NÃ£o foi possÃ­vel subscrever a conta ${igAccountIdForSub} aos webhooks (agentId=${agentId}).`);
+        if (!ok) console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountIdForSub} aos webhooks (agentId=${agentId}).`);
       });
     }
   } else if (instagramToken) {
-    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId/instagramAccountId â€” nÃ£o foi possÃ­vel subscrever webhooks para agentId=${agentId}.`);
+    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId/instagramAccountId — não foi possível subscrever webhooks para agentId=${agentId}.`);
   }
 
-  // Telegram: um token novo jÃ¡ foi validado e o webhook registado mais acima
-  // (sÃ­ncrono). Aqui sÃ³ tratamos o caso de o cliente sÃ³ mexer no toggle
-  // telegramEnabled (sem colar um token novo) â€” reativa/remove o webhook usando
-  // o token jÃ¡ guardado, em segundo plano (nÃ£o bloqueia a resposta do PATCH).
+  // Telegram: um token novo já foi validado e o webhook registado mais acima
+  // (síncrono). Aqui só tratamos o caso de o cliente só mexer no toggle
+  // telegramEnabled (sem colar um token novo) — reativa/remove o webhook usando
+  // o token já guardado, em segundo plano (não bloqueia a resposta do PATCH).
   const telegramEnabledTouched = (updateData as any).telegramEnabled !== undefined;
   if (!telegramBotToken && telegramEnabledTouched && (existing as any).telegramBotToken) {
     const tenantForDecrypt = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
@@ -424,7 +428,7 @@ export async function updateAgent(
         const existingSecret = (existing as any).telegramWebhookSecret as string | undefined;
         const secret = existingSecret ?? crypto.randomBytes(24).toString('hex');
         setTelegramWebhook(rawTokenForToggle, `${backendUrl}/api/webhooks/telegram/${agentId}`, secret).then((ok) => {
-          if (!ok) console.warn(`[Telegram] NÃ£o foi possÃ­vel reativar o webhook do bot (agentId=${agentId}).`);
+          if (!ok) console.warn(`[Telegram] Não foi possível reativar o webhook do bot (agentId=${agentId}).`);
         });
         if (!existingSecret) {
           prisma.agent.update({ where: { id: agentId }, data: { telegramWebhookSecret: secret } as any }).catch(() => {});
@@ -466,7 +470,7 @@ export async function toggleAgent(tenantId: string, agentId: string) {
   return agent;
 }
 
-// ===== LACUNAS DA BASE DE CONHECIMENTO (deteÃ§Ã£o automÃ¡tica via marcador [UNKNOWN:...]) =====
+// ===== LACUNAS DA BASE DE CONHECIMENTO (deteção automática via marcador [UNKNOWN:...]) =====
 
 export async function listKnowledgeGaps(tenantId: string, agentId: string) {
   const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId }, select: { id: true } });
@@ -498,9 +502,9 @@ export async function updateKnowledgeGap(tenantId: string, agentId: string, gapI
     return (prisma as any).knowledgeGap.update({ where: { id: gapId }, data: { status: 'open' } });
   }
 
-  // add_to_kb â€” cria um documento de texto na KB com a pergunta + a resposta dada pelo dono do negÃ³cio
+  // add_to_kb — cria um documento de texto na KB com a pergunta + a resposta dada pelo dono do negócio
   const answer = (input.answer ?? '').trim();
-  if (!answer) throw new BadRequestError('answer Ã© obrigatÃ³rio para adicionar Ã  base de conhecimento');
+  if (!answer) throw new BadRequestError('answer é obrigatório para adicionar à base de conhecimento');
 
   await addTextDocument({ id: tenantId }, agentId, {
     title: `Pergunta: ${gap.question.slice(0, 100)}`,

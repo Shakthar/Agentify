@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import ChatWidget from '../../components/ChatWidget';
 import KnowledgeBase from '../../components/KnowledgeBase';
+import AgentValidation from '../../components/AgentValidation';
 import AgentDocs from '../../components/AgentDocs';
 import Orders from '../../components/Orders';
 import ConversationHistory from '../../components/ConversationHistory';
@@ -51,6 +52,10 @@ export default function AgentDetailPage() {
   const [error, setError] = useState<string | null>(null);
   // WhatsApp state
   const [phoneId, setPhoneId] = useState('');
+  // Guarda sempre o valor mais recente de phoneId, sem sofrer do problema de closure
+  // obsoleta do React — necessário porque o callback do FB.login() é criado antes do
+  // evento postMessage do Embedded Signup atualizar o state.
+  const phoneIdRef = useRef('');
   const [notifyPhone, setNotifyPhone] = useState('');
   const [wpEnabled, setWpEnabled] = useState(false);
   const [wpToken, setWpToken] = useState('');
@@ -239,7 +244,10 @@ export default function AgentDetailPage() {
           } else {
             // Dados do flow: phone_number_id, waba_id, business_id
             console.log('[EmbeddedSignup] Dados da sessão:', d.data);
-            if (d.data?.phone_number_id) setPhoneId(d.data.phone_number_id);
+            if (d.data?.phone_number_id) {
+              setPhoneId(d.data.phone_number_id);
+              phoneIdRef.current = d.data.phone_number_id;
+            }
           }
         }
       } catch {}
@@ -338,10 +346,20 @@ export default function AgentDetailPage() {
     win.FB!.login((response) => {
       if (response.authResponse) {
         const code = response.authResponse.code;
-        api.post(`/api/agents/${agent.id}/whatsapp/embedded-signup`, { code })
+        // Envia também o phone_number_id capturado pelo listener de postMessage
+        // (onFbMessage) — sem isto o backend nunca gravava o número no agente,
+        // e o Passo 4 (Registar número) falhava por falta de Phone Number ID.
+        api.post(`/api/agents/${agent.id}/whatsapp/embedded-signup`, { code, phoneNumberId: phoneIdRef.current || undefined })
           .then(({ data: result }) => {
-            setEsMsg('✅ WhatsApp ligado! Token guardado. Confirma o Phone Number ID e guarda.');
-            if (result.phoneNumberId) setPhoneId(result.phoneNumberId);
+            if (result.phoneNumberId) {
+              setPhoneId(result.phoneNumberId);
+              phoneIdRef.current = result.phoneNumberId;
+            }
+            setEsMsg(
+              result.phoneNumberId
+                ? '✅ WhatsApp ligado e número associado! Confirma no Passo 3 e depois ativa no Passo 4 com o PIN.'
+                : '⚠️ WhatsApp ligado, mas não recebemos o Phone Number ID automaticamente — confirma-o no Passo 3 (abre "ou configura manualmente") e clica em Guardar antes de avançares para o Passo 4.'
+            );
             setWpEnabled(true);
           })
           .catch((err: unknown) => {
@@ -390,8 +408,14 @@ export default function AgentDetailPage() {
       setWpRegMsg('✅ Número registado com sucesso! Já pode receber e enviar mensagens.');
       setWpRegPin('');
     } catch (err: unknown) {
-      const details = (err as { response?: { data?: { details?: { error?: { message?: string } } } } })?.response?.data?.details;
-      setWpRegMsg(`Erro: ${details?.error?.message ?? 'Falha ao registar na Meta API'}`);
+      // O backend pode devolver dois formatos: um erro de validação simples
+      // ({ error: "mensagem" }, ex: "Phone Number ID não configurado") ou um erro
+      // vindo da própria Meta API ({ error: "Erro da Meta API", details: {...} }).
+      // Antes só líamos o segundo formato, por isso erros de validação apareciam
+      // sempre como "Falha ao registar na Meta API", escondendo a causa real.
+      const data = (err as { response?: { data?: { error?: string; details?: { error?: { message?: string } } } } })?.response?.data;
+      const msg = data?.details?.error?.message ?? data?.error ?? 'Falha ao registar na Meta API';
+      setWpRegMsg(`Erro: ${msg}`);
     } finally {
       setWpRegSaving(false);
     }
@@ -949,6 +973,9 @@ export default function AgentDetailPage() {
                         </div>
                       );
                     })()}
+
+                    {/* Validação — allow-list de contactos aprovados (WhatsApp + Telegram) */}
+                    <AgentValidation agent={agent} onAgentUpdate={setAgent} />
 
                   </div>
                 </div>
@@ -1546,16 +1573,20 @@ export default function AgentDetailPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs text-gray-400">ou configura manualmente</span>
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-              </div>
+              <details className="group space-y-6">
+                <summary className="flex items-center gap-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden py-1">
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <span className="text-xs text-gray-400 group-open:text-gray-600 dark:group-open:text-gray-300 flex items-center gap-1.5">
+                    <svg className="w-2.5 h-2.5 transition-transform group-open:rotate-90" viewBox="0 0 8 8" fill="currentColor"><path d="M1 0l6 4-6 4V0z"/></svg>
+                    ou configura manualmente
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                </summary>
 
-              <div className="card">
-                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
-                <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
-                  <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria uma App do tipo <strong>Business</strong>.</li>
+                <div className="card">
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
+                  <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
+                    <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria uma App do tipo <strong>Business</strong>.</li>
                   <li>Adiciona o produto <strong>WhatsApp</strong> à app.</li>
                   <li>Em <em>WhatsApp → Getting Started</em>, copia o <strong>Phone Number ID</strong> (número longo — não é o número de telefone).</li>
                   <li>Gera um <strong>Access Token</strong> (temporário para testes ou permanente via System User).</li>
@@ -1724,7 +1755,8 @@ export default function AgentDetailPage() {
                 {wpRegMsg && (
                   <p className={`text-xs mt-2 ${wpRegMsg.startsWith('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{wpRegMsg}</p>
                 )}
-              </div>
+                </div>
+              </details>
             </div>
           )}
 
@@ -1749,15 +1781,19 @@ export default function AgentDetailPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs text-gray-400">ou configura manualmente</span>
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-              </div>
-              <div className="card">
-                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
-                <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
-                  <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria (ou usa) uma App do tipo <strong>Business</strong>.</li>
+              <details className="group space-y-6">
+                <summary className="flex items-center gap-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden py-1">
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <span className="text-xs text-gray-400 group-open:text-gray-600 dark:group-open:text-gray-300 flex items-center gap-1.5">
+                    <svg className="w-2.5 h-2.5 transition-transform group-open:rotate-90" viewBox="0 0 8 8" fill="currentColor"><path d="M1 0l6 4-6 4V0z"/></svg>
+                    ou configura manualmente
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                </summary>
+                <div className="card">
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
+                  <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
+                    <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria (ou usa) uma App do tipo <strong>Business</strong>.</li>
                   <li>Adiciona o produto <strong>Instagram Graph API</strong> à app.</li>
                   <li>Em <em>Instagram → Basic Display</em>, liga a tua conta <strong>Instagram Business</strong>.</li>
                   <li>Copia o <strong>Instagram Account ID</strong> (número numérico longo, ex: 17841400008460056).</li>
@@ -1901,7 +1937,8 @@ export default function AgentDetailPage() {
                     {igSaving ? 'A guardar...' : '💾 Guardar configuração Instagram'}
                   </button>
                 </div>
-              </div>
+                </div>
+              </details>
             </div>
           )}
 

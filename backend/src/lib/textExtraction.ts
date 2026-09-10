@@ -144,8 +144,13 @@ export function extractCsv(content: string): string {
   return rows.map((r) => r.join(' | ')).join('\n');
 }
 
-/** Parser CSV minimalista compatível com RFC 4180 (aspas duplas). */
-function parseCsv(text: string): string[][] {
+/**
+ * Parser CSV minimalista compatível com RFC 4180 (aspas duplas).
+ * Exportado para reutilização fora da extração de KB — ex.: importação de
+ * contactos da skill de Validação (validation.service.ts), que usa o mesmo
+ * formato de ficheiro (uma coluna, opcionalmente com uma segunda).
+ */
+export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let field = '';
   let row: string[] = [];

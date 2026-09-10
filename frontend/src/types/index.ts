@@ -50,6 +50,8 @@ export interface Agent {
   skillFileUpload: boolean;
   skillHumorDetection: boolean;
   skillVendas: boolean;
+  skillValidationEnabled: boolean;
+  validationBlockedMessage?: string;
   testMode: boolean;
   languageMode: string;
   ratingEnabled: boolean;

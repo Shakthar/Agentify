@@ -78,3 +78,36 @@ export async function sendTelegramMessage(chatId: string | number, text: string,
     console.error('[Telegram] Falha ao enviar texto (network/fetch error):', err);
   }
 }
+
+/**
+ * POST /sendMessage com o teclado nativo "partilhar contacto" (reply_markup com
+ * request_contact:true) — usado pela skill de Validação quando ainda não sabemos
+ * o telefone do chat. Ao contrário do WhatsApp (que entrega sempre o número real
+ * do remetente), o Telegram só o expõe se o utilizador tocar neste botão e
+ * autorizar explicitamente a partilha.
+ */
+export async function sendTelegramContactRequest(chatId: string | number, text: string, botToken: string): Promise<void> {
+  try {
+    const resp = await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        reply_markup: {
+          keyboard: [[{ text: '📱 Partilhar o meu contacto', request_contact: true }]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }),
+    });
+    const respBody = await resp.text();
+    if (!resp.ok) {
+      console.error(`[Telegram] Erro ao pedir partilha de contacto para chat=${chatId} status=${resp.status}:`, respBody);
+    } else {
+      console.log(`[Telegram] Pedido de partilha de contacto enviado para chat=${chatId}`);
+    }
+  } catch (err) {
+    console.error('[Telegram] Falha ao pedir partilha de contacto (network/fetch error):', err);
+  }
+}
