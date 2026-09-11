@@ -330,11 +330,14 @@ router.post('/instagram/connect', authenticate, asyncHandler(async (req: Authent
 
   // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
   // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
-  // configurado no dashboard.
+  // configurado no dashboard. Ver nota (11/09) em lib/instagram.ts: para contas de
+  // clientes reais (sem papel na app Meta) isto exige pages_manage_metadata, ainda
+  // não aprovada — enquanto isso não acontecer, esta subscrição falha e a Meta não
+  // entrega nenhuma mensagem/comentário desta conta ao nosso webhook.
   if (igAccountId) {
     const subscribed = await subscribeInstagramAccount(igAccountId, igPageId ?? '', longToken);
     if (!subscribed) {
-      console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountId} aos webhooks — mensagens/comentários podem não chegar.`);
+      console.warn(`[Instagram] Conta ${igAccountId} ligada, mas sem subscrição de webhooks ativa — mensagens recebidas não vão chegar até pages_manage_metadata ser aprovada no App Review.`);
     }
   }
 

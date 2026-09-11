@@ -50,28 +50,31 @@ export async function getPageAccessToken(pageId: string, systemUserToken: string
 
 /**
  * Subscreve (instala) a Página do Facebook ligada à conta profissional do Instagram
- * nesta app, via POST /{page-id}/subscribed_apps?subscribed_fields=<campo>.
+ * nesta app, via POST /{page-id}/subscribed_apps?subscribed_fields=<campos>.
  *
  * NOTA (04/09): esta função usava o ID da conta Instagram em vez do Page ID, o que
  * dava sempre "(#3) Application does not have the capability to make this API call.".
  * Corrigido para usar pageId (commit b5a8a36) — eliminou o erro #3.
  *
- * PAUSADO (04/09): testámos 10 campos diferentes do tópico "page" (comments, feed,
- * messages, messaging_postbacks, mention, name, picture, category, description,
- * conversations, standby, message_mention, inbox_labels, agent_messages) e TODOS, sem
- * excepção, exigem a permissão pages_manage_metadata ou pages_messaging — nenhuma das
- * duas disponível/desejada para esta app (Instagram-only, Facebook Login for
- * Business). Ou seja, este endpoint de "instalação" da Página não está atualmente
- * acessível para o Agentify, com as permissões que a app tem hoje.
+ * CORREÇÃO (11/09): a nota anterior (04/09) dizia que esta falha "não tem impacto nas
+ * DMs" — isso estava errado para contas de clientes reais. Confirmámos com a
+ * documentação oficial da Meta (Instagram Platform > Webhooks, tabela de permissões
+ * por campo) que o campo "messages" — o que entrega DMs via Messenger Platform/
+ * Facebook Login for Business — exige pages_manage_metadata (além de instagram_basic,
+ * instagram_manage_messages, pages_read_engagement, pages_show_list). A app ainda não
+ * tem esta permissão aprovada, por isso esta chamada continua a falhar por agora.
  *
- * IMPORTANTE: isto NÃO bloqueia o envio/receção de DMs — confirmado em produção
- * (04/09) que as DMs continuam a funcionar normalmente mesmo com esta função a falhar
- * sempre (é chamada em modo "fire-and-forget"/best-effort nos 3 sítios onde é usada,
- * nunca bloqueia a ligação da conta nem o envio de mensagens). Por decisão do
- * utilizador, pausámos a investigação da subscrição de comentários (que dependia
- * disto) para não continuar a gastar chamadas à API sem sucesso — deixamos só UMA
- * tentativa (em vez do loop de 10), só para log/diagnóstico, sem qualquer efeito no
- * funcionamento atual do agente.
+ * O motivo de "ter funcionado" antes é que a conta usada nos testes de 04/09 tinha um
+ * papel (developer/tester) na própria app Meta — a Meta aplica regras mais leves
+ * (Standard Access) a essas contas. Uma conta de cliente externo genuína (Advanced
+ * Access, obrigatório em produção) precisa mesmo de pages_manage_metadata para a
+ * Meta entregar qualquer webhook de mensagens dessa conta — confirmado em produção a
+ * 11/09: nenhuma mensagem enviada para uma conta nova chegou sequer aos logs do
+ * servidor, porque a Meta nunca a chega a "instalar".
+ *
+ * Passámos a pedir também o campo "messages" (antes só "mention", que serve para
+ * comentários/menções). Assim que pages_manage_metadata for aprovada no App Review,
+ * esta chamada passa a ter sucesso sem precisar de mais nenhuma alteração de código.
  */
 export async function subscribeInstagramAccount(
   igAccountId: string,
@@ -87,15 +90,15 @@ export async function subscribeInstagramAccount(
     const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
 
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=mention&access_token=${encodeURIComponent(pageToken)}`,
+      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=messages,mention&access_token=${encodeURIComponent(pageToken)}`,
       { method: 'POST' },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
-      console.warn(`[Instagram] Instalação da Página ${pageId} (conta Instagram ${igAccountId}) pausada — falta pages_manage_metadata/pages_messaging, sem impacto nas DMs:`, JSON.stringify(data));
+      console.warn(`[Instagram] Instalação da Página ${pageId} (conta Instagram ${igAccountId}) falhou — provavelmente falta pages_manage_metadata (pendente de aprovação no App Review). Para contas sem papel na app Meta, isto IMPEDE a entrega de DMs:`, JSON.stringify(data));
       return false;
     }
-    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita/instalada para webhooks.`);
+    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita/instalada para webhooks (messages + mention).`);
     return true;
   } catch (err) {
     console.error('[Instagram] Erro ao subscrever webhooks da conta Instagram:', err);
