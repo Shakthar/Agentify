@@ -1,12 +1,12 @@
 /**
- * Integrações de terceiros (Google Calendar OAuth, Facebook Login OAuth)
+ * Integrações de terceiros (Google Calendar OAuth, Instagram Login OAuth)
  * GET  /api/integrations/google/auth         — URL de autorização Google Calendar
  * GET  /api/integrations/google/callback     — callback OAuth Google
  * GET  /api/integrations/google/status       — estado da ligação Google
  * DELETE /api/integrations/google            — desliga conta Google
  *
- * GET  /api/integrations/facebook/auth       — URL de autorização Facebook Login
- * GET  /api/integrations/facebook/callback   — callback OAuth Facebook (Instagram token)
+ * GET  /api/integrations/instagram/auth      — URL de autorização Instagram Login
+ * GET  /api/integrations/instagram/callback  — callback OAuth Instagram Login
  */
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth.js';
@@ -22,7 +22,12 @@ import {
 import prisma from '../lib/prisma.js';
 import { encrypt } from '../lib/encryption.js';
 import { unwrapDataKey } from '../lib/keyVault.js';
-import { subscribeInstagramAccount } from '../lib/instagram.js';
+import {
+  subscribeInstagramAccount,
+  exchangeInstagramCode,
+  exchangeLongLivedToken,
+  getInstagramProfile,
+} from '../lib/instagram.js';
 
 const router = Router();
 
@@ -118,23 +123,27 @@ router.delete('/google', authenticate, asyncHandler(async (req: AuthenticatedReq
   res.json({ success: true });
 }));
 
-// ── Instagram Connect (via FB.login SDK — token direto do frontend) ──────────
-
-const FB_GRAPH = 'https://graph.facebook.com';
-// O config_id usado no FB.login (Business Login) devolve um token EAA... normal do
-// Facebook — graph.instagram.com REJEITA este token ("Cannot parse access token"), por
-// isso todas as chamadas continuam em graph.facebook.com. O problema não é o host: é que
-// /me com este tipo de token devolve o System User da app (o "dono" do token), não a
-// conta Instagram que o utilizador concedeu no ecrã de consentimento. Para descobrir qual
-// conta Instagram foi concedida, a forma correta é inspecionar os granular_scopes do
-// próprio token via /debug_token (ver findGrantedInstagramAccountId abaixo).
+// ── Instagram Connect (Instagram API with Instagram Login) ───────────────────
+//
+// MIGRAÇÃO (11/09/2026): substituído o fluxo antigo via Login do Facebook
+// (FB.login SDK + Business Login config_id, token EAA..., exigia uma Página
+// do Facebook ligada e a permissão pages_manage_metadata para receber
+// webhooks — nunca aprovada) por este fluxo: o cliente autentica DIRETAMENTE
+// com a conta Instagram dele, sem Página nenhuma envolvida. Ver
+// backend/src/lib/instagram.ts para a explicação completa e os detalhes de
+// cada chamada. Contas ligadas pelo fluxo antigo precisam de reconectar por
+// aqui — decisão tomada a 11/09 (substituição total, não coexistência).
+//
+// Variáveis de ambiente necessárias (diferentes de FACEBOOK_APP_ID/SECRET):
+//   INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET — Meta App Dashboard > Instagram >
+//   API setup with Instagram Login > Business login settings.
+//   INSTAGRAM_REDIRECT_URI (opcional — default: {BACKEND_URL}/api/integrations/instagram/callback)
 
 /**
- * Cifra um token do Instagram/Facebook antes de guardar, no mesmo formato
- * "iv:ciphertext" usado em agents.service.ts. Sem isto, o token ficava em
- * texto simples na BD e o decrypt() no webhook falhava (split(':') não
- * encontrava um par iv/ciphertext válido) — TypeError ao tentar responder
- * a DMs do Instagram.
+ * Cifra um token do Instagram antes de guardar, no mesmo formato "iv:ciphertext"
+ * usado em agents.service.ts. Sem isto, o token ficava em texto simples na BD
+ * e o decrypt() no webhook falhava (split(':') não encontrava um par iv/ciphertext
+ * válido) — TypeError ao tentar responder a DMs do Instagram.
  */
 async function encryptTokenForTenant(tenantId: string, token: string): Promise<string> {
   const tenantRecord = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { encryptionKey: true } });
@@ -147,247 +156,47 @@ async function encryptTokenForTenant(tenantId: string, token: string): Promise<s
   return `${iv}:${ciphertext}`;
 }
 
-/**
- * Descobre o Instagram Account ID concedido pelo utilizador durante o consentimento do
- * Business Login. Confirmado contra a documentação oficial da Meta (Login do Facebook
- * para Empresas, configuração de "token de acesso do usuário do sistema"): este config_id
- * devolve um Business Integration System User Access Token — por isso /me devolve o System
- * User da app ("Agentfy System User"), não a conta Instagram escolhida.
- *
- * Testámos vários mecanismos, do mais para o menos confiável:
- *
- *   1. GET /me/accounts?fields=instagram_business_account — lista as Páginas de Facebook
- *      concedidas a este token (scope pages_show_list) e, para cada uma, o campo
- *      instagram_business_account devolve o IGUser ligado a essa Página. Em produção
- *      devolveu {"data":[]} — o token não tem Páginas assignadas via este edge (possível
- *      restrição de modo de desenvolvimento/Standard Access da app).
- *   2. GET /me?fields=client_business_id + GET /{client_business_id}/instagram_accounts
- *      — falhou com "missing permissions" (subcode 33): ler ativos de um negócio que a
- *      app não possui/gere requer Advanced Access aprovado por App Review da Meta.
- *   3. /debug_token + granular_scopes dos scopes instagram_* diretamente.
- *   4. Reserva final: granular_scopes de pages_show_list → busca instagram_business_account
- *      dessa Página diretamente (contorna o /me/accounts, que pode devolver vazio).
- */
-async function findGrantedInstagramAccountId(accessToken: string, appId: string, appSecret: string): Promise<{ id: string; name: string; pageId?: string } | undefined> {
-  // 1. Páginas concedidas → instagram_business_account (mecanismo principal)
-  const pagesResp = await fetch(`${FB_GRAPH}/v21.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`);
-  const pagesData = await pagesResp.json() as { data?: Array<{ id: string; name?: string; instagram_business_account?: { id: string } }>; error?: unknown };
-  console.log(`[Instagram Connect] me/accounts status=${pagesResp.status}:`, JSON.stringify(pagesData).slice(0, 800));
-
-  for (const page of pagesData.data ?? []) {
-    if (page.instagram_business_account?.id) {
-      const igId = page.instagram_business_account.id;
-      const igResp = await fetch(`${FB_GRAPH}/v21.0/${igId}?fields=username&access_token=${accessToken}`);
-      const igData = await igResp.json() as { username?: string; error?: unknown };
-      console.log(`[Instagram Connect] ig account ${igId} status=${igResp.status}:`, JSON.stringify(igData).slice(0, 300));
-      // page.id aqui é o Facebook Page ID — necessário para enviar DMs (POST /{PAGE-ID}/messages).
-      return { id: igId, name: igData.username ?? page.name ?? '', pageId: page.id };
-    }
-  }
-
-  // 2. client_business_id → instagram_accounts (reserva)
-  const meResp = await fetch(`${FB_GRAPH}/v21.0/me?fields=client_business_id,name&access_token=${accessToken}`);
-  const meData = await meResp.json() as { client_business_id?: string; name?: string; error?: unknown };
-  console.log(`[Instagram Connect] /me (client_business_id) status=${meResp.status}:`, JSON.stringify(meData).slice(0, 300));
-
-  if (meData.client_business_id) {
-    const igListResp = await fetch(`${FB_GRAPH}/v21.0/${meData.client_business_id}/instagram_accounts?fields=id,username&access_token=${accessToken}`);
-    const igListData = await igListResp.json() as { data?: Array<{ id: string; username?: string }>; error?: unknown };
-    console.log(`[Instagram Connect] instagram_accounts status=${igListResp.status}:`, JSON.stringify(igListData).slice(0, 500));
-    if (igListData.data?.length) {
-      const first = igListData.data[0];
-      return { id: first.id, name: first.username ?? meData.name ?? '' };
-    }
-  }
-
-  // 3. granular_scopes via /debug_token — log de TODOS os scopes (não só os de instagram),
-  // porque o alvo concedido pode aparecer em pages_show_list ou business_management em vez de
-  // diretamente num scope instagram_*.
-  const debugResp = await fetch(`${FB_GRAPH}/debug_token?` + new URLSearchParams({
-    input_token: accessToken,
-    access_token: `${appId}|${appSecret}`,
-  }));
-  const debugData = await debugResp.json() as { data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } };
-  const scopes = debugData.data?.granular_scopes ?? [];
-  // Só listamos scope + quantos target_ids cada um tem (não os IDs completos) para não sermos
-  // cortados pelo tamanho do array e para vermos rapidamente onde procurar.
-  console.log(`[Instagram Connect] debug_token status=${debugResp.status} scopes=`, JSON.stringify(scopes.map(s => ({ scope: s.scope, target_ids: s.target_ids ?? null }))));
-
-  const instagramScopes = ['instagram_manage_messages', 'instagram_basic', 'instagram_manage_comments', 'instagram_content_publish'];
-  for (const scope of scopes) {
-    if (instagramScopes.includes(scope.scope) && scope.target_ids?.length) {
-      return { id: scope.target_ids[0], name: meData.name ?? '' };
-    }
-  }
-
-  // 4. Reserva: se o Page ID foi concedido via pages_show_list, busca o instagram_business_account
-  // dessa Página diretamente (contorna /me/accounts, que pode devolver vazio em modo de teste/dev).
-  const pagesScope = scopes.find(s => s.scope === 'pages_show_list' && s.target_ids?.length);
-  if (pagesScope?.target_ids) {
-    for (const pageId of pagesScope.target_ids) {
-      const pageResp = await fetch(`${FB_GRAPH}/v21.0/${pageId}?fields=name,instagram_business_account&access_token=${accessToken}`);
-      const pageData = await pageResp.json() as { name?: string; instagram_business_account?: { id: string }; error?: unknown };
-      console.log(`[Instagram Connect] page ${pageId} status=${pageResp.status}:`, JSON.stringify(pageData).slice(0, 300));
-      if (pageData.instagram_business_account?.id) {
-        const igId = pageData.instagram_business_account.id;
-        const igResp = await fetch(`${FB_GRAPH}/v21.0/${igId}?fields=username&access_token=${accessToken}`);
-        const igData = await igResp.json() as { username?: string };
-        return { id: igId, name: igData.username ?? pageData.name ?? '', pageId };
-      }
-    }
-  }
-
-  return undefined;
-}
-
-// POST /api/integrations/instagram/connect
-// Recebe o accessToken do FB SDK, obtém o IG User ID e guarda no agente
-router.post('/instagram/connect', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { token, code, agentId } = req.body as { token?: string; code?: string; agentId?: string };
-  if ((!token && !code) || !agentId) { res.status(400).json({ error: 'token ou code + agentId obrigatórios' }); return; }
-
-  const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId: req.tenant!.id } });
-  if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
-
-  const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
-  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
-
-  let accessToken = token ?? '';
-
-  // Se recebemos code (Instagram Login for Business), trocamos por access_token.
-  // Este 'code' vem do popup do FB.login() (JS SDK) — NÃO do fluxo de redirect
-  // (/api/integrations/facebook/auth + /callback). O SDK não usa o FACEBOOK_REDIRECT_URI
-  // do backend como redirect_uri no dialog OAuth interno, por isso a troca do code tem de
-  // usar redirect_uri vazio para bater certo com o que foi usado no pedido original —
-  // caso contrário a Meta devolve "Error validating verification code ... redirect_uri"
-  // (OAuthException code 100, subcode 36008).
-  if (code && !accessToken) {
-    const codeResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      redirect_uri: '',
-      code,
-    }));
-    const codeData = await codeResp.json() as Record<string, unknown>;
-    console.log(`[Instagram Connect] code exchange status=${codeResp.status}:`, JSON.stringify(codeData).slice(0, 300));
-    if (codeData.access_token) {
-      accessToken = codeData.access_token as string;
-    } else {
-      // Desktop app fallback: Instagram Login for Business pode devolver access_token diretamente no code
-      // Se falhar, reporta o erro mas continua sem token (vai falhar mais abaixo)
-      console.warn('[Instagram] Code exchange falhou, sem access_token:', codeData);
-    }
-  }
-
-  if (!accessToken) {
-    res.status(400).json({ error: 'Não foi possível obter access_token do Instagram' });
-    return;
-  }
-
-  // Descobre a conta Instagram concedida (ver findGrantedInstagramAccountId acima).
-  const granted = await findGrantedInstagramAccountId(accessToken, appId, appSecret);
-  if (!granted) {
-    res.status(400).json({
-      error: 'Não foi possível identificar automaticamente a conta Instagram concedida. '
-        + 'Introduz o Instagram Account ID manualmente no campo abaixo (consulta os logs do servidor '
-        + 'para diagnosticar, se precisares).',
-    });
-    return;
-  }
-  const { id: igAccountId, name: igName, pageId: igPageId } = granted;
-
-  // Troca por long-lived token (60 dias) — endpoint do Facebook, como a troca do code
-  // (graph.instagram.com rejeita este token por completo, ver nota acima de FB_GRAPH).
-  let longToken = accessToken;
-  if (appId && appSecret) {
-    const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      grant_type: 'fb_exchange_token',
-      client_id: appId,
-      client_secret: appSecret,
-      fb_exchange_token: accessToken,
-    }));
-    const longData = await longResp.json() as Record<string, unknown>;
-    console.log(`[Instagram Connect] long-lived token exchange status=${longResp.status}:`, JSON.stringify(longData).slice(0, 200));
-    if (longData.access_token) longToken = longData.access_token as string;
-    else console.warn('[Instagram] Long-lived token exchange falhou, a usar token de curta duração:', longData);
-  }
-
-  const encryptedToken = await encryptTokenForTenant(req.tenant!.id, longToken);
-
-  if (!igPageId) {
-    console.warn(`[Instagram] Facebook Page ID não foi descoberto automaticamente para agentId=${agentId} — envio de DMs não vai funcionar até seres preenchido manualmente no dashboard.`);
-  }
-
-  await (prisma.agent as any).update({
-    where: { id: agentId, tenantId: req.tenant!.id },
-    data: {
-      instagramToken: encryptedToken,
-      instagramAccountId: igAccountId,
-      ...(igPageId ? { instagramPageId: igPageId } : {}),
-      instagramEnabled: true,
-    },
-  });
-
-  // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
-  // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
-  // configurado no dashboard. Ver nota (11/09) em lib/instagram.ts: para contas de
-  // clientes reais (sem papel na app Meta) isto exige pages_manage_metadata, ainda
-  // não aprovada — enquanto isso não acontecer, esta subscrição falha e a Meta não
-  // entrega nenhuma mensagem/comentário desta conta ao nosso webhook.
-  if (igAccountId) {
-    const subscribed = await subscribeInstagramAccount(igAccountId, igPageId ?? '', longToken);
-    if (!subscribed) {
-      console.warn(`[Instagram] Conta ${igAccountId} ligada, mas sem subscrição de webhooks ativa — mensagens recebidas não vão chegar até pages_manage_metadata ser aprovada no App Review.`);
-    }
-  }
-
-  console.log(`[Instagram] Conta ligada: igAccountId=${igAccountId} name=${igName} agentId=${agentId}`);
-  res.json({ success: true, igAccountId, name: igName });
-}));
-
-// ── Facebook Login OAuth redirect (mantido para compatibilidade) ──────────────
-
-// GET /api/integrations/facebook/auth?agentId=X
-// Devolve o URL do diálogo OAuth do Facebook Login
-router.get('/facebook/auth', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/integrations/instagram/auth?agentId=X
+// Devolve o URL do diálogo OAuth do Instagram Login
+router.get('/instagram/auth', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { agentId } = req.query as { agentId?: string };
   if (!agentId) { res.status(400).json({ error: 'agentId obrigatório' }); return; }
 
-  const appId = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID;
+  const appId = process.env.INSTAGRAM_APP_ID;
   if (!appId) {
-    res.status(503).json({ error: 'FACEBOOK_APP_ID não configurado nas variáveis de ambiente' });
+    res.status(503).json({ error: 'INSTAGRAM_APP_ID não configurado nas variáveis de ambiente' });
     return;
   }
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, tenantId: req.tenant!.id } });
   if (!agent) { res.status(404).json({ error: 'Agente não encontrado' }); return; }
 
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI
-    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
+  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI
+    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/instagram/callback`;
 
   const state = Buffer.from(JSON.stringify({ tenantId: req.tenant!.id, agentId })).toString('base64url');
 
-  const igConfigId = process.env.INSTAGRAM_CONFIG_ID ?? '1334200631878203';
-
   const params = new URLSearchParams({
     client_id: appId,
-    config_id: igConfigId,
     redirect_uri: redirectUri,
     response_type: 'code',
+    // instagram_business_basic é a permissão-base; instagram_business_manage_messages
+    // habilita o envio/receção de DMs (ver instagram.ts, subscribeInstagramAccount).
+    scope: 'instagram_business_basic,instagram_business_manage_messages',
     state,
   });
 
-  res.json({ url: `https://www.facebook.com/dialog/oauth?${params}` });
+  res.json({ url: `https://www.instagram.com/oauth/authorize?${params}` });
 }));
 
-// GET /api/integrations/facebook/callback?code=X&state=X
-// Callback chamado pelo Facebook após o login — sem authenticate middleware
-router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response) => {
+// GET /api/integrations/instagram/callback?code=X&state=X
+// Callback chamado pelo Instagram após o login — sem authenticate middleware
+router.get('/instagram/callback', asyncHandler(async (req: Request, res: Response) => {
   const { code, state, error, error_description } = req.query as Record<string, string | undefined>;
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
   if (error || !code || !state) {
-    return res.redirect(`${frontendUrl}/dashboard?fb=error&reason=${encodeURIComponent(error_description ?? error ?? 'missing_params')}`);
+    return res.redirect(`${frontendUrl}/dashboard?ig=error&reason=${encodeURIComponent(error_description ?? error ?? 'missing_params')}`);
   }
 
   let tenantId: string;
@@ -398,76 +207,66 @@ router.get('/facebook/callback', asyncHandler(async (req: Request, res: Response
     agentId  = decoded.agentId;
     if (!tenantId || !agentId) throw new Error('invalid');
   } catch {
-    return res.redirect(`${frontendUrl}/dashboard?fb=error&reason=invalid_state`);
+    return res.redirect(`${frontendUrl}/dashboard?ig=error&reason=invalid_state`);
   }
 
-  const appId     = process.env.FACEBOOK_APP_ID ?? process.env.META_APP_ID ?? '';
-  const appSecret = process.env.FACEBOOK_APP_SECRET ?? process.env.META_APP_SECRET ?? '';
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI
-    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/facebook/callback`;
+  const appId     = process.env.INSTAGRAM_APP_ID ?? '';
+  const appSecret = process.env.INSTAGRAM_APP_SECRET ?? '';
+  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI
+    ?? `${process.env.BACKEND_URL ?? 'https://agentify-production-8d3a.up.railway.app'}/api/integrations/instagram/callback`;
 
-  console.log(`[Facebook OAuth] appId=${appId} secretPrefix=${appSecret.slice(0, 6)}*** redirectUri=${redirectUri}`);
+  if (!appId || !appSecret) {
+    console.error('[Instagram OAuth] INSTAGRAM_APP_ID/INSTAGRAM_APP_SECRET em falta nas variáveis de ambiente');
+    return res.redirect(`${frontendUrl}/dashboard/${agentId}?ig=error&reason=not_configured`);
+  }
+
+  console.log(`[Instagram OAuth] appId=${appId} redirectUri=${redirectUri}`);
 
   try {
-    // 1. Troca code por short-lived token
-    const tokenResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      redirect_uri: redirectUri,
-      code,
-    }));
-    const tokenData = await tokenResp.json() as Record<string, unknown>;
-    if (!tokenData.access_token) throw new Error(`Token exchange failed: ${JSON.stringify(tokenData)}`);
-    const shortToken = tokenData.access_token as string;
+    // 1. Troca code por access_token de curta duração + Instagram-scoped User ID
+    const exchanged = await exchangeInstagramCode(code, redirectUri, appId, appSecret);
+    if (!exchanged) throw new Error('Falha na troca do code por access_token');
 
-    // 2. Converte para long-lived token (60 dias) — endpoint do Facebook
-    // (graph.instagram.com rejeita este token por completo, ver nota junto a FB_GRAPH).
-    const longResp = await fetch(`${FB_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      grant_type: 'fb_exchange_token',
-      client_id: appId,
-      client_secret: appSecret,
-      fb_exchange_token: shortToken,
-    }));
-    const longData = await longResp.json() as Record<string, unknown>;
-    const longToken = (longData.access_token as string) ?? shortToken;
-
-    // 3. Descobre a conta Instagram concedida (ver findGrantedInstagramAccountId acima).
-    const granted = await findGrantedInstagramAccountId(longToken, appId, appSecret);
-    const igAccountId = granted?.id ?? '';
-    const igName = granted?.name ?? '';
-    const igPageId = granted?.pageId;
-    if (igAccountId && !igPageId) {
-      console.warn(`[Facebook OAuth] Facebook Page ID não foi descoberto automaticamente para agentId=${agentId} — envio de DMs não vai funcionar até seres preenchido manualmente no dashboard.`);
+    // 2. Converte para long-lived token (60 dias)
+    const longLived = await exchangeLongLivedToken(exchanged.accessToken, appSecret);
+    const longToken = longLived?.accessToken ?? exchanged.accessToken;
+    const expiresAt = longLived ? new Date(Date.now() + longLived.expiresIn * 1000) : null;
+    if (!longLived) {
+      console.warn('[Instagram OAuth] Long-lived token exchange falhou — a usar token de curta duração (expira em ~1h, vai falhar em breve)');
     }
 
-    // 4. Guarda no agente (token long-lived do utilizador, ID da conta Instagram)
+    // 3. Perfil (username, para mostrar no dashboard)
+    const profile = await getInstagramProfile(longToken);
+    const igAccountId = profile?.userId ?? exchanged.userId;
+    const igName = profile?.username ?? profile?.name ?? '';
+
+    // 4. Guarda no agente (instagramPageId fica a null — Instagram Login não usa Página)
     const encryptedToken = await encryptTokenForTenant(tenantId, longToken);
     await (prisma.agent as any).update({
       where: { id: agentId, tenantId },
       data: {
         instagramToken: encryptedToken,
-        instagramAccountId: igAccountId || undefined,
-        ...(igPageId ? { instagramPageId: igPageId } : {}),
-        instagramEnabled: !!igAccountId,
+        instagramAccountId: igAccountId,
+        instagramTokenExpiresAt: expiresAt,
+        instagramPageId: null,
+        instagramEnabled: true,
       },
     });
 
-    // Subscreve a Página para receber webhooks (mensagens e comentários) — sem isto
-    // a Meta não entrega nenhum evento desta conta, mesmo com o app corretamente
-    // configurado no dashboard.
-    if (igAccountId) {
-      const subscribed = await subscribeInstagramAccount(igAccountId, igPageId ?? '', longToken);
-      if (!subscribed) {
-        console.warn(`[Facebook OAuth] Não foi possível subscrever a conta ${igAccountId} aos webhooks — mensagens/comentários podem não chegar.`);
-      }
+    // 5. Subscreve a conta para receber webhooks (mensagens, comentários, menções) —
+    // sem isto a Meta não entrega nenhum evento desta conta ao nosso webhook.
+    const subscribed = await subscribeInstagramAccount(igAccountId, longToken);
+    if (!subscribed) {
+      console.warn(`[Instagram OAuth] Não foi possível subscrever a conta ${igAccountId} aos webhooks — verifica se instagram_business_manage_messages já está aprovada no App Review.`);
     }
 
+    console.log(`[Instagram] Conta ligada via Instagram Login: igAccountId=${igAccountId} name=${igName} agentId=${agentId}`);
     return res.redirect(
-      `${frontendUrl}/dashboard/${agentId}?fb=success&igId=${igAccountId}&name=${encodeURIComponent(igName)}`,
+      `${frontendUrl}/dashboard/${agentId}?ig=success&igId=${igAccountId}&name=${encodeURIComponent(igName)}${subscribed ? '' : '&warn=webhook_subscribe_failed'}`,
     );
   } catch (err) {
-    console.error('[Facebook OAuth] callback error:', err);
-    return res.redirect(`${frontendUrl}/dashboard/${agentId}?fb=error&reason=token_exchange`);
+    console.error('[Instagram OAuth] callback error:', err);
+    return res.redirect(`${frontendUrl}/dashboard/${agentId}?ig=error&reason=token_exchange`);
   }
 }));
 

@@ -1,104 +1,173 @@
 /**
- * Helper para interações com Instagram via Meta Graph API (nova Instagram Login API).
+ * Helper para interações com Instagram via Meta Graph API — Instagram API with
+ * Instagram Login ("Business Login for Instagram").
  * Suporta: DMs, respostas a comentários, publicação de conteúdo, insights.
+ *
+ * MIGRAÇÃO (11/09/2026): este ficheiro usava antes o fluxo "Instagram API with
+ * Facebook Login" (graph.facebook.com, Page Access Token, exigia uma Página do
+ * Facebook ligada e a permissão pages_manage_metadata para receber webhooks).
+ * Passámos para o Instagram Login porque:
+ *   1. Não exige Página do Facebook nenhuma — o cliente autentica diretamente
+ *      com a conta Instagram dele (Business ou Creator).
+ *   2. As chamadas usam sempre o Instagram-scoped User ID diretamente — já não
+ *      há noção de "Page Access Token" nem troca prévia de token.
+ *   3. A subscrição de webhooks (messages) precisa apenas de
+ *      instagram_business_manage_messages — NÃO de pages_manage_metadata, que
+ *      era o bloqueio identificado a 11/09 e nunca chegou a ser aprovado.
+ *
+ * Contrapartida: o token de longa duração aqui expira ao fim de 60 dias (ao
+ * contrário do Page Access Token, que na prática não expirava) — por isso
+ * existe refreshInstagramToken(), a chamar periodicamente antes de expirar
+ * (ver Agent.instagramTokenExpiresAt no schema).
+ *
+ * Documentação oficial: developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
  */
 
-const IG_GRAPH = 'https://graph.facebook.com';
-// NOTA (04/09): tentei mudar esta chamada para graph.instagram.com (é o host usado no
-// exemplo da doc "Instagram Platform"), mas esse host devolve
-// "(#190) Invalid OAuth access token - Cannot parse access token" para QUALQUER token
-// desta app — porque o nosso token é um Facebook Page Access Token (obtido via Login do
-// Facebook para Empresas), e graph.instagram.com só reconhece tokens da "Instagram Login"
-// (formato IGAA..., de uma app Instagram distinta). Por isso voltámos a usar
-// graph.facebook.com aqui, que é o host correto para o tipo de token que este app usa.
+const IG_GRAPH = 'https://graph.instagram.com';
+// Host DIFERENTE — só usado para a troca inicial do code por um token de curta
+// duração (Business Login). Todos os outros pedidos (incluindo a troca para
+// long-lived e o refresh) usam graph.instagram.com.
+const IG_OAUTH = 'https://api.instagram.com';
 
 function igVersion(): string {
-  // NOTA (04/09): esta função tinha 'v20.0' como último fallback, muito mais antiga do
-  // que o resto do código (whatsapp.ts e webhooks.ts usam 'v26.0'). Se INSTAGRAM_API_VERSION
-  // e WHATSAPP_API_VERSION não estiverem definidos no Railway, todas as chamadas do
-  // Instagram (incluindo subscribed_apps) caíam para v20.0 — uma versão da API anterior à
-  // unificação do tópico "instagram" (mensagens+comentários), o que explica plausivelmente o
-  // "(#3) Application does not have the capability to make this API call.": nessa versão
-  // antiga a app pode não ter mesmo essa capacidade para este tipo de nó. Alinhado agora
-  // com o resto do código.
   return process.env.INSTAGRAM_API_VERSION ?? process.env.WHATSAPP_API_VERSION ?? 'v26.0';
 }
 
-// ─── DMs ─────────────────────────────────────────────────────────────────────
+// ─── OAuth (Instagram Login) ──────────────────────────────────────────────────
+
+export interface InstagramCodeExchangeResult {
+  accessToken: string;
+  userId: string;
+  permissions?: string[];
+}
 
 /**
- * Troca um token de System User (ou qualquer token com acesso ao ativo) por um
- * verdadeiro Page Access Token da Página indicada. A Graph API exige este tipo
- * de token especificamente para POST /{PAGE-ID}/messages — um token de System
- * User "genérico", mesmo com as permissões corretas, é rejeitado com
- * "(#190) This method must be called with a Page Access Token".
+ * Troca o "code" devolvido pelo redirect de https://www.instagram.com/oauth/authorize
+ * por um access_token de curta duração + o Instagram-scoped User ID. Ao contrário
+ * de todos os outros pedidos deste ficheiro, este é feito em api.instagram.com
+ * (não graph.instagram.com) e como POST com corpo form-urlencoded — não query string.
  */
-export async function getPageAccessToken(pageId: string, systemUserToken: string): Promise<string | null> {
+export async function exchangeInstagramCode(
+  code: string,
+  redirectUri: string,
+  appId: string,
+  appSecret: string,
+): Promise<InstagramCodeExchangeResult | null> {
   try {
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${pageId}?fields=access_token&access_token=${systemUserToken}`);
-    const data = await resp.json() as { access_token?: string; error?: unknown };
-    if (!resp.ok || !data.access_token) {
-      console.error('[Instagram] Falha ao obter Page Access Token:', JSON.stringify(data).slice(0, 300));
-      return null;
-    }
-    return data.access_token;
+    const body = new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code,
+    });
+    const resp = await fetch(`${IG_OAUTH}/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    const data = await resp.json() as { access_token?: string; user_id?: string | number; permissions?: string[]; error_message?: string; error_type?: string };
+    console.log(`[Instagram] Troca de code status=${resp.status}:`, JSON.stringify(data).slice(0, 300));
+    if (!resp.ok || !data.access_token || !data.user_id) return null;
+    return { accessToken: data.access_token, userId: String(data.user_id), permissions: data.permissions };
   } catch (err) {
-    console.error('[Instagram] Erro ao trocar por Page Access Token:', err);
+    console.error('[Instagram] Erro ao trocar code por access_token:', err);
+    return null;
+  }
+}
+
+export interface InstagramTokenResult {
+  accessToken: string;
+  expiresIn: number; // segundos
+}
+
+/** Troca um token de curta duração por um de longa duração (60 dias). */
+export async function exchangeLongLivedToken(shortToken: string, appSecret: string): Promise<InstagramTokenResult | null> {
+  try {
+    const resp = await fetch(`${IG_GRAPH}/access_token?` + new URLSearchParams({
+      grant_type: 'ig_exchange_token',
+      client_secret: appSecret,
+      access_token: shortToken,
+    }));
+    const data = await resp.json() as { access_token?: string; expires_in?: number; error?: unknown };
+    console.log(`[Instagram] Troca long-lived status=${resp.status}:`, JSON.stringify(data).slice(0, 200));
+    if (!resp.ok || !data.access_token) return null;
+    return { accessToken: data.access_token, expiresIn: data.expires_in ?? 60 * 24 * 60 * 60 };
+  } catch (err) {
+    console.error('[Instagram] Erro ao trocar por token de longa duração:', err);
     return null;
   }
 }
 
 /**
- * Subscreve (instala) a Página do Facebook ligada à conta profissional do Instagram
- * nesta app, via POST /{page-id}/subscribed_apps?subscribed_fields=<campos>.
+ * Renova um token de longa duração antes de expirar (só funciona se ainda tiver
+ * pelo menos 24h de validade). Chamar periodicamente (ex: cron diário) para
+ * cada agente com instagramTokenExpiresAt a aproximar-se — sem isto, ao fim de
+ * 60 dias o envio de DMs e a subscrição de webhooks passam a falhar.
+ */
+export async function refreshInstagramToken(longToken: string): Promise<InstagramTokenResult | null> {
+  try {
+    const resp = await fetch(`${IG_GRAPH}/refresh_access_token?` + new URLSearchParams({
+      grant_type: 'ig_refresh_token',
+      access_token: longToken,
+    }));
+    const data = await resp.json() as { access_token?: string; expires_in?: number; error?: unknown };
+    if (!resp.ok || !data.access_token) {
+      console.warn('[Instagram] Falha ao renovar token:', JSON.stringify(data).slice(0, 200));
+      return null;
+    }
+    return { accessToken: data.access_token, expiresIn: data.expires_in ?? 60 * 24 * 60 * 60 };
+  } catch (err) {
+    console.error('[Instagram] Erro ao renovar token:', err);
+    return null;
+  }
+}
+
+/** Obtém o perfil (Instagram-scoped User ID + username) do dono do token. */
+export async function getInstagramProfile(token: string): Promise<{ userId: string; username?: string; name?: string } | null> {
+  try {
+    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/me?fields=user_id,username,name&access_token=${encodeURIComponent(token)}`);
+    const data = await resp.json() as { user_id?: string | number; username?: string; name?: string; error?: unknown };
+    if (!resp.ok || !data.user_id) {
+      console.error('[Instagram] Falha ao obter perfil:', JSON.stringify(data).slice(0, 300));
+      return null;
+    }
+    return { userId: String(data.user_id), username: data.username, name: data.name };
+  } catch (err) {
+    console.error('[Instagram] Erro ao obter perfil:', err);
+    return null;
+  }
+}
+
+// ─── DMs ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Subscreve a conta Instagram para receber webhooks (mensagens, comentários,
+ * menções), via POST /{ig-user-id}/subscribed_apps?subscribed_fields=<campos>.
  *
- * NOTA (04/09): esta função usava o ID da conta Instagram em vez do Page ID, o que
- * dava sempre "(#3) Application does not have the capability to make this API call.".
- * Corrigido para usar pageId (commit b5a8a36) — eliminou o erro #3.
- *
- * CORREÇÃO (11/09): a nota anterior (04/09) dizia que esta falha "não tem impacto nas
- * DMs" — isso estava errado para contas de clientes reais. Confirmámos com a
- * documentação oficial da Meta (Instagram Platform > Webhooks, tabela de permissões
- * por campo) que o campo "messages" — o que entrega DMs via Messenger Platform/
- * Facebook Login for Business — exige pages_manage_metadata (além de instagram_basic,
- * instagram_manage_messages, pages_read_engagement, pages_show_list). A app ainda não
- * tem esta permissão aprovada, por isso esta chamada continua a falhar por agora.
- *
- * O motivo de "ter funcionado" antes é que a conta usada nos testes de 04/09 tinha um
- * papel (developer/tester) na própria app Meta — a Meta aplica regras mais leves
- * (Standard Access) a essas contas. Uma conta de cliente externo genuína (Advanced
- * Access, obrigatório em produção) precisa mesmo de pages_manage_metadata para a
- * Meta entregar qualquer webhook de mensagens dessa conta — confirmado em produção a
- * 11/09: nenhuma mensagem enviada para uma conta nova chegou sequer aos logs do
- * servidor, porque a Meta nunca a chega a "instalar".
- *
- * Passámos a pedir também o campo "messages" (antes só "mention", que serve para
- * comentários/menções). Assim que pages_manage_metadata for aprovada no App Review,
- * esta chamada passa a ter sucesso sem precisar de mais nenhuma alteração de código.
+ * Instagram Login não usa Página nenhuma — o token já é do próprio utilizador
+ * Instagram, por isso esta chamada usa-o diretamente (sem troca prévia por
+ * Page Access Token, ao contrário do fluxo antigo via Login do Facebook).
+ * Permissão exigida para o campo "messages": instagram_business_manage_messages
+ * (base: instagram_business_basic). Confirmado na doc oficial da Meta — NÃO
+ * depende de pages_manage_metadata, que bloqueava o fluxo antigo.
  */
 export async function subscribeInstagramAccount(
-  igAccountId: string,
-  pageId: string,
-  systemUserToken: string,
+  igUserId: string,
+  token: string,
 ): Promise<boolean> {
-  if (!igAccountId || !systemUserToken) return false;
-  if (!pageId) {
-    console.error(`[Instagram] Sem pageId para subscrever webhooks da conta ${igAccountId} — endpoint correto (Facebook Login for Business) é sempre /{page-id}/subscribed_apps.`);
-    return false;
-  }
+  if (!igUserId || !token) return false;
   try {
-    const pageToken = await getPageAccessToken(pageId, systemUserToken) ?? systemUserToken;
-
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${pageId}/subscribed_apps?subscribed_fields=messages,mention&access_token=${encodeURIComponent(pageToken)}`,
+      `${IG_GRAPH}/${igVersion()}/${igUserId}/subscribed_apps?subscribed_fields=messages,comments,mentions&access_token=${encodeURIComponent(token)}`,
       { method: 'POST' },
     );
     const data = await resp.json() as { success?: boolean; error?: unknown };
     if (!resp.ok || !data.success) {
-      console.warn(`[Instagram] Instalação da Página ${pageId} (conta Instagram ${igAccountId}) falhou — provavelmente falta pages_manage_metadata (pendente de aprovação no App Review). Para contas sem papel na app Meta, isto IMPEDE a entrega de DMs:`, JSON.stringify(data));
+      console.warn(`[Instagram] Falha ao subscrever webhooks da conta ${igUserId}:`, JSON.stringify(data));
       return false;
     }
-    console.log(`[Instagram] Página ${pageId} (conta Instagram ${igAccountId}) subscrita/instalada para webhooks (messages + mention).`);
+    console.log(`[Instagram] Conta ${igUserId} subscrita para webhooks (messages, comments, mentions).`);
     return true;
   } catch (err) {
     console.error('[Instagram] Erro ao subscrever webhooks da conta Instagram:', err);
@@ -109,23 +178,18 @@ export async function subscribeInstagramAccount(
 export async function sendInstagramDM(
   recipientId: string,
   text: string,
-  pageId: string,
+  igUserId: string,
   token: string | undefined,
 ): Promise<void> {
-  // Nota: a Graph API do Instagram (via Facebook Login) exige o ID da Página do
-  // Facebook ligada à conta do Instagram neste endpoint — NÃO o Instagram Business
-  // Account ID (esse vem nos webhooks e é usado só para encontrar o agente).
-  // Usar o ID errado aqui causa "(#3) Application does not have the capability
-  // to make this API call.".
+  // Instagram Login: o endpoint /{ig-user-id}/messages usa diretamente o
+  // Instagram-scoped User ID da conta ligada — já não existe Facebook Page
+  // nenhuma envolvida neste fluxo.
   if (!token) { console.warn('[Instagram] Token em falta — DM não enviada para', recipientId); return; }
-  if (!pageId) { console.warn('[Instagram] Facebook Page ID em falta (instagramPageId) — DM não enviada para', recipientId); return; }
+  if (!igUserId) { console.warn('[Instagram] Instagram Account ID em falta — DM não enviada para', recipientId); return; }
   try {
-    // O token guardado é normalmente um token de System User — trocar por um
-    // Page Access Token antes de enviar (exigido por este endpoint específico).
-    const pageToken = await getPageAccessToken(pageId, token) ?? token;
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${pageId}/messages`, {
+    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${igUserId}/messages`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${pageToken}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
     });
     const body = await resp.text();
@@ -167,7 +231,7 @@ export async function getInstagramComment(
   if (!token) return null;
   try {
     const resp = await fetch(
-      `${IG_GRAPH}/${igVersion()}/${commentId}?fields=text,from,timestamp&access_token=${token}`,
+      `${IG_GRAPH}/${igVersion()}/${commentId}?fields=text,from,timestamp&access_token=${encodeURIComponent(token)}`,
     );
     if (!resp.ok) return null;
     return await resp.json() as { text?: string; from?: { id: string; username?: string } };

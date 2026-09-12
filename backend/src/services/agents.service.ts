@@ -369,21 +369,20 @@ export async function updateAgent(
   });
 
   // Se o Instagram foi ligado/configurado manualmente (Passo 3 do dashboard, sem
-  // passar pelo OAuth /instagram/connect) e agora já temos token + IDs, subscreve
-  // a Página (mensagens) e a conta Instagram (comentários) aos webhooks aqui também
-  // — sem isto a Meta não entrega mensagens nem comentários desta conta, mesmo com
-  // o token e os IDs certos guardados.
+  // passar pelo OAuth /instagram/auth) e agora já temos token + Instagram Account ID,
+  // subscreve a conta aos webhooks aqui também — sem isto a Meta não entrega
+  // mensagens/comentários desta conta, mesmo com o token e o ID certos guardados.
+  // Instagram Login (11/09/2026): já não existe Facebook Page nenhuma envolvida —
+  // subscribeInstagramAccount usa o Instagram Account ID diretamente.
   // Só verifica/subscreve quando este pedido tocou de facto em algo do Instagram
   // (evita chamadas desnecessárias à Meta em updates que nada têm a ver, ex.: WhatsApp).
   const touchedInstagram = instagramToken !== undefined
-    || (updateData as any).instagramPageId !== undefined
     || (updateData as any).instagramAccountId !== undefined;
-  const pageIdForSub = (updatedAgent as any).instagramPageId as string | undefined;
   const igAccountIdForSub = (updatedAgent as any).instagramAccountId as string | undefined;
-  if (touchedInstagram && (pageIdForSub || igAccountIdForSub)) {
+  if (touchedInstagram && igAccountIdForSub) {
     let rawTokenForSub = instagramToken; // token novo, em texto simples, se foi enviado agora
     if (!rawTokenForSub && existing.instagramToken) {
-      // Nenhum token novo neste pedido (ex.: só se guardou o Page ID agora) —
+      // Nenhum token novo neste pedido (ex.: só se guardou o Account ID agora) —
       // reutiliza o token já guardado, desencriptando-o.
       try {
         const tenantForDecrypt = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { encryptionKey: true } });
@@ -397,12 +396,12 @@ export async function updateAgent(
       }
     }
     if (rawTokenForSub && igAccountIdForSub) {
-      subscribeInstagramAccount(igAccountIdForSub, pageIdForSub ?? '', rawTokenForSub).then((ok) => {
+      subscribeInstagramAccount(igAccountIdForSub, rawTokenForSub).then((ok) => {
         if (!ok) console.warn(`[Instagram] Não foi possível subscrever a conta ${igAccountIdForSub} aos webhooks (agentId=${agentId}).`);
       });
     }
   } else if (instagramToken) {
-    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramPageId/instagramAccountId — não foi possível subscrever webhooks para agentId=${agentId}.`);
+    console.warn(`[Instagram] Token do Instagram guardado manualmente sem instagramAccountId — não foi possível subscrever webhooks para agentId=${agentId}.`);
   }
 
   // Telegram: um token novo já foi validado e o webhook registado mais acima

@@ -86,7 +86,6 @@ export default function AgentDetailPage() {
   const [wpOffMsg, setWpOffMsg] = useState('');
   // Instagram state
   const [igAccountId, setIgAccountId] = useState('');
-  const [igPageId, setIgPageId] = useState('');
   const [igEnabled, setIgEnabled] = useState(false);
   const [igToken, setIgToken] = useState('');
   const [igTokenVisible, setIgTokenVisible] = useState(false);
@@ -130,8 +129,8 @@ export default function AgentDetailPage() {
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalEmail, setGcalEmail] = useState('');
   const [gcalLoading, setGcalLoading] = useState(false);
-  // Facebook Login (Instagram OAuth)
-  const [fbConnecting, setFbConnecting] = useState(false);
+  // Instagram Login (OAuth)
+  const [igConnecting, setIgConnecting] = useState(false);
   // WhatsApp Embedded Signup
   const [esConnecting, setEsConnecting] = useState(false);
   const [esMsg, setEsMsg] = useState('');
@@ -147,7 +146,6 @@ export default function AgentDetailPage() {
       setWpEnabled(data.whatsappEnabled ?? false);
       // token is write-only — never returned from API, leave blank
       setIgAccountId(data.instagramAccountId ?? '');
-      setIgPageId(data.instagramPageId ?? '');
       setIgEnabled(data.instagramEnabled ?? false);
       // instagram token is also write-only
       // Load WhatsApp schedule
@@ -209,22 +207,26 @@ export default function AgentDetailPage() {
       delete q.gcal;
       router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
     }
-    // Facebook OAuth callback
-    const { fb, igId, name: fbName } = router.query as { fb?: string; igId?: string; name?: string };
-    if (fb === 'success' && igId) {
+    // Instagram Login OAuth callback
+    const { ig, igId, name: igName, warn } = router.query as { ig?: string; igId?: string; name?: string; warn?: string };
+    if (ig === 'success' && igId) {
       setIgAccountId(igId);
       setIgEnabled(true);
-      setIgMsg(`✅ Conta Instagram ligada${fbName ? ` (${decodeURIComponent(fbName)})` : ''}! Verifica e guarda.`);
+      if (warn === 'webhook_subscribe_failed') {
+        setIgMsg(`⚠️ Conta Instagram ligada${igName ? ` (${decodeURIComponent(igName)})` : ''}, mas não foi possível ativar os webhooks — confirma se a permissão instagram_business_manage_messages já está aprovada no App Review.`);
+      } else {
+        setIgMsg(`✅ Conta Instagram ligada${igName ? ` (${decodeURIComponent(igName)})` : ''}! Verifica e guarda.`);
+      }
       setActiveTab('instagram');
       const q = { ...router.query };
-      delete q.fb; delete q.igId; delete q.name;
+      delete q.ig; delete q.igId; delete q.name; delete q.warn;
       router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
     }
-    if (fb === 'error') {
-      setIgMsg('❌ Erro ao ligar conta Facebook/Instagram. Tenta novamente ou introduz os dados manualmente.');
+    if (ig === 'error') {
+      setIgMsg('❌ Erro ao ligar conta Instagram. Tenta novamente ou introduz os dados manualmente.');
       setActiveTab('instagram');
       const q = { ...router.query };
-      delete q.fb;
+      delete q.ig; delete q.reason;
       router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
     }
   }, [router.isReady, router.query]);
@@ -315,34 +317,21 @@ export default function AgentDetailPage() {
     }
   };
 
-  const handleFbConnect = () => {
+  // Instagram Login (11/09/2026): autenticação direta com a conta Instagram,
+  // sem SDK de popup nem Página do Facebook — apenas um redirect OAuth normal,
+  // igual ao Google Calendar (ver handleGcalConnect).
+  const handleInstagramConnect = async () => {
     if (!agent) return;
-    const win = window as unknown as { FB?: { login: (cb: (r: { authResponse?: { accessToken?: string; code?: string } }) => void, opts: object) => void } };
-    if (!win.FB) { setIgMsg('❌ SDK do Facebook ainda não carregou. Aguarda e tenta de novo.'); return; }
-    setFbConnecting(true);
+    setIgConnecting(true);
     setIgMsg('');
-    win.FB!.login((response) => {
-      const code = response.authResponse?.code;
-      const token = response.authResponse?.accessToken;
-      const credential = code ?? token;
-      if (credential) {
-        api.post(`/api/integrations/instagram/connect`, { code, token, agentId: agent.id })
-          .then(({ data }) => {
-            setIgAccountId(data.igAccountId ?? '');
-            setIgEnabled(true);
-            setIgMsg(`✅ Instagram ligado${data.name ? ` (${data.name})` : ''}! Verifica e guarda.`);
-          })
-          .catch(() => setIgMsg('❌ Erro ao guardar token Instagram. Tenta novamente.'))
-          .finally(() => setFbConnecting(false));
-      } else {
-        setIgMsg('');
-        setFbConnecting(false);
-      }
-    }, {
-      config_id: '1334200631878203',
-      response_type: 'code',
-      override_default_response_type: true,
-    });
+    try {
+      const { data } = await api.get(`/api/integrations/instagram/auth?agentId=${agent.id}`);
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erro ao iniciar OAuth do Instagram';
+      setIgMsg(`❌ ${msg}`);
+      setIgConnecting(false);
+    }
   };
 
   const launchWhatsAppSignup = () => {
@@ -484,7 +473,6 @@ export default function AgentDetailPage() {
     try {
       const payload: Record<string, unknown> = {
         instagramAccountId: igAccountId,
-        instagramPageId: igPageId || undefined,
         instagramEnabled: igEnabled,
         notifyPhone: notifyPhone || undefined,
         instagramOffHoursMessage: igOffMsg || undefined,
@@ -1550,19 +1538,7 @@ export default function AgentDetailPage() {
                           defaultValue={agent.instagramAccountId ?? ''}
                           onBlur={(e) => handleSaveIntegrations({ instagramAccountId: e.target.value || undefined })}
                         />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Facebook Page ID <span className="text-gray-400 font-normal">(obrigatório para enviar DMs)</span></label>
-                        <input className="input w-full" placeholder="ex: 1281854898348672"
-                          defaultValue={(agent as any).instagramPageId ?? ''}
-                          onBlur={(e) => handleSaveIntegrations({ instagramPageId: e.target.value || undefined })}
-                        />
-                      </div>
-                      <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded text-xs text-pink-700 dark:text-pink-300">
-                        1. No Meta for Developers, adiciona o produto <strong>Instagram Graph API</strong> à tua app.<br/>
-                        2. Liga a conta Instagram Business.<br/>
-                        3. Adiciona o webhook URL: <code className="font-mono bg-pink-100 dark:bg-pink-900/40 px-1 rounded">{`${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/instagram`}</code><br/>
-                        4. O Token de acesso é o mesmo que usas no WhatsApp se for a mesma app Meta.
+                        <p className="text-[15px] text-gray-400 mt-1">Preenchido automaticamente ao ligar pela aba <strong>Instagram</strong> (Login com Instagram) — só precisas de editar manualmente em casos especiais.</p>
                       </div>
                     </div>
                   )}
@@ -1788,18 +1764,18 @@ export default function AgentDetailPage() {
               {/* Opção 1: OAuth automático */}
               <div className="card border border-pink-200 dark:border-pink-800 bg-pink-50 dark:bg-pink-900/10">
                 <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">⚡ Ligar Instagram automaticamente</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Um popup abre para autenticares com o Facebook. Após aceitar, o agente fica ligado ao teu Instagram Business automaticamente — sem copiar tokens.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Autentica diretamente com a tua conta Instagram Business ou Creator — não precisas de nenhuma Página do Facebook nem de copiar tokens.</p>
                 {igMsg && (
                   <p className={`text-xs mb-3 ${igMsg.startsWith('✅') ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{igMsg}</p>
                 )}
                 <button
-                  onClick={handleFbConnect}
-                  disabled={fbConnecting}
+                  onClick={handleInstagramConnect}
+                  disabled={igConnecting}
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm text-white transition-colors"
-                  style={{ background: fbConnecting ? '#888' : '#1877F2' }}
+                  style={{ background: igConnecting ? '#888' : '#E1306C' }}
                 >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                  {fbConnecting ? 'A ligar...' : 'Continuar com Facebook'}
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+                  {igConnecting ? 'A redirecionar...' : 'Continuar com Instagram'}
                 </button>
               </div>
 
@@ -1816,10 +1792,10 @@ export default function AgentDetailPage() {
                   <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Passo 1 — Conta Meta for Developers</h2>
                   <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1.5 list-decimal list-inside">
                     <li>Vai a <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">developers.facebook.com</a> e cria (ou usa) uma App do tipo <strong>Business</strong>.</li>
-                  <li>Adiciona o produto <strong>Instagram Graph API</strong> à app.</li>
-                  <li>Em <em>Instagram → Basic Display</em>, liga a tua conta <strong>Instagram Business</strong>.</li>
-                  <li>Copia o <strong>Instagram Account ID</strong> (número numérico longo, ex: 17841400008460056).</li>
-                  <li>Gera um <strong>Access Token</strong> permanente via System User — pode ser o mesmo que o WhatsApp se usarem a mesma app Meta.</li>
+                  <li>Adiciona o produto <strong>Instagram</strong> (API setup with Instagram Login) à app — não precisa de nenhuma Página do Facebook.</li>
+                  <li>Liga a tua conta <strong>Instagram Business ou Creator</strong> diretamente ao produto.</li>
+                  <li>Copia o <strong>Instagram Account ID</strong> (número numérico longo, ex: 17841400008460056) — ou usa o botão "Continuar com Instagram" acima, que preenche isto sozinho.</li>
+                  <li>O token de acesso também é obtido automaticamente pelo botão acima (renovado a cada 60 dias).</li>
                 </ol>
               </div>
 
@@ -1832,7 +1808,7 @@ export default function AgentDetailPage() {
                 </div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Subscreve o campo <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">messages</code>.</p>
                 <div className="mt-3 p-3 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg text-xs text-pink-700 dark:text-pink-300">
-                  ⚠️ Para receber DMs, a tua app Meta precisa estar em modo <strong>Live</strong> e ter a permissão <code className="bg-pink-100 dark:bg-pink-900/40 px-1 rounded">instagram_manage_messages</code> aprovada.
+                  ⚠️ Para receber DMs, a tua app Meta precisa estar em modo <strong>Live</strong> e ter a permissão <code className="bg-pink-100 dark:bg-pink-900/40 px-1 rounded">instagram_business_manage_messages</code> aprovada.
                 </div>
               </div>
 
@@ -1844,13 +1820,6 @@ export default function AgentDetailPage() {
                       Instagram Account ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID numérico da conta do Instagram)</span>
                     </label>
                     <input className="input" placeholder="ex: 17841400008460056" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Facebook Page ID <span className="text-gray-400 dark:text-gray-500 font-normal">(ID da Página ligada a esta conta — obrigatório para enviar DMs)</span>
-                    </label>
-                    <input className="input" placeholder="ex: 1281854898348672" value={igPageId} onChange={(e) => setIgPageId(e.target.value)} />
-                    <p className="text-[15px] text-gray-400 mt-1">É diferente do Instagram Account ID. Encontra-o em Meta Business Suite → Configurações → Páginas → (a tua página) → Identificação.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

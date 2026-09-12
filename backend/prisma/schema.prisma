@@ -193,11 +193,12 @@ model Agent {
   // CRM
   crmEnabled            Boolean    @default(false)
 
-  // Instagram DM
+  // Instagram DM (Instagram API with Instagram Login, desde 11/09/2026 — ver instagram.ts)
   instagramEnabled      Boolean    @default(false)
-  instagramAccountId    String?    // Instagram Business Account ID (recebido nos webhooks)
-  instagramPageId       String?    // Facebook Page ID ligada à conta do Instagram — obrigatório para POST /{id}/messages
-  instagramToken        String?
+  instagramAccountId    String?    // Instagram-scoped User ID (devolvido no OAuth do Instagram Login e nos webhooks)
+  instagramPageId       String?    // OBSOLETO — só existia para o fluxo antigo via Login do Facebook (Page Access Token). O Instagram Login não usa Página nenhuma. Mantido apenas para não perder o histórico de contas ligadas antes da migração.
+  instagramToken        String?    // Token de longa duração (60 dias) do Instagram Login — ver instagramTokenExpiresAt
+  instagramTokenExpiresAt DateTime? // Quando o instagramToken expira — usado para renovar via refresh_access_token antes de expirar
 
   // Telegram — 1 agente = 1 bot do Telegram (criado pelo cliente via @BotFather)
   telegramEnabled       Boolean    @default(false)
