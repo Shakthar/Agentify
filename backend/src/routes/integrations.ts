@@ -1,14 +1,18 @@
 /**
  * Integrações de terceiros (Google Calendar OAuth, Instagram Login OAuth)
- * GET  /api/integrations/google/auth         — URL de autorização Google Calendar
- * GET  /api/integrations/google/callback     — callback OAuth Google
- * GET  /api/integrations/google/status       — estado da ligação Google
- * DELETE /api/integrations/google            — desliga conta Google
+ * GET  /api/integrations/google/auth              — URL de autorização Google Calendar
+ * GET  /api/integrations/google/callback          — callback OAuth Google
+ * GET  /api/integrations/google/status            — estado da ligação Google
+ * DELETE /api/integrations/google                 — desliga conta Google
  *
- * GET  /api/integrations/instagram/auth      — URL de autorização Instagram Login
- * GET  /api/integrations/instagram/callback  — callback OAuth Instagram Login
+ * GET  /api/integrations/instagram/auth           — URL de autorização Instagram Login
+ * GET  /api/integrations/instagram/callback       — callback OAuth Instagram Login
+ * POST /api/integrations/instagram/deauthorize    — callback chamado pela Meta quando o utilizador remove a app
+ * POST /api/integrations/instagram/data-deletion  — callback chamado pela Meta quando o utilizador pede eliminação de dados
  */
 import { Router, Request, Response } from 'express';
+import express from 'express';
+import crypto from 'crypto';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { AuthenticatedRequest } from '../types/index.js';
@@ -268,6 +272,85 @@ router.get('/instagram/callback', asyncHandler(async (req: Request, res: Respons
     console.error('[Instagram OAuth] callback error:', err);
     return res.redirect(`${frontendUrl}/dashboard/${agentId}?ig=error&reason=token_exchange`);
   }
+}));
+
+// ── Deauthorize / Data Deletion callbacks (exigidos pela secção "Business login
+// settings" do produto Instagram) ────────────────────────────────────────────
+//
+// A Meta chama estes dois endpoints com POST application/x-www-form-urlencoded,
+// corpo "signed_request=<payload>" — NUNCA JSON. Como o resto da app só regista
+// express.json() globalmente (ver index.ts), aplicamos express.urlencoded() só
+// nestas duas rotas, sem afetar mais nada.
+//
+// signed_request = "<assinatura base64url>.<payload base64url>" — a assinatura é
+// HMAC-SHA256 do payload usando o INSTAGRAM_APP_SECRET. O payload contém
+// user_id = o Instagram-scoped User ID (o mesmo valor que guardamos em
+// instagramAccountId), exatamente como documentado pela Meta.
+
+function base64UrlDecode(input: string): Buffer {
+  return Buffer.from(input.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+}
+
+function parseSignedRequest(signedRequest: string, secret: string): { user_id?: string } | null {
+  const parts = signedRequest.split('.');
+  if (parts.length !== 2) return null;
+  const [encodedSig, encodedPayload] = parts;
+  const sig = base64UrlDecode(encodedSig);
+  const expectedSig = crypto.createHmac('sha256', secret).update(encodedPayload).digest();
+  if (sig.length !== expectedSig.length || !crypto.timingSafeEqual(sig, expectedSig)) {
+    console.warn('[Instagram] signed_request com assinatura inválida — a rejeitar');
+    return null;
+  }
+  try {
+    return JSON.parse(base64UrlDecode(encodedPayload).toString('utf8')) as { user_id?: string };
+  } catch {
+    return null;
+  }
+}
+
+// POST /api/integrations/instagram/deauthorize
+// Chamado pela Meta quando um utilizador remove a app a partir das definições do Instagram.
+router.post('/instagram/deauthorize', express.urlencoded({ extended: false }), asyncHandler(async (req: Request, res: Response) => {
+  const { signed_request } = req.body as { signed_request?: string };
+  const appSecret = process.env.INSTAGRAM_APP_SECRET;
+  const data = signed_request && appSecret ? parseSignedRequest(signed_request, appSecret) : null;
+  if (!data?.user_id) {
+    console.warn('[Instagram Deauthorize] signed_request em falta ou inválido');
+    res.status(400).json({ error: 'invalid signed_request' });
+    return;
+  }
+  const igAccountId = String(data.user_id);
+  const result = await (prisma.agent as any).updateMany({
+    where: { instagramAccountId: igAccountId },
+    data: { instagramEnabled: false, instagramToken: null, instagramTokenExpiresAt: null },
+  });
+  console.log(`[Instagram Deauthorize] Conta ${igAccountId} desautorizada pelo utilizador — ${result.count} agente(s) desligado(s).`);
+  res.status(200).json({ success: true });
+}));
+
+// POST /api/integrations/instagram/data-deletion
+// Chamado pela Meta quando um utilizador pede a eliminação dos seus dados.
+// Deve responder com { url, confirmation_code } — ver docs da Meta (Data Deletion Request Callback).
+router.post('/instagram/data-deletion', express.urlencoded({ extended: false }), asyncHandler(async (req: Request, res: Response) => {
+  const { signed_request } = req.body as { signed_request?: string };
+  const appSecret = process.env.INSTAGRAM_APP_SECRET;
+  const data = signed_request && appSecret ? parseSignedRequest(signed_request, appSecret) : null;
+  if (!data?.user_id) {
+    console.warn('[Instagram Data Deletion] signed_request em falta ou inválido');
+    res.status(400).json({ error: 'invalid signed_request' });
+    return;
+  }
+  const igAccountId = String(data.user_id);
+  await (prisma.agent as any).updateMany({
+    where: { instagramAccountId: igAccountId },
+    data: { instagramEnabled: false, instagramToken: null, instagramAccountId: null, instagramTokenExpiresAt: null },
+  });
+  const confirmationCode = crypto.randomBytes(8).toString('hex');
+  console.log(`[Instagram Data Deletion] Dados da conta ${igAccountId} eliminados. confirmation_code=${confirmationCode}`);
+  res.status(200).json({
+    url: `${process.env.FRONTEND_URL ?? 'https://agentfy.shaklabs.tech'}/data-deletion?code=${confirmationCode}`,
+    confirmation_code: confirmationCode,
+  });
 }));
 
 export default router;
