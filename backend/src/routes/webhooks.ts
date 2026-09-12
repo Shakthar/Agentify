@@ -84,6 +84,57 @@ router.get('/whatsapp/debug', authenticate, asyncHandler(async (req: Authenticat
   });
 }));
 
+// ─── GET /api/webhooks/instagram/debug (SUPERADMIN ONLY) ────────────────────────────────────
+// Diagnóstico: mostra, por agente com Instagram ligado, o instagramAccountId,
+// tenantId, updatedAt e um PREFIXO (6 chars) do token decifrado — o suficiente
+// para confirmar se é IGAA... (Instagram Login, correto) ou EAA... (Facebook,
+// incompatível com graph.instagram.com) sem nunca expor o token completo.
+// SECURITY: requer autenticação + isAdmin — nunca expor publicamente
+router.get('/instagram/debug', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.tenant?.isAdmin) throw new ForbiddenError('Superadmin only');
+  const allAgents = await prisma.agent.findMany({
+    where: { instagramEnabled: true },
+    select: {
+      id: true, name: true, tenantId: true, instagramAccountId: true,
+      instagramToken: true, instagramTokenExpiresAt: true, updatedAt: true, isActive: true,
+      tenant: { select: { encryptionKey: true } },
+    },
+  });
+  const agentsInfo = allAgents.map((a) => {
+    let tokenPrefix: string | null = null;
+    let decryptError: string | null = null;
+    if (a.instagramToken && a.tenant.encryptionKey) {
+      try {
+        const dataKey = unwrapDataKey(a.tenant.encryptionKey);
+        const [iv, ciphertext] = a.instagramToken.split(':');
+        if (dataKey) tokenPrefix = decrypt(ciphertext, iv, dataKey).slice(0, 6);
+      } catch (err) {
+        decryptError = err instanceof Error ? err.message : String(err);
+      }
+    }
+    return {
+      id: a.id,
+      name: a.name,
+      tenantId: a.tenantId,
+      instagramAccountId: a.instagramAccountId,
+      isActive: a.isActive,
+      updatedAt: a.updatedAt,
+      instagramTokenExpiresAt: a.instagramTokenExpiresAt,
+      hasInstagramToken: !!a.instagramToken,
+      tokenPrefix,
+      decryptError,
+    };
+  });
+  res.json({
+    config: {
+      INSTAGRAM_TOKEN: process.env.INSTAGRAM_TOKEN ? '***configured***' : null,
+      INSTAGRAM_APP_ID: process.env.INSTAGRAM_APP_ID ?? null,
+    },
+    instagramAgents: agentsInfo,
+    hint: 'tokenPrefix deve começar por "IGAAO" (Instagram Login). Se começar por "EAA", é um token do Facebook incompatível.',
+  });
+}));
+
 // ─── POST /api/webhooks/whatsapp/simulate (SUPERADMIN ONLY) ─────────────────────────────────────
 // Testa o fluxo completo sem necessitar de mensagem real do WhatsApp
 // SECURITY: requer autenticação + isAdmin — nunca expor publicamente (causa credit drain)

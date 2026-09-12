@@ -87,8 +87,11 @@ export default function AgentDetailPage() {
   // Instagram state
   const [igAccountId, setIgAccountId] = useState('');
   const [igEnabled, setIgEnabled] = useState(false);
-  const [igToken, setIgToken] = useState('');
-  const [igTokenVisible, setIgTokenVisible] = useState(false);
+  // NOTA (12/09/2026): removido o campo manual de Access Token — a conta Instagram
+  // Login guarda sempre o token via OAuth (ver handleInstagramConnect). Um campo
+  // manual aqui permitia sobrepor esse token com um valor no formato errado
+  // (ex: um token EAA... do Facebook, incompatível com graph.instagram.com),
+  // causando "(#190) Cannot parse access token" ao enviar DMs.
   const [igSaving, setIgSaving] = useState(false);
   const [igMsg, setIgMsg] = useState('');
   // Instagram schedule state
@@ -478,7 +481,6 @@ export default function AgentDetailPage() {
         instagramOffHoursMessage: igOffMsg || undefined,
         instagramSchedule: buildSchedulePayload(igSchedEnabled, igSchedTz, igSchedWdEnabled, igSchedWdStart, igSchedWdEnd, igSchedWeEnabled, igSchedWeStart, igSchedWeEnd),
       };
-      if (igToken.trim()) payload.instagramToken = igToken.trim();
       const updated = await updateAgent(agent.id, payload);
       setAgent(updated);
       setIgMsg('Guardado com sucesso!');
@@ -1821,28 +1823,9 @@ export default function AgentDetailPage() {
                     </label>
                     <input className="input" placeholder="ex: 17841400008460056" value={igAccountId} onChange={(e) => setIgAccountId(e.target.value)} />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Access Token <span className="text-gray-400 dark:text-gray-500 font-normal">(opcional — sobrepõe o token global)</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        className="input pr-20"
-                        type={igTokenVisible ? 'text' : 'password'}
-                        placeholder={agent?.instagramTokenConfigured ? '••••••••  (já configurado — deixa vazio para manter)' : 'EAAxxxxxxx... (Access Token do Meta)'}
-                        value={igToken}
-                        onChange={(e) => setIgToken(e.target.value)}
-                        autoComplete="off"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIgTokenVisible(v => !v)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1"
-                      >
-                        {igTokenVisible ? 'Ocultar' : 'Mostrar'}
-                      </button>
-                    </div>
-                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+                    O Access Token é sempre gerido automaticamente pelo botão "Continuar com Instagram" acima (OAuth) — já não há campo manual aqui, para evitar sobrepor por engano com um token incompatível.
+                  </p>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Número de notificação WhatsApp <span className="text-gray-400 dark:text-gray-500 font-normal">(recebe alerta de handoff + pedidos)</span>
