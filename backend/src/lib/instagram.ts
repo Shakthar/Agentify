@@ -187,11 +187,19 @@ export async function sendInstagramDM(
   if (!token) { console.warn('[Instagram] Token em falta — DM não enviada para', recipientId); return; }
   if (!igUserId) { console.warn('[Instagram] Instagram Account ID em falta — DM não enviada para', recipientId); return; }
   try {
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${igUserId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
-    });
+    // NOTA (12/09/2026): graph.instagram.com falha com "(#190) Cannot parse
+    // access token" quando o token vai no header Authorization: Bearer — ao
+    // contrário de graph.facebook.com. subscribeInstagramAccount() sempre
+    // mandou o token como query string (access_token=) e sempre funcionou;
+    // aqui alinhamos ao mesmo padrão.
+    const resp = await fetch(
+      `${IG_GRAPH}/${igVersion()}/${igUserId}/messages?access_token=${encodeURIComponent(token)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+      },
+    );
     const body = await resp.text();
     if (!resp.ok) console.error(`[Instagram] Erro DM → ${recipientId} status=${resp.status}:`, body);
     else console.log(`[Instagram] DM enviada → ${recipientId}:`, body.slice(0, 200));
@@ -210,11 +218,14 @@ export async function replyToInstagramComment(
 ): Promise<void> {
   if (!token) { console.warn('[Instagram] Token em falta — reply a comentário não enviado'); return; }
   try {
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${commentId}/replies`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
-    });
+    const resp = await fetch(
+      `${IG_GRAPH}/${igVersion()}/${commentId}/replies?access_token=${encodeURIComponent(token)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      },
+    );
     const body = await resp.text();
     if (!resp.ok) console.error(`[Instagram] Erro reply comentário ${commentId} status=${resp.status}:`, body);
     else console.log(`[Instagram] Reply a comentário ${commentId} enviado`);
@@ -254,11 +265,14 @@ export async function createInstagramMediaContainer(
   },
 ): Promise<string | null> {
   try {
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${igUserId}/media`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...params }),
-    });
+    const resp = await fetch(
+      `${IG_GRAPH}/${igVersion()}/${igUserId}/media?access_token=${encodeURIComponent(token)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...params }),
+      },
+    );
     const data = await resp.json() as { id?: string; error?: unknown };
     if (!resp.ok || !data.id) { console.error('[Instagram] Erro ao criar container:', data.error); return null; }
     return data.id;
@@ -275,11 +289,14 @@ export async function publishInstagramMedia(
   token: string,
 ): Promise<string | null> {
   try {
-    const resp = await fetch(`${IG_GRAPH}/${igVersion()}/${igUserId}/media_publish`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ creation_id: containerId }),
-    });
+    const resp = await fetch(
+      `${IG_GRAPH}/${igVersion()}/${igUserId}/media_publish?access_token=${encodeURIComponent(token)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creation_id: containerId }),
+      },
+    );
     const data = await resp.json() as { id?: string; error?: unknown };
     if (!resp.ok || !data.id) { console.error('[Instagram] Erro ao publicar media:', data.error); return null; }
     console.log(`[Instagram] Media publicada: ${data.id}`);

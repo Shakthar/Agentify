@@ -571,6 +571,7 @@ router.post('/instagram', webhookLimiter, asyncHandler(async (req: Request & { r
         }
       }
       const effectiveToken = agentToken ?? process.env.INSTAGRAM_TOKEN ?? process.env.WHATSAPP_TOKEN;
+      console.log(`[Instagram] Token: agente=${agentToken ? 'sim' : 'não'} hasInstagramToken=${agent.instagramToken ? 'sim' : 'não'} hasEncKey=${agent.tenant.encryptionKey ? 'sim' : 'não'} envInstagram=${process.env.INSTAGRAM_TOKEN ? 'sim' : 'não'} envWhatsapp=${process.env.WHATSAPP_TOKEN ? 'sim' : 'não'} effectiveTokenPrefix=${effectiveToken ? effectiveToken.slice(0, 6) : 'AUSENTE!'}`);
 
       // Identificar/criar Customer unificado
       const igCustomer = await identifyCustomer({
