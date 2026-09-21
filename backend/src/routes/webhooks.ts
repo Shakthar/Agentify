@@ -812,6 +812,15 @@ router.post('/telegram/:agentId', webhookLimiter, asyncHandler(async (req: Reque
     return;
   }
 
+  // O agente nunca deve responder em grupos/supergrupos/canais — só 1:1. Sem esta
+  // verificação, o chat.id do grupo (partilhado por toda a gente lá dentro) seria
+  // tratado como um único "cliente", misturando mensagens de pessoas diferentes na
+  // mesma conversa. Decisão explícita: agente só fala em privado.
+  if (message.chat.type !== 'private') {
+    console.log(`[Telegram] A ignorar mensagem de chat não-privado (type=${message.chat.type}, chat=${message.chat.id}) — agente só responde 1:1.`);
+    return;
+  }
+
   const chatId = message.chat.id;
   const from = String(chatId);
 
