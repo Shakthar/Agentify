@@ -222,7 +222,7 @@ const configPatchSchema = z.object({
     z.object({
       credits:  z.number().int().min(0).max(10_000_000),
       price:    z.number().min(0).max(100_000),
-      priceBRL: z.number().min(0).max(1_000_000),
+      priceBRL: z.number().min(0).max(1_000_000).optional(),
     }).strict()
   ).optional(),
   fx: z.object({ BRLperEUR: z.number().min(0.1).max(100) }).strict().optional(),

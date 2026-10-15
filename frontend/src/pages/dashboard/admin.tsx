@@ -42,7 +42,7 @@ interface PricingConfig {
   version?: number;
   fx?: { BRLperEUR: number };
   plans: Record<string, PC>;
-  topUp?: Record<string, { credits: number; price: number; priceBRL: number }>;
+  topUp?: Record<string, { credits: number; price: number; priceBRL?: number }>;
   features: {
     scheduling:     Record<string, FeaturePlanConfig>;
     fileUpload:     Record<string, FeaturePlanConfig>;
@@ -897,7 +897,14 @@ export default function AdminPage() {
 
                   {/* Planos base */}
                   <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">📦 Planos — preço, créditos e agentes</h3>
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">📦 Planos — preço, créditos e agentes</h3>
+                    <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
+                      <span>Câmbio € → R$ (o € é a base; R$ arredonda para cima até final 9):</span>
+                      <input type="number" min="0.1" step="0.01" className="input text-xs w-24"
+                        value={getDraftVal(['fx', 'BRLperEUR'], pricing.fx?.BRLperEUR ?? 5.61)}
+                        onChange={(e) => pNum(['fx', 'BRLperEUR'], e.target.value)}
+                        onBlur={(e) => handleNumBlur(['fx', 'BRLperEUR'], e.target.value)} />
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm min-w-[500px]">
                         <thead>
@@ -905,8 +912,7 @@ export default function AdminPage() {
                             <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
                             <th className="text-left py-2 text-xs text-gray-500">Preço (€/mês)</th>
                             <th className="text-left py-2 text-xs text-gray-500">Créditos/mês</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Preço (R$/mês)</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Créditos/mês (R$)</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Preço R$ (€ × {pricing.fx?.BRLperEUR ?? 5.61})</th>
                             <th className="text-left py-2 text-xs text-gray-500">Agentes máx.</th>
                           </tr>
                         </thead>
@@ -924,14 +930,10 @@ export default function AdminPage() {
                                 value={getDraftVal(['plans', plan, 'credits'], pricing.plans[plan]?.credits)}
                                 onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)}
                                 onBlur={(e) => handleNumBlur(['plans', plan, 'credits'], e.target.value)} /></td>
-                              <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input text-xs w-24"
-                                value={getDraftVal(['plans', plan, 'priceBRL'], pricing.plans[plan]?.priceBRL)}
-                                onChange={(e) => pNum(['plans', plan, 'priceBRL'], e.target.value)}
-                                onBlur={(e) => handleNumBlur(['plans', plan, 'priceBRL'], e.target.value)} /></td>
-                              <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input text-xs w-28"
-                                value={getDraftVal(['plans', plan, 'creditsBRL'], pricing.plans[plan]?.creditsBRL)}
-                                onChange={(e) => pNum(['plans', plan, 'creditsBRL'], e.target.value)}
-                                onBlur={(e) => handleNumBlur(['plans', plan, 'creditsBRL'], e.target.value)} /></td>
+                              <td className="py-2 pr-3 text-xs text-gray-600 dark:text-gray-300">
+                                {(() => { const eur = pricing.plans[plan]?.price ?? 0; const r = pricing.fx?.BRLperEUR ?? 5.61;
+                                  return eur > 0 ? `R$${Math.ceil((eur * r + 1) / 10) * 10 - 1}` : 'R$0'; })()}
+                              </td>
                               <td className="py-2"><input type="number" min="1" step="1" className="input text-xs w-20"
                                 value={getDraftVal(['plans', plan, 'agents'], pricing.plans[plan]?.agents)}
                                 onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)}

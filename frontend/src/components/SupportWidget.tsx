@@ -10,11 +10,11 @@ interface Message {
 const FAQ: Array<{ keywords: string[]; answer: string }> = [
   {
     keywords: ['crédito', 'credito', 'custa', 'preço', 'preco', 'quanto'],
-    answer: `Os créditos são a unidade de consumo da plataforma (1 crédito ≈ 1.000 tokens no Claude Haiku).\n\n• Conversa simples: ~10–20 créditos\n• Conversa média (3-5 trocas): ~30–50 créditos\n• Pedido com pagamento: ~50–80 créditos\n• Mensagens WhatsApp não consomem créditos (a Meta fatura as suas tarifas diretamente ao dono do número)\n\nPreços (Europa):\n• Free: 1.000 créditos (únicos)\n• Starter €49/mês: 18.000 créditos (≈450 conversas)\n• Business €129/mês: 49.000 créditos (≈1.250 conversas)\n• Enterprise €349/mês: 134.000 créditos (≈3.350 conversas)\n\nBrasil: Starter R$197 (12.500) · Business R$497 (33.000) · Enterprise R$1.297 (88.000)`,
+    answer: `Os créditos são a unidade de consumo da plataforma (1 crédito ≈ 1.000 tokens no Claude Haiku).\n\n• Conversa simples: ~10–20 créditos\n• Conversa média (3-5 trocas): ~30–50 créditos\n• Pedido com pagamento: ~50–80 créditos\n• Mensagens WhatsApp não consomem créditos (a Meta fatura as suas tarifas diretamente ao dono do número)\n\nPreços (Europa):\n• Free: 1.000 créditos (únicos)\n• Starter €49/mês: 18.000 créditos (≈450 conversas)\n• Business €129/mês: 49.000 créditos (≈1.250 conversas)\n• Enterprise €349/mês: 134.000 créditos (≈3.350 conversas)\n\nBrasil (mesmos créditos): Starter R$279 · Business R$729 · Enterprise R$1.959`,
   },
   {
     keywords: ['plano', 'planos', 'starter', 'business', 'enterprise', 'free', 'gratis', 'grátis'],
-    answer: `Temos 4 planos:\n\n🆓 **Free** — grátis (1.000 créditos únicos, 1 agente)\n🔵 **Starter** — €49/mês · R$197 (18.000 / 12.500 créditos, 1 agente)\n🟠 **Business** — €129/mês · R$497 (49.000 / 33.000 créditos, 3 agentes)\n🟢 **Enterprise** — €349/mês · R$1.297 (134.000 / 88.000 créditos, 10 agentes)\n\nTodos os planos incluem WhatsApp + Chat Web. No Brasil a cobrança é em reais (PIX ou cartão).`,
+    answer: `Temos 4 planos:\n\n🆓 **Free** — grátis (1.000 créditos únicos, 1 agente)\n🔵 **Starter** — €49/mês · R$279 (18.000 créditos, 1 agente)\n🟠 **Business** — €129/mês · R$729 (49.000 créditos, 3 agentes)\n🟢 **Enterprise** — €349/mês · R$1.959 (134.000 créditos, 10 agentes)\n\nTodos os planos incluem WhatsApp + Chat Web. No Brasil a cobrança é em reais (PIX ou cartão).`,
   },
   {
     keywords: ['ligar whatsapp', 'conectar whatsapp', 'configurar whatsapp', 'ativar whatsapp', 'número de whatsapp', 'numero de whatsapp'],
@@ -46,11 +46,11 @@ const FAQ: Array<{ keywords: string[]; answer: string }> = [
   },
   {
     keywords: ['agente', 'agentes', 'adicionar', 'extra', 'mais agente'],
-    answer: `Podes adicionar agentes extra sem mudar de plano:\n\n• Starter: +€20 (R$79)/agente/mês (máx 3 total)\n• Business: +€15 (R$59)/agente/mês (máx 10 total)\n• Enterprise: +€10 (R$39)/agente/mês (ilimitados)`,
+    answer: `Podes adicionar agentes extra sem mudar de plano:\n\n• Starter: +€20 (R$119)/agente/mês (máx 3 total)\n• Business: +€15 (R$89)/agente/mês (máx 10 total)\n• Enterprise: +€10 (R$59)/agente/mês (ilimitados)`,
   },
   {
     keywords: ['pagamento', 'mbway', 'mb way', 'pix', 'multibanco', 'pagar'],
-    answer: `O agente aceita pagamentos diretamente no WhatsApp:\n\n• MB Way (Portugal)\n• PIX (Brasil)\n• Referência Multibanco\n• Outros métodos configuráveis\n\nA skill de Pagamentos está incluída no Business e Enterprise. No Starter está disponível como addon por €15/mês (R$59), mais créditos por transação (Starter 50 · Business 20 · Enterprise 10).`,
+    answer: `O agente aceita pagamentos diretamente no WhatsApp:\n\n• MB Way (Portugal)\n• PIX (Brasil)\n• Referência Multibanco\n• Outros métodos configuráveis\n\nA skill de Pagamentos está incluída no Business e Enterprise. No Starter está disponível como addon por €15/mês (R$89), mais créditos por transação (Starter 50 · Business 20 · Enterprise 10).`,
   },
   {
     keywords: ['gdpr', 'rgpd', 'segurança', 'seguranca', 'dados', 'privacidade'],
@@ -58,11 +58,11 @@ const FAQ: Array<{ keywords: string[]; answer: string }> = [
   },
   {
     keywords: ['whitelabel', 'white-label', 'marca', 'revend', 'minha marca'],
-    answer: `Sim, o White-label permite disponibilizar a plataforma com a tua marca:\n\n• Starter: +€5 (R$19)/agente/mês\n• Business: +€3 (R$19)/agente/mês\n• Enterprise: incluído\n\nOs teus clientes acedem com o teu logo, cores e domínio — sem qualquer referência ao Agentfy.`,
+    answer: `Sim, o White-label permite disponibilizar a plataforma com a tua marca:\n\n• Starter: +€5 (R$29)/agente/mês\n• Business: +€3 (R$19)/agente/mês\n• Enterprise: incluído\n\nOs teus clientes acedem com o teu logo, cores e domínio — sem qualquer referência ao Agentfy.`,
   },
   {
     keywords: ['brasil', 'brazil', 'brasil', 'português do brasil', 'pt-br'],
-    answer: `Sim, o Agentfy funciona no Brasil! 🇧🇷\n\n• Planos em reais: Starter R$197 · Business R$497 · Enterprise R$1.297\n• Pagamento da assinatura por PIX ou cartão\n• Suporte a PIX nas vendas do agente\n• WhatsApp com números brasileiros\n• Responde em Português do Brasil\n• A plataforma detecta automaticamente o idioma do cliente`,
+    answer: `Sim, o Agentfy funciona no Brasil! 🇧🇷\n\n• Planos em reais: Starter R$279 · Business R$729 · Enterprise R$1.959\n• Pagamento da assinatura por PIX ou cartão\n• Suporte a PIX nas vendas do agente\n• WhatsApp com números brasileiros\n• Responde em Português do Brasil\n• A plataforma detecta automaticamente o idioma do cliente`,
   },
   {
     keywords: ['suporte', 'contacto', 'contactar', 'ajuda', 'email', 'falar'],

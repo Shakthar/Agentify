@@ -14,14 +14,14 @@ export interface FeaturePlanConfig {
 }
 
 export interface PlanConfig {
-  price: number;       // € / mês (sem IVA)
-  credits: number;     // créditos / mês para tenants em EUR
+  price: number;       // € / mês (sem IVA) — base; o preço em R$ é derivado (eurToBrl)
+  credits: number;     // créditos / mês (iguais em € e R$)
   agents: number;      // agentes (1 agente = 1 número WhatsApp)
-  priceBRL: number;    // R$ / mês
-  creditsBRL: number;  // créditos / mês para tenants em BRL
+  priceBRL?: number;   // obsoleto (v2) — ignorado
+  creditsBRL?: number; // obsoleto (v2) — ignorado
 }
 
-export interface TopUpConfig { credits: number; price: number; priceBRL: number }
+export interface TopUpConfig { credits: number; price: number; priceBRL?: number }
 
 export type Currency = 'EUR' | 'BRL';
 
@@ -50,8 +50,16 @@ export interface PricingConfig {
  * substituída pelos defaults no próximo arranque (as edições do superadmin feitas
  * depois disso voltam a ser respeitadas até à próxima subida de versão).
  * v2 (out/2026): planos recalculados para 40% de margem bruta + tabela BRL.
+ * v3 (out/2026): € é a base — R$ = € × câmbio (arredondado p/ cima até final 9), mesmos créditos;
+ *                Vendas+Delivery €25/€20/€15; Análises €20/€15; Custom Skills €20 no Enterprise.
  */
-export const PRICING_VERSION = 2;
+export const PRICING_VERSION = 3;
+
+/** € → R$: câmbio e arredondamento para cima até ao próximo valor terminado em 9 (€25 → R$149). */
+export function eurToBrl(eur: number, rate = _config?.fx?.BRLperEUR ?? 5.61): number {
+  if (eur <= 0) return 0;
+  return Math.ceil((eur * rate + 1) / 10) * 10 - 1;
+}
 
 /**
  * Créditos calculados com backend/scripts/pricing-model.mjs para margem bruta de 40%
@@ -63,15 +71,15 @@ export function defaultConfig(): PricingConfig {
     fx: { BRLperEUR: 5.61 }, // PTAX 14/10/2026 — usado só para relatórios (MRR em €)
     plans: {
       // FREE: 1.000 créditos concedidos UMA VEZ no signup (não renovam)
-      free:       { price: 0,   credits: 1000,   agents: 1,  priceBRL: 0,    creditsBRL: 1000  },
-      starter:    { price: 49,  credits: 18000,  agents: 1,  priceBRL: 197,  creditsBRL: 12500 },
-      business:   { price: 129, credits: 49000,  agents: 3,  priceBRL: 497,  creditsBRL: 33000 },
-      enterprise: { price: 349, credits: 134000, agents: 10, priceBRL: 1297, creditsBRL: 88000 },
+      free:       { price: 0,   credits: 1000,   agents: 1  },
+      starter:    { price: 49,  credits: 18000,  agents: 1  },
+      business:   { price: 129, credits: 49000,  agents: 3  },
+      enterprise: { price: 349, credits: 134000, agents: 10 },
     },
     topUp: {
-      starter:    { credits: 5000, price: 16, priceBRL: 89 },
-      business:   { credits: 5000, price: 15, priceBRL: 84 },
-      enterprise: { credits: 5000, price: 14, priceBRL: 79 },
+      starter:    { credits: 5000, price: 16 },
+      business:   { credits: 5000, price: 15 },
+      enterprise: { credits: 5000, price: 14 },
     },
     // Add-ons — espelham a tabela da página Planos & Addons (frontend/src/utils/pricing.ts)
     features: {
@@ -105,10 +113,11 @@ export function defaultConfig(): PricingConfig {
         business:   { mode: 'addon',    price: 3 },
         enterprise: { mode: 'included' },
       },
+      // Vendas + Delivery/Pedidos + KDS
       vendas: {
         free:       { mode: 'disabled' },
-        starter:    { mode: 'addon',    price: 15 },
-        business:   { mode: 'addon',    price: 15 },
+        starter:    { mode: 'addon',    price: 25 },
+        business:   { mode: 'addon',    price: 20 },
         enterprise: { mode: 'addon',    price: 15 },
       },
       feedback: {
@@ -119,8 +128,8 @@ export function defaultConfig(): PricingConfig {
       },
       analytics: {
         free:       { mode: 'disabled' },
-        starter:    { mode: 'addon',    price: 18 },
-        business:   { mode: 'addon',    price: 18 },
+        starter:    { mode: 'addon',    price: 20 },
+        business:   { mode: 'addon',    price: 15 },
         enterprise: { mode: 'included' },
       },
       leadGen: {
@@ -133,7 +142,7 @@ export function defaultConfig(): PricingConfig {
         free:       { mode: 'disabled' },
         starter:    { mode: 'disabled' },
         business:   { mode: 'addon',    price: 30 },
-        enterprise: { mode: 'included' },
+        enterprise: { mode: 'addon',    price: 20 },
       },
       extraAgents: {
         free:       { mode: 'disabled' },
@@ -150,7 +159,7 @@ export function planTerms(plan: string, currency: Currency | string = 'EUR'): { 
   const p = _config.plans[plan];
   if (!p) return { price: 0, credits: 0, currency: currency === 'BRL' ? 'BRL' : 'EUR' };
   return currency === 'BRL'
-    ? { price: p.priceBRL, credits: p.creditsBRL, currency: 'BRL' }
+    ? { price: eurToBrl(p.price), credits: p.credits, currency: 'BRL' }
     : { price: p.price, credits: p.credits, currency: 'EUR' };
 }
 

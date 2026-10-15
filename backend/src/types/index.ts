@@ -68,7 +68,7 @@ export type Plan = 'free' | 'starter' | 'business' | 'enterprise';
  * platformConfig (getConfig) no arranque — ver lib/platformConfig.ts.
  * - free: 1.000 créditos concedidos UMA VEZ no signup, nunca resetam.
  * - starter/business/enterprise: créditos resetam a cada pagamento mensal.
- * - Tenants com billingCurrency = 'BRL' recebem os créditos da tabela BRL (creditsBRL).
+ * - Tenants em BRL têm os mesmos créditos; o preço em R$ é € × câmbio (platformConfig.eurToBrl).
  *
  * 1 Agente = 1 Número WhatsApp (relação 1:1)
  * Modelo de custos e margem (40% bruta): backend/scripts/pricing-model.mjs

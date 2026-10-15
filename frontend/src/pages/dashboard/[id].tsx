@@ -894,15 +894,16 @@ export default function AgentDetailPage() {
                       const vendasActive = agent.skillVendas;
                       // Addon disponível a partir do Starter (não free) — admins sempre podem
                       const vendasAvail = isAdmin || planIdx >= planOrder.indexOf('starter');
+                      const vendasPrice = plan === 'enterprise' ? '€15' : plan === 'business' ? '€20' : '€25';
                       return (
                         <div className="flex items-start gap-3 py-3">
                           <span className="text-lg shrink-0 w-7 text-center mt-0.5">🏷️</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Vendas + Pedidos/KDS</span>
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Vendas + Delivery/Pedidos + KDS</span>
                                 {!vendasAvail && <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full">🔒 Starter+</span>}
-                                {vendasAvail && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon +€15/mês</span>}
+                                {vendasAvail && <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon +{vendasPrice}/mês</span>}
                                 {vendasActive && <span className="text-[14px] text-green-600 dark:text-green-400">● Ativa</span>}
                               </div>
                               <TogglePill
@@ -920,7 +921,7 @@ export default function AgentDetailPage() {
                               <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-brand-600 dark:text-brand-400 hover:underline">Upgrade para Starter+ →</button>
                             )}
                             {vendasAvail && !vendasActive && (
-                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon +€15/mês →</button>
+                              <button onClick={() => router.push('/dashboard/plans')} className="mt-1 text-[15px] text-orange-600 dark:text-orange-400 hover:underline">Ativar addon +{vendasPrice}/mês →</button>
                             )}
                             {vendasActive && (
                               <div className="flex flex-wrap gap-3 mt-1">

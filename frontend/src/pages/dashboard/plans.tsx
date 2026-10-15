@@ -66,16 +66,6 @@ const SKILLS: SkillDef[] = [
     plans: { free: 'included', starter: 'included', business: 'included', enterprise: 'included' },
     addonPrice: {},
   },
-  {
-    id: 'delivery',
-    name: 'Delivery / Pedidos',
-    icon: '🛵',
-    category: 'base',
-    desc: 'Recebe e processa pedidos de entrega com itens e morada',
-    detail: 'O agente recolhe os itens do pedido, morada de entrega e confirma o pedido. Integra com sistemas POS ou envia para o e-mail/painel.',
-    plans: { free: 'included', starter: 'included', business: 'included', enterprise: 'included' },
-    addonPrice: {},
-  },
   // ── Automation ──────────────────────────────────────────────────────
   {
     id: 'file_upload',
@@ -110,13 +100,13 @@ const SKILLS: SkillDef[] = [
   // ── Revenue ─────────────────────────────────────────────────────────
   {
     id: 'vendas',
-    name: 'Vendas + Pedidos/KDS',
+    name: 'Vendas + Delivery/Pedidos + KDS',
     icon: '🏷️',
     category: 'revenue',
-    desc: 'Upselling inteligente, cliente recorrente e gestão de pedidos com KDS',
-    detail: 'Addon de vendas com boas práticas integradas + sistema Pedidos/KDS incluído:\n\n• Trata sempre o cliente pelo nome — usa o histórico para personalizar cada conversa\n• Clientes recorrentes: analisa o histórico de pedidos e sugere automaticamente o que o cliente costuma pedir ("Olá João! Queres o teu habitual — pizza margherita + sumo?")\n• Upselling natural — sugere itens adicionais no momento certo, de forma amigável e assertiva, sem ser invasivo\n• Cross-sell contextual — recomenda produtos complementares com base no pedido atual\n• Histórico de preferências — aprende com as conversas anteriores para afinar sugestões ao longo do tempo\n• Inclui sistema de Pedidos/KDS: painel de cozinha em tempo real, gestão de estados e notificações',
+    desc: 'Pedidos e delivery, upselling inteligente, cliente recorrente e KDS',
+    detail: 'Addon de vendas com boas práticas integradas + Delivery/Pedidos e sistema KDS incluídos:\n\n• Delivery / Pedidos — o agente recolhe os itens, a morada de entrega e confirma o pedido\n• Trata sempre o cliente pelo nome — usa o histórico para personalizar cada conversa\n• Clientes recorrentes: analisa o histórico de pedidos e sugere automaticamente o que o cliente costuma pedir ("Olá João! Queres o teu habitual — pizza margherita + sumo?")\n• Upselling natural — sugere itens adicionais no momento certo, de forma amigável e assertiva, sem ser invasivo\n• Cross-sell contextual — recomenda produtos complementares com base no pedido atual\n• Histórico de preferências — aprende com as conversas anteriores para afinar sugestões ao longo do tempo\n• Inclui sistema de Pedidos/KDS: painel de cozinha em tempo real, gestão de estados e notificações',
     plans: { free: 'unavailable', starter: 'addon', business: 'addon', enterprise: 'addon' },
-    addonPrice: { starter: 15, business: 15, enterprise: 15 },
+    addonPrice: { starter: 25, business: 20, enterprise: 15 },
   },
   {
     id: 'payments',
@@ -148,7 +138,7 @@ const SKILLS: SkillDef[] = [
     desc: 'Dashboard com métricas, conversões, padrões e insights',
     detail: 'Relatórios detalhados: volume de conversas, taxa de resolução, produtos mais pedidos, horários de pico, motivos de handoff, funil de conversão e mais.',
     plans: { free: 'unavailable', starter: 'addon', business: 'addon', enterprise: 'included' },
-    addonPrice: { starter: 18, business: 18 },
+    addonPrice: { starter: 20, business: 15 },
   },
   {
     id: 'lead_gen',
@@ -168,8 +158,8 @@ const SKILLS: SkillDef[] = [
     category: 'custom',
     desc: 'Skills desenvolvidas à medida para o teu negócio',
     detail: 'Desenvolvemos skills personalizadas para os teus casos de uso específicos — integrações com sistemas próprios, fluxos únicos, automações à medida.',
-    plans: { free: 'unavailable', starter: 'unavailable', business: 'addon', enterprise: 'included' },
-    addonPrice: { business: 30 },
+    plans: { free: 'unavailable', starter: 'unavailable', business: 'addon', enterprise: 'addon' },
+    addonPrice: { business: 30, enterprise: 20 },
   },
 ];
 

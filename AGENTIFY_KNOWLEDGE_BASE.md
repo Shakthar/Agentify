@@ -96,18 +96,16 @@ O agente para de responder. O utilizador recebe avisos aos 30% e 10% dos crédit
 
 ## PLANOS E PREÇOS
 
-Os preços são mensais, sem fidelização. Há duas tabelas: **Europa (€)** e **Brasil (R$)**. Se o lead for do Brasil (número +55, fala português do Brasil ou pergunta em reais), apresenta sempre a tabela em R$. Caso contrário, usa a tabela em €.
+Os preços são mensais, sem fidelização. O **euro é a moeda base**: o preço em reais é sempre o valor em € convertido ao câmbio (€1 = R$5,61) e arredondado para cima até ao próximo valor terminado em 9. Os créditos são os mesmos em € e em R$. Se o lead for do Brasil (número +55, fala português do Brasil ou pergunta em reais), apresenta os valores em R$; caso contrário, em €.
 
 | | Free | Starter ⭐ | Business | Enterprise |
 |---|---|---|---|---|
 | **Preço Europa** | €0 | **€49/mês** | **€129/mês** | **€349/mês** |
-| Créditos Europa | 1.000 (uma vez) | 18.000/mês | 49.000/mês | 134.000/mês |
+| Créditos (€ e R$) | 1.000 (uma vez) | 18.000/mês | 49.000/mês | 134.000/mês |
 | Conversas estimadas | ≈ 25 | ≈ 450/mês | ≈ 1.250/mês | ≈ 3.350/mês |
-| **Preço Brasil** | R$0 | **R$197/mês** | **R$497/mês** | **R$1.297/mês** |
-| Créditos Brasil | 1.000 (uma vez) | 12.500/mês | 33.000/mês | 88.000/mês |
-| Conversas estimadas | ≈ 25 | ≈ 310/mês | ≈ 830/mês | ≈ 2.200/mês |
+| **Preço Brasil** | R$0 | **R$279/mês** | **R$729/mês** | **R$1.959/mês** |
 | Agentes / números WhatsApp | 1 | 1 | 3 | 10 |
-| Pacote extra 5.000 créditos | — | €16 · R$89 | €15 · R$84 | €14 · R$79 |
+| Pacote extra 5.000 créditos | — | €16 · R$99 | €15 · R$89 | €14 · R$79 |
 
 **Pagamento da assinatura:** Europa — MB Way, Multibanco ou cartão. Brasil — PIX ou cartão (o plano é ativado quando o pagamento é confirmado).
 
@@ -118,28 +116,28 @@ Os preços são mensais, sem fidelização. Há duas tabelas: **Europa (€)** e
 - Suporte: documentação online
 - **Para quem é:** testar a plataforma sem compromisso
 
-### STARTER — €49/mês · R$197/mês ⭐ Mais popular
-- **18.000 créditos/mês** (Brasil: 12.500)
+### STARTER — €49/mês · R$279/mês ⭐ Mais popular
+- **18.000 créditos/mês**
 - 1 agente / 1 número WhatsApp, Chat Web, base de conhecimento
 - Upload de ficheiros incluído
-- Add-ons disponíveis: Vendas + Pedidos/KDS, Pagamentos, Agendamento, Detecção de humor, Feedback, Análises avançadas, White-label
+- Add-ons disponíveis: Vendas + Delivery/Pedidos + KDS, Pagamentos, Agendamento, Detecção de humor, Feedback, Análises avançadas, White-label
 - Modelos: + Claude Sonnet
 - Histórico de conversas: 90 dias · Suporte por email
 - **Para quem é:** PMEs e negócios individuais que querem começar a automatizar
 
-### BUSINESS — €129/mês · R$497/mês
-- **49.000 créditos/mês** (Brasil: 33.000)
+### BUSINESS — €129/mês · R$729/mês
+- **49.000 créditos/mês**
 - 3 agentes / 3 números WhatsApp
 - **Incluídos:** Pagamentos, Agendamento, Detecção de humor, Recolha de Feedback, Upload de ficheiros
-- Add-ons disponíveis: Vendas + Pedidos/KDS, Análises avançadas, Lead Generation, Custom Skills, White-label
+- Add-ons disponíveis: Vendas + Delivery/Pedidos + KDS, Análises avançadas, Lead Generation, Custom Skills, White-label
 - Modelos: + GPT-4o · API Access
 - Histórico de conversas: 1 ano · Suporte por email prioritário
 - **Para quem é:** negócios com vários pontos de venda ou equipas
 
-### ENTERPRISE — €349/mês · R$1.297/mês
-- **134.000 créditos/mês** (Brasil: 88.000)
+### ENTERPRISE — €349/mês · R$1.959/mês
+- **134.000 créditos/mês**
 - 10 agentes / 10 números WhatsApp
-- **Todas as skills incluídas**, exceto Vendas + Pedidos/KDS (add-on em todos os planos)
+- **Todas as skills incluídas**, exceto Vendas + Delivery/Pedidos + KDS (add-on €15 · R$89) e Custom Skills (add-on €20 · R$119)
 - **White-label incluído**
 - Claude Opus (o modelo mais avançado da Anthropic)
 - Histórico ilimitado · SLA de 24h
@@ -169,32 +167,32 @@ As skills são capacidades especializadas que o agente pode ter. São o grande d
 |---|---|---|---|---|
 | Handoff para Humano | ✓ | ✓ | ✓ | ✓ |
 | Recolha de Dados | ✓ | ✓ | ✓ | ✓ |
-| Delivery / Pedidos | ✓ | ✓ | ✓ | ✓ |
-| Upload de Ficheiros | €8 · R$39 | ✓ | ✓ | ✓ |
-| Agendamento | — | €7 · R$29 | ✓ | ✓ |
-| Detecção de Humor | — | €9 · R$39 | ✓ | ✓ |
-| Vendas + Pedidos/KDS | — | €15 · R$59 | €15 · R$59 | €15 · R$59 |
-| Pagamentos | — | €15 · R$59 + 50 créditos/transação | ✓ + 20 créditos/transação | ✓ + 10 créditos/transação |
-| Recolha de Feedback | €4 · R$19 | €4 · R$19 | ✓ | ✓ |
-| Análises Avançadas | — | €18 · R$79 | €18 · R$79 | ✓ |
-| Lead Generation | — | — | €25 · R$99 | ✓ |
-| Custom Skills | — | — | €30 · R$119 | ✓ |
+| Upload de Ficheiros | €8 · R$49 | ✓ | ✓ | ✓ |
+| Agendamento | — | €7 · R$49 | ✓ | ✓ |
+| Detecção de Humor | — | €9 · R$59 | ✓ | ✓ |
+| Vendas + Delivery/Pedidos + KDS | — | €25 · R$149 | €20 · R$119 | €15 · R$89 |
+| Pagamentos | — | €15 · R$89 + 50 créditos/transação | ✓ + 20 créditos/transação | ✓ + 10 créditos/transação |
+| Recolha de Feedback | €4 · R$29 | €4 · R$29 | ✓ | ✓ |
+| Análises Avançadas | — | €20 · R$119 | €15 · R$89 | ✓ |
+| Lead Generation | — | — | €25 · R$149 | ✓ |
+| Custom Skills | — | — | €30 · R$169 | €20 · R$119 |
 
-✓ = incluído no plano · valores = add-on por mês · — = não disponível no plano
+✓ = incluído no plano · valores = add-on por mês (R$ = € × 5,61, arredondado para cima até final 9) · — = não disponível no plano
 
-### Skill Vendas + Pedidos/KDS (upselling + cross-sell + cliente recorrente)
-O pacote completo de vendas, com o sistema de Pedidos/KDS incluído:
+### Skill Vendas + Delivery/Pedidos + KDS (pedidos, upselling, cross-sell, cliente recorrente)
+O pacote completo de vendas. **Delivery/Pedidos faz parte deste pacote — não é gratuito nem vendido em separado.**
+- **Delivery / Pedidos** — o agente recolhe os itens do pedido, a morada de entrega e confirma o pedido
 - **Upselling** — sugere versões premium ou complementos no momento certo ("Queres adicionar o acompanhamento?")
 - **Cross-sell** — recomenda produtos relacionados com base no pedido atual
 - **Cliente recorrente** — analisa os últimos pedidos pagos desse número de WhatsApp e sugere os favoritos ("Olá João! Queres o teu habitual?")
-- **Pedidos/KDS** — painel de cozinha em tempo real, gestão de estados e notificações
+- **KDS** — painel de cozinha em tempo real, gestão de estados e notificações
 
-*Disponível:* add-on de €15/mês (R$59) em todos os planos pagos, incluindo Enterprise.
+*Disponível:* add-on em todos os planos pagos — Starter €25/mês (R$149) · Business €20/mês (R$119) · Enterprise €15/mês (R$89).
 
 ### Skill Pagamentos
 Aceita pagamentos diretamente na conversa: MB Way e Multibanco (Portugal), PIX (Brasil) e cartão. Cada transação processada consome créditos.
 
-*Disponível:* add-on de €15/mês (R$59) + 50 créditos/transação no Starter · incluído no Business (20 créditos/transação) e Enterprise (10 créditos/transação).
+*Disponível:* add-on de €15/mês (R$89) + 50 créditos/transação no Starter · incluído no Business (20 créditos/transação) e Enterprise (10 créditos/transação).
 
 ### Skill Handoff para Humano
 Quando o cliente está frustrado, o assunto é sensível ou o agente não tem confiança suficiente, transfere a conversa para um humano com todo o contexto preservado.
@@ -206,45 +204,40 @@ Formulários conversacionais: o agente guia o cliente para recolher nome, morada
 
 *Disponível:* incluído em todos os planos.
 
-### Skill Delivery / Pedidos
-O agente recolhe os itens do pedido e a morada de entrega e confirma o pedido.
-
-*Disponível:* incluído em todos os planos.
-
 ### Skill Detecção de Humor
 O agente deteta o estado emocional do cliente (frustrado, satisfeito, irritado, entusiasmado) e adapta o tom. Pode acionar handoff automático quando deteta frustração elevada.
 
-*Disponível:* add-on de €9/mês (R$39) no Starter · incluído no Business e Enterprise.
+*Disponível:* add-on de €9/mês (R$59) no Starter · incluído no Business e Enterprise.
 
 ### Skill Agendamento
 O agente agenda reuniões, consultas, reservas ou demonstrações diretamente na conversa.
 
-*Disponível:* add-on de €7/mês (R$29) no Starter · incluído no Business e Enterprise.
+*Disponível:* add-on de €7/mês (R$49) no Starter · incluído no Business e Enterprise.
 
 ### Skill Upload de Ficheiros
 O cliente pode enviar documentos, fotos ou ficheiros na conversa e o agente processa-os (comprovativos, reclamações, contratos).
 
-*Disponível:* add-on de €8/mês (R$39) no Free · incluído do Starter ao Enterprise.
+*Disponível:* add-on de €8/mês (R$49) no Free · incluído do Starter ao Enterprise.
 
 ### Skill Recolha de Feedback
 No fim de cada conversa resolvida, o agente pede uma avaliação de 1 a 5 estrelas (e comentário opcional) via WhatsApp ou Chat Web. Os resultados ficam agregados no Histórico de conversas.
 
-*Disponível:* add-on de €4/mês (R$19) no Free e Starter · incluído no Business e Enterprise.
+*Disponível:* add-on de €4/mês (R$29) no Free e Starter · incluído no Business e Enterprise.
 
 ### Skill Análises Avançadas
 Relatórios detalhados: volume de conversas, taxa de resolução, produtos mais pedidos, horários de pico, motivos de handoff e funil de conversão.
 
-*Disponível:* add-on de €18/mês (R$79) no Starter e Business · incluído no Enterprise.
+*Disponível:* add-on de €20/mês (R$119) no Starter · €15/mês (R$89) no Business · incluído no Enterprise.
 
 ### Skill Lead Generation
 O agente qualifica leads com perguntas estratégicas, atribui pontuação e sincroniza com HubSpot, Pipedrive ou outros CRMs via webhook.
 
-*Disponível:* add-on de €25/mês (R$99) no Business · incluído no Enterprise.
+*Disponível:* add-on de €25/mês (R$149) no Business · incluído no Enterprise.
 
 ### Custom Skills
 Skills desenvolvidas à medida: integrações com sistemas próprios, fluxos únicos e automações específicas do negócio.
 
-*Disponível:* add-on de €30/mês (R$119) no Business · incluído no Enterprise.
+*Disponível:* add-on de €30/mês (R$169) no Business · €20/mês (R$119) no Enterprise.
 
 ---
 
@@ -263,21 +256,21 @@ O agente aprende o nome de cada cliente durante a conversa e guarda-o associado 
 
 ### Pacotes de créditos extra
 Pacotes de 5.000 créditos, pedidos pelo suporte, a qualquer momento:
-- Starter: €16 (R$89)
-- Business: €15 (R$84)
+- Starter: €16 (R$99)
+- Business: €15 (R$89)
 - Enterprise: €14 (R$79)
 
 ### Rollover de créditos (em breve)
 Créditos não usados no mês poderão ser transferidos para o mês seguinte, pagando 85% do seu valor (desconto de 15%), com validade de 2 meses. Não disponível no plano Free. Ainda não está ativo — não prometas datas.
 
 ### Agentes extra
-- Starter: +€20/agente/mês · R$79 (máximo 3 agentes no total)
-- Business: +€15/agente/mês · R$59 (máximo 10 agentes no total)
-- Enterprise: +€10/agente/mês · R$39 (ilimitados)
+- Starter: +€20/agente/mês · R$119 (máximo 3 agentes no total)
+- Business: +€15/agente/mês · R$89 (máximo 10 agentes no total)
+- Enterprise: +€10/agente/mês · R$59 (ilimitados)
 
 ### White-label
 A plataforma com a tua marca (logo, cores, domínio personalizado). Os teus clientes não veem nenhuma referência ao Agentfy.
-- Starter: +€5/agente/mês (R$19)
+- Starter: +€5/agente/mês (R$29)
 - Business: +€3/agente/mês (R$19)
 - Enterprise: **incluído**
 
@@ -315,16 +308,16 @@ A Meta cobra as mensagens de resposta acima de 1.000 por número por mês. Essa 
 Exatamente. Cada agente está ligado a um número dedicado. O mesmo agente pode estar integrado em simultâneo com o site, Shopify, iFood, etc.
 
 **O agente pode processar pedidos e pagamentos?**
-Sim. Com a Skill Pagamentos, o agente recebe pedidos, gera referências de pagamento (MB Way, PIX, Multibanco) e confirma automaticamente quando o pagamento é recebido.
+Sim. Os pedidos e o delivery fazem parte da Skill Vendas + Delivery/Pedidos + KDS (add-on). Com a Skill Pagamentos, o agente recebe pedidos, gera referências de pagamento (MB Way, PIX, Multibanco) e confirma automaticamente quando o pagamento é recebido.
 
 **O agente reconhece clientes que já compraram antes?**
-Sim, com a Skill Vendas + Pedidos/KDS (add-on de €15/mês · R$59). O agente lê o histórico de pedidos do número de WhatsApp e personaliza a conversa com base nos favoritos do cliente.
+Sim, com a Skill Vendas + Delivery/Pedidos + KDS (add-on de €25/€20/€15 por mês conforme o plano · R$149/R$119/R$89). O agente lê o histórico de pedidos do número de WhatsApp e personaliza a conversa com base nos favoritos do cliente.
 
 **Posso cancelar a qualquer momento?**
 Sim. Sem contratos de fidelidade. Cancelas quando quiseres. Os créditos do mês não são reembolsados.
 
 **O Agentfy funciona no Brasil?**
-Sim. Há planos em reais (Starter R$197, Business R$497, Enterprise R$1.297), a assinatura paga-se por PIX ou cartão, o agente aceita PIX nas vendas, responde em Português do Brasil e funciona com números de WhatsApp brasileiros.
+Sim. Há planos em reais (Starter R$279, Business R$729, Enterprise R$1.959 — o valor em € convertido ao câmbio, com os mesmos créditos), a assinatura paga-se por PIX ou cartão, o agente aceita PIX nas vendas, responde em Português do Brasil e funciona com números de WhatsApp brasileiros.
 
 **Posso ter um agente com a minha marca?**
 Sim, com o white-label. Os teus clientes acedem à plataforma com o teu logo, cores e domínio. Disponível como addon no Starter e Business, incluído no Enterprise.
@@ -346,8 +339,8 @@ Business (3 agentes) ou Enterprise (10 agentes). Podes ainda adicionar agentes e
 
 **Como escolho o plano certo?**
 Pergunta quantas conversas o negócio tem por mês e usa ~40 créditos por conversa:
-- até ~450 conversas/mês (Brasil ~310) → Starter
-- até ~1.250 conversas/mês (Brasil ~830) ou mais de 1 número → Business
+- até ~450 conversas/mês → Starter
+- até ~1.250 conversas/mês ou mais de 1 número → Business
 - acima disso, vários pontos de venda, franquias ou agências → Enterprise
 
 ---
@@ -388,7 +381,7 @@ Transfere a conversa para o Eduardo (handoff) nas seguintes situações:
 ## OBJEÇÕES COMUNS E COMO RESPONDER
 
 **"É muito caro."**
-> "Entendo. Quanto é que custas atualmente a responder mensagens no WhatsApp — em tempo teu ou da tua equipa? O Agentfy liberta esse tempo e trabalha 24/7. O plano Starter são €49/mês (no Brasil R$197) e cobre cerca de 450 conversas — menos de €0,11 por conversa atendida, 24/7. Queres calcular o retorno para o teu caso?"
+> "Entendo. Quanto é que custas atualmente a responder mensagens no WhatsApp — em tempo teu ou da tua equipa? O Agentfy liberta esse tempo e trabalha 24/7. O plano Starter são €49/mês (no Brasil R$279) e cobre cerca de 450 conversas — cerca de €0,11 (R$0,62) por conversa atendida, 24/7. Queres calcular o retorno para o teu caso?"
 
 **"Já tenho alguém a responder."**
 > "Ótimo — esse alguém pode focar-se nos casos que realmente precisam de atenção humana. O Agentfy trata dos 70-80% de mensagens repetitivas automaticamente e passa ao humano só o que importa."
@@ -413,4 +406,4 @@ Transfere a conversa para o Eduardo (handoff) nas seguintes situações:
 
 ---
 
-*Última atualização: Outubro 2026 — tabela de preços v2 (EUR + BRL)*
+*Última atualização: Outubro 2026 — tabela de preços v3 (€ base, R$ = € × câmbio)*

@@ -21,7 +21,7 @@ const PLANS = [
     highlight: false,
     cta: 'Começar grátis',
     color: 'border-gray-200',
-    features: ['1 número WhatsApp', 'Chat Web', 'Base de conhecimento', 'Skill Delivery básico', 'Modelos: Haiku / GPT-mini'],
+    features: ['1 número WhatsApp', 'Chat Web', 'Base de conhecimento', 'Handoff + Recolha de dados', 'Modelos: Haiku / GPT-mini'],
   },
   {
     id: 'starter',
@@ -31,7 +31,7 @@ const PLANS = [
     highlight: true,
     cta: 'Começar agora',
     color: 'border-brand-500',
-    features: ['1 número WhatsApp', 'Chat Web', 'Skill Delivery + Upload de ficheiros', 'Addons: Vendas¹, Pagamentos, Agendamento', 'Modelos: + Claude Sonnet', 'Suporte por email'],
+    features: ['1 número WhatsApp', 'Chat Web', 'Upload de ficheiros incluído', 'Addons: Vendas + Delivery¹, Pagamentos, Agendamento', 'Modelos: + Claude Sonnet', 'Suporte por email'],
   },
   {
     id: 'business',
@@ -52,7 +52,7 @@ const PLANS = [
     cta: 'Falar com vendas',
     ctaHref: 'mailto:contact@solutions.shaklabs.tech',
     color: 'border-green-400',
-    features: ['10 números WhatsApp', 'Todas as skills incluídas (exceto Vendas¹)', 'Claude Opus (melhor IA)', 'White-label incluído', 'SLA 24h', 'Histórico ilimitado'],
+    features: ['10 números WhatsApp', 'Todas as skills incluídas (exceto Vendas¹ e Custom)', 'Claude Opus (melhor IA)', 'White-label incluído', 'SLA 24h', 'Histórico ilimitado'],
   },
 ];
 
@@ -96,7 +96,7 @@ const FAQS = [
   },
   {
     q: 'O que acontece quando os créditos acabam?',
-    a: 'O agente para de responder. Recebes avisos aos 30% e 10%. Podes comprar pacotes de 5.000 créditos extra (Starter €16 · Business €15 · Enterprise €14 — no Brasil R$89 · R$84 · R$79; pedido pelo suporte) ou fazer upgrade para um plano com mais créditos.',
+    a: 'O agente para de responder. Recebes avisos aos 30% e 10%. Podes comprar pacotes de 5.000 créditos extra (Starter €16 · Business €15 · Enterprise €14 — no Brasil R$99 · R$89 · R$79; pedido pelo suporte) ou fazer upgrade para um plano com mais créditos.',
   },
   {
     q: 'Posso acumular créditos não usados?',
@@ -108,7 +108,7 @@ const FAQS = [
   },
   {
     q: 'Posso adicionar mais agentes sem mudar de plano?',
-    a: 'Sim. No Starter podes adicionar até 2 agentes extra por €20/agente/mês (máx 3 total). No Business, até 7 extras por €15/agente/mês (máx 10 total). No Enterprise são ilimitados a €10/agente/mês. No Brasil: R$79, R$59 e R$39/agente/mês.',
+    a: 'Sim. No Starter podes adicionar até 2 agentes extra por €20/agente/mês (máx 3 total). No Business, até 7 extras por €15/agente/mês (máx 10 total). No Enterprise são ilimitados a €10/agente/mês. No Brasil: R$119, R$89 e R$59/agente/mês.',
   },
   {
     q: 'Quanto tempo demora a criar um agente?',
@@ -643,7 +643,7 @@ export default function Home() {
             </div>
 
             <p className="text-center text-xs text-gray-400 mt-6">
-              ¹ Vendas + Pedidos/KDS (upselling, cross-sell, cliente recorrente): addon de {money(addonPrice(15, currency), currency)}/mês em qualquer plano pago.
+              ¹ Vendas + Delivery/Pedidos + KDS (pedidos, upselling, cross-sell, cliente recorrente): addon de {money(addonPrice(25, currency), currency)} no Starter, {money(addonPrice(20, currency), currency)} no Business e {money(addonPrice(15, currency), currency)} no Enterprise, por mês.
               {' · '}Todos os planos incluem SSL, uptime 99.9% e backups diários.
             </p>
 

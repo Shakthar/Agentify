@@ -94,16 +94,18 @@ npm run dev
 
 Calculados para **40% de margem bruta** no pior caso (cliente consome todos os créditos). Modelo de custos: `backend/scripts/pricing-model.mjs`. Fonte de verdade: `backend/src/lib/platformConfig.ts` (backend) e `frontend/src/utils/pricing.ts` (frontend). Catálogo comercial completo: `AGENTIFY_KNOWLEDGE_BASE.md`.
 
-| Plano | Europa (€) | Créditos | Brasil (R$) | Créditos | Agentes |
-|-------|-----------|----------|-------------|----------|---------|
-| **Free** | €0 | 1.000 (uma vez) | R$0 | 1.000 (uma vez) | 1 |
-| **Starter** | €49/mês | 18.000 | R$197/mês | 12.500 | 1 |
-| **Business** | €129/mês | 49.000 | R$497/mês | 33.000 | 3 |
-| **Enterprise** | €349/mês | 134.000 | R$1.297/mês | 88.000 | 10 |
+O **€ é a base**: R$ = € × câmbio (`fx.BRLperEUR`, 5,61), arredondado para cima até ao próximo valor terminado em 9. Os créditos são iguais nas duas moedas.
+
+| Plano | Europa (€) | Brasil (R$) | Créditos | Agentes |
+|-------|-----------|-------------|----------|---------|
+| **Free** | €0 | R$0 | 1.000 (uma vez) | 1 |
+| **Starter** | €49/mês | R$279/mês | 18.000 | 1 |
+| **Business** | €129/mês | R$729/mês | 49.000 | 3 |
+| **Enterprise** | €349/mês | R$1.959/mês | 134.000 | 10 |
 
 - 1 crédito ≈ 1.000 tokens Haiku (Sonnet/GPT-4o ×3, Opus ×5) · ~40 créditos por conversa média
 - Mensagens WhatsApp/Instagram/Telegram não consomem créditos; as tarifas da Meta são faturadas pela Meta ao dono do número (cartão registado no onboarding)
-- Pacote extra de 5.000 créditos: €16/€15/€14 · R$89/R$84/R$79
+- Pacote extra de 5.000 créditos: €16/€15/€14 · R$99/R$89/R$79
 - Add-ons (skills, agentes extra, white-label): ver tabela na página Planos e no Knowledge Base
 - Tenants em BRL (`Tenant.billingCurrency = 'BRL'`) pagam por PIX (confirmação manual) ou cartão — migração `backend/prisma/migrations/add_billing_currency.sql`
 

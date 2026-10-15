@@ -17,10 +17,14 @@ const COST_PER_CREDIT_EUR = ((0.85 * 1 + 0.15 * 5) / 1000) * USD_EUR; // ≈ €
 const PAYMENT_FEE_PCT = 0.025, PAYMENT_FEE_FIXED_EUR = 0.25;
 const INFRA_PER_ACCOUNT_EUR = 1.0;
 
+// O € é a base. R$ = € × câmbio, arredondado para cima até ao próximo valor terminado em 9.
+const eurToBrl = (eur) => (eur <= 0 ? 0 : Math.ceil((eur * BRL_PER_EUR + 1) / 10) * 10 - 1);
+const EUR_PLANS = { starter: 49, business: 129, enterprise: 349 };
 const plans = {
-  EUR: { starter: 49, business: 129, enterprise: 349 },
-  BRL: { starter: 197, business: 497, enterprise: 1297 },
+  EUR: EUR_PLANS,
+  BRL: Object.fromEntries(Object.entries(EUR_PLANS).map(([k, v]) => [k, eurToBrl(v)])),
 };
+const EUR_CREDITS = {};
 
 const floor500 = (n) => Math.floor(n / 500) * 500;
 console.log(`Custo por crédito: €${COST_PER_CREDIT_EUR.toFixed(5)}  |  margem alvo ${TARGET_MARGIN * 100}%\n`);
@@ -29,7 +33,8 @@ for (const [cur, table] of Object.entries(plans)) {
     const priceEur = cur === 'BRL' ? price / BRL_PER_EUR : price;
     const fixed = priceEur * PAYMENT_FEE_PCT + PAYMENT_FEE_FIXED_EUR + INFRA_PER_ACCOUNT_EUR;
     const budget = priceEur * (1 - TARGET_MARGIN) - fixed;
-    const credits = floor500(budget / COST_PER_CREDIT_EUR);
+    // Créditos calculados no €; em R$ os créditos são os mesmos (preço ≥ € × câmbio → margem ≥ alvo)
+    const credits = cur === 'EUR' ? (EUR_CREDITS[plan] = floor500(budget / COST_PER_CREDIT_EUR)) : EUR_CREDITS[plan];
     const cogs = credits * COST_PER_CREDIT_EUR + fixed;
     const margin = (priceEur - cogs) / priceEur;
     const per1k = (price / credits) * 1000;
@@ -39,15 +44,9 @@ for (const [cur, table] of Object.entries(plans)) {
 
 // Pacotes de créditos extra (5.000 créditos)
 console.log('\nPacotes extra de 5.000 créditos:');
-for (const [cur, price] of [['EUR', 16], ['EUR', 15], ['EUR', 14], ['BRL', 89], ['BRL', 84], ['BRL', 79]]) {
+for (const [cur, price] of [['EUR', 16], ['EUR', 15], ['EUR', 14], ['BRL', eurToBrl(16)], ['BRL', eurToBrl(15)], ['BRL', eurToBrl(14)]]) {
   const priceEur = cur === 'BRL' ? price / BRL_PER_EUR : price;
   const cogs = 5000 * COST_PER_CREDIT_EUR + priceEur * PAYMENT_FEE_PCT + PAYMENT_FEE_FIXED_EUR;
   console.log(`  ${cur} ${price}: margem ${(((priceEur - cogs) / priceEur) * 100).toFixed(1)}%`);
 }
 
-// Mensagens WhatsApp Cloud API acima das 1.000 grátis/número/mês (tarifa Meta "service")
-console.log('\nCréditos por mensagem WhatsApp (API oficial, acima de 1.000/mês):');
-const revenuePerCredit = 49 / 17500; // ≈ receita média por crédito
-for (const [pais, custo] of [['BR (R$0,035)', 0.035 / BRL_PER_EUR], ['PT/UE (€0,0142)', 0.0142]]) {
-  console.log(`  ${pais}: ${Math.ceil(custo / ((1 - TARGET_MARGIN) * revenuePerCredit))} créditos`);
-}
