@@ -32,19 +32,19 @@ export const PAYMENT_SKILL_COST: Record<string, number | null> = {
   enterprise: 10,    // 10 créditos/transação (incluído no plano)
 };
 
-// Créditos mensais e preço por plano (usado em vários componentes)
+// Créditos mensais e preço por plano em EUR (tabela completa EUR/BRL em utils/pricing.ts)
 export const PLAN_CREDITS: Record<string, number> = {
   free:       1000,
-  starter:    5000,
-  business:   15000,
-  enterprise: 40000,
+  starter:    18000,
+  business:   49000,
+  enterprise: 134000,
 };
 
 export const PLAN_PRICE: Record<string, number> = {
   free:       0,
-  starter:    59,
-  business:   159,
-  enterprise: 399,
+  starter:    49,
+  business:   129,
+  enterprise: 349,
 };
 
 export const PLAN_AGENTS: Record<string, number> = {
@@ -54,12 +54,12 @@ export const PLAN_AGENTS: Record<string, number> = {
   enterprise: 10,
 };
 
-// Custo por crédito por plano (€)
+// Preço por crédito por plano (€)
 export const CREDIT_COST_EUR: Record<string, number> = {
-  free:       0,       // gratuito
-  starter:    0.0118,  // €59 / 5.000
-  business:   0.0106,  // €159 / 15.000
-  enterprise: 0.00998, // €399 / 40.000
+  free:       0,        // gratuito
+  starter:    0.00272,  // €49 / 18.000
+  business:   0.00263,  // €129 / 49.000
+  enterprise: 0.00260,  // €349 / 134.000
 };
 
 export const AVAILABLE_MODELS_BY_PLAN: Record<string, { value: string; label: string; description: string; badge?: string }[]> = {
@@ -80,7 +80,6 @@ export const AVAILABLE_MODELS_BY_PLAN: Record<string, { value: string; label: st
     { value: 'gpt-4o-mini',                label: 'GPT-4o Mini',             description: 'Modelo OpenAI leve e rápido' },
     { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5',       description: 'Respostas mais elaboradas e contexto mais longo' },
     { value: 'gpt-4o',                     label: 'GPT-4o',                  description: 'Modelo OpenAI avançado para tarefas complexas' },
-    { value: 'gemini-1.5-pro',             label: 'Gemini 1.5 Pro',          description: 'Google — janela de contexto de 1M tokens' },
   ],
   enterprise: [
     { value: 'auto',                       label: '⚡ Automático',            description: 'Escolhe o modelo ideal para cada conversa automaticamente', badge: 'Recomendado' },
@@ -88,7 +87,6 @@ export const AVAILABLE_MODELS_BY_PLAN: Record<string, { value: string; label: st
     { value: 'gpt-4o-mini',                label: 'GPT-4o Mini',             description: 'Modelo OpenAI leve e rápido' },
     { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5',       description: 'Respostas mais elaboradas e contexto mais longo' },
     { value: 'gpt-4o',                     label: 'GPT-4o',                  description: 'Modelo OpenAI avançado para tarefas complexas' },
-    { value: 'gemini-1.5-pro',             label: 'Gemini 1.5 Pro',          description: 'Google — janela de contexto de 1M tokens' },
     { value: 'claude-opus-4-5-20251101',   label: 'Claude Opus 4.5',         description: 'Máxima inteligência — exclusivo Enterprise', badge: 'Premium' },
   ],
 };

@@ -54,7 +54,9 @@ export async function callLLM(
   maxTokens = 2000,
   temperature = 0.7,
 ): Promise<LLMResponse> {
-  const resolvedModel = model === 'auto' ? autoSelectModel(systemPrompt, messages) : model;
+  // Modelos descontinuados/não suportados (ex.: gemini-1.5-pro) caem para o modo automático
+  const supported = model === 'auto' || model.startsWith('claude') || model.startsWith('gpt');
+  const resolvedModel = !supported || model === 'auto' ? autoSelectModel(systemPrompt, messages) : model;
 
   if (resolvedModel.startsWith('claude')) {
     return callAnthropic(resolvedModel, systemPrompt, messages, maxTokens, temperature);

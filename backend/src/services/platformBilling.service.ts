@@ -9,22 +9,30 @@
  *  3. suspendExpired()             → cron: suspende tenants com expiry há +3 dias
  */
 import prisma from '../lib/prisma.js';
-import { getConfig } from '../lib/platformConfig.js';
+import { planTerms, type Currency } from '../lib/platformConfig.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export type PaymentMethod = 'stripe' | 'ifthenpay_mbway' | 'ifthenpay_multibanco' | 'manual';
+export type PaymentMethod = 'stripe' | 'ifthenpay_mbway' | 'ifthenpay_multibanco' | 'pix' | 'manual';
+
+/** Métodos aceites por moeda. PIX é confirmado manualmente pelo superadmin até haver gateway. */
+export const METHODS_BY_CURRENCY: Record<Currency, PaymentMethod[]> = {
+  EUR: ['stripe', 'ifthenpay_mbway', 'ifthenpay_multibanco', 'manual'],
+  BRL: ['pix', 'stripe', 'manual'],
+};
 
 export interface CreateInvoiceParams {
   tenantId: string;
   plan: string;
   method: PaymentMethod;
   phone?: string;  // obrigatório para ifthenpay_mbway
+  currency?: Currency; // default EUR
 }
 
 export interface PaymentInstructions {
   invoiceId: string;
   method: PaymentMethod;
   amount: number;
+  currency: Currency;
   plan: string;
   mock: boolean;
   // Stripe
@@ -36,6 +44,9 @@ export interface PaymentInstructions {
   multibancoEntity?: string;
   multibancoReference?: string;
   multibancoExpiry?: string;
+  // PIX (Brasil)
+  pixKey?: string;
+  pixReference?: string;
   // Genérico
   notes?: string;
 }
@@ -43,8 +54,11 @@ export interface PaymentInstructions {
 // ─── Create invoice ───────────────────────────────────────────────────────────
 export async function createSubscriptionInvoice(params: CreateInvoiceParams): Promise<PaymentInstructions> {
   const { tenantId, plan, method, phone } = params;
-  const cfg = getConfig();
-  const amount = cfg.plans[plan]?.price ?? 0;
+  const currency: Currency = params.currency === 'BRL' ? 'BRL' : 'EUR';
+  if (!METHODS_BY_CURRENCY[currency].includes(method)) {
+    throw new Error(`Método ${method} não disponível para pagamentos em ${currency}`);
+  }
+  const amount = planTerms(plan, currency).price;
 
   if (amount === 0) {
     // Plano Free — não precisa de pagamento
@@ -83,6 +97,10 @@ export async function createSubscriptionInvoice(params: CreateInvoiceParams): Pr
   } else if (method === 'ifthenpay_multibanco') {
     entity = '11249'; // entidade Ifthenpay real
     reference = isMock ? generateFakeMultibancoRef() : await callIfthenpayMultibanco(amount);
+  } else if (method === 'pix') {
+    // Sem gateway PIX: o cliente paga para a chave PIX e indica a referência;
+    // o superadmin confirma a fatura (POST /api/billing/test-confirm/:id).
+    reference = `AGF-${Date.now().toString(36).toUpperCase()}`;
   }
 
   const invoice = await prisma.platformInvoice.create({
@@ -90,6 +108,7 @@ export async function createSubscriptionInvoice(params: CreateInvoiceParams): Pr
       tenantId,
       plan,
       amount,
+      currency,
       method,
       status: 'pending',
       reference,
@@ -97,7 +116,9 @@ export async function createSubscriptionInvoice(params: CreateInvoiceParams): Pr
       externalId,
       periodStart: now,
       periodEnd,
-      notes: isMock ? 'MODO TESTE — confirmar com /api/billing/test-confirm/:id' : undefined,
+      notes: isMock
+        ? 'MODO TESTE — confirmar com /api/billing/test-confirm/:id'
+        : method === 'pix' ? 'PIX — confirmar manualmente após receção do pagamento' : undefined,
     },
   });
 
@@ -114,6 +135,7 @@ export async function createSubscriptionInvoice(params: CreateInvoiceParams): Pr
     invoiceId: invoice.id,
     method,
     amount,
+    currency,
     plan,
     mock: isMock,
     checkoutUrl,
@@ -122,6 +144,8 @@ export async function createSubscriptionInvoice(params: CreateInvoiceParams): Pr
     multibancoEntity: entity ?? undefined,
     multibancoReference: method === 'ifthenpay_multibanco' ? (reference ?? undefined) : undefined,
     multibancoExpiry: method === 'ifthenpay_multibanco' ? multibancoExpiry : undefined,
+    pixKey: method === 'pix' ? (process.env.PIX_KEY ?? 'PIX_KEY não configurada') : undefined,
+    pixReference: method === 'pix' ? (reference ?? undefined) : undefined,
     notes: isMock ? `[TESTE] Confirmar pagamento: POST /api/billing/test-confirm/${invoice.id}` : undefined,
   };
 }
@@ -133,8 +157,8 @@ export async function confirmPlatformPayment(invoiceId: string): Promise<{ ok: b
   if (invoice.status === 'paid') throw new Error('Invoice já paga');
   if (invoice.status === 'cancelled' || invoice.status === 'expired') throw new Error('Invoice inválida');
 
-  const cfg = getConfig();
-  const newCredits = cfg.plans[invoice.plan]?.credits ?? 0;
+  const currency: Currency = invoice.currency === 'BRL' ? 'BRL' : 'EUR';
+  const newCredits = planTerms(invoice.plan, currency).credits;
 
   const now = new Date();
   const expiresAt = new Date(invoice.periodEnd);
@@ -150,6 +174,7 @@ export async function confirmPlatformPayment(invoiceId: string): Promise<{ ok: b
         plan: invoice.plan,
         subscriptionStatus: 'active',
         subscriptionMethod: invoice.method as string,
+        billingCurrency: currency,
         subscriptionExpiresAt: expiresAt,
         creditsTotal: newCredits,
         creditsUsed: 0,
@@ -162,7 +187,7 @@ export async function confirmPlatformPayment(invoiceId: string): Promise<{ ok: b
         tenantId: invoice.tenantId,
         amount: newCredits,
         reason: 'subscription-renewed',
-        details: { plan: invoice.plan, invoiceId, method: invoice.method },
+        details: { plan: invoice.plan, invoiceId, method: invoice.method, currency },
       },
     }),
   ]);
@@ -177,7 +202,7 @@ export async function getPlatformInvoices(tenantId: string) {
     orderBy: { createdAt: 'desc' },
     take: 20,
     select: {
-      id: true, plan: true, amount: true, method: true, status: true,
+      id: true, plan: true, amount: true, currency: true, method: true, status: true,
       reference: true, entity: true, periodStart: true, periodEnd: true,
       paidAt: true, createdAt: true, notes: true,
     },
@@ -218,7 +243,7 @@ async function applyFreeUpgrade(tenantId: string, plan: string): Promise<Payment
       paidAt: new Date(), notes: 'Plano gratuito',
     },
   });
-  return { invoiceId: inv.id, method: 'manual', amount: 0, plan, mock: false, notes: 'Plano Free activado' };
+  return { invoiceId: inv.id, method: 'manual', amount: 0, currency: 'EUR', plan, mock: false, notes: 'Plano Free activado' };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -227,6 +252,7 @@ function isTestMode(method: PaymentMethod): boolean {
   if (method === 'ifthenpay_mbway' || method === 'ifthenpay_multibanco') {
     return !process.env.IFTHENPAY_ACCOUNT_ID || !process.env.IFTHENPAY_API_KEY;
   }
+  if (method === 'pix') return !process.env.PIX_KEY;
   return true;
 }
 

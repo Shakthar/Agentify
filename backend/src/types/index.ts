@@ -11,6 +11,7 @@ export interface AuthenticatedRequest extends Request {
     subscriptionMethod: string;
     subscriptionStatus: string;
     subscriptionExpiresAt: Date | null;
+    billingCurrency: string;
   };
 }
 
@@ -63,51 +64,53 @@ export interface SendMessageInput {
 export type Plan = 'free' | 'starter' | 'business' | 'enterprise';
 
 /**
- * Limites por plano.
+ * Limites por plano (valores EUR). Os valores reais são sincronizados a partir de
+ * platformConfig (getConfig) no arranque — ver lib/platformConfig.ts.
  * - free: 1.000 créditos concedidos UMA VEZ no signup, nunca resetam.
- *         Para obter mais, o utilizador tem de fazer upgrade.
- * - starter/business/enterprise: créditos resetam mensalmente.
+ * - starter/business/enterprise: créditos resetam a cada pagamento mensal.
+ * - Tenants com billingCurrency = 'BRL' recebem os créditos da tabela BRL (creditsBRL).
  *
  * 1 Agente = 1 Número WhatsApp (relação 1:1)
- * 1 Agente PODE conectar a múltiplas plataformas (Shopify, Menu, etc.)
+ * Modelo de custos e margem (40% bruta): backend/scripts/pricing-model.mjs
  */
-export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number; paymentSkillCost: number | null; waMsgCreditCost: number }> = {
-  // waMsgCreditCost = créditos debitados por cada mensagem enviada via WhatsApp/Instagram API
-  // Meta cobra ~R$0,035/msg; a plataforma cobra mais para ter margem.
-  // Planos superiores têm custo menor por msg (benefício do plano).
-  free:       { agents: 1,  credits: 1000,  conversations: Infinity, paymentSkillCost: null, waMsgCreditCost: 8  },
-  starter:    { agents: 1,  credits: 5000,  conversations: Infinity, paymentSkillCost: 50,   waMsgCreditCost: 6  },
-  business:   { agents: 3,  credits: 15000, conversations: Infinity, paymentSkillCost: 20,   waMsgCreditCost: 5  },
-  enterprise: { agents: 10, credits: 40000, conversations: Infinity, paymentSkillCost: 10,   waMsgCreditCost: 4  },
+export const PLAN_LIMITS: Record<Plan, { agents: number; credits: number; conversations: number; paymentSkillCost: number | null }> = {
+  free:       { agents: 1,  credits: 1000,   conversations: Infinity, paymentSkillCost: null },
+  starter:    { agents: 1,  credits: 18000,  conversations: Infinity, paymentSkillCost: 50   },
+  business:   { agents: 3,  credits: 49000,  conversations: Infinity, paymentSkillCost: 20   },
+  enterprise: { agents: 10, credits: 134000, conversations: Infinity, paymentSkillCost: 10   },
 };
 
 export const ALLOWED_MODELS: Record<Plan, string[]> = {
   free:       ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini'],
   starter:    ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929'],
-  business:   ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gemini-1.5-pro'],
-  enterprise: ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'gemini-1.5-pro', 'claude-opus-4-5-20251101'],
+  business:   ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o'],
+  enterprise: ['auto', 'claude-haiku-4-5-20251001', 'gpt-4o-mini', 'claude-sonnet-4-5-20250929', 'gpt-4o', 'claude-opus-4-5-20251101'],
 };
 
+/**
+ * Multiplicador de créditos por 1.000 tokens. Alinhado ao custo real de cada modelo
+ * face ao Haiku 4.5 (mix 85% input / 15% output), para o custo por crédito ser ~igual
+ * em todos os modelos (≈ €0,0015) e a margem se manter em qualquer escolha.
+ *   Haiku $1/$5 → 1 · Sonnet $3/$15 → 3 · Opus $5/$25 → 5 · GPT-4o $2,50/$10 → 3 (arred. p/ cima) · GPT-4o mini → 1 (mínimo)
+ */
 export const TOKEN_COSTS: Record<string, number> = {
   'claude-haiku-4-5-20251001':  1,
   'gpt-4o-mini':                1,
   'claude-sonnet-4-5-20250929': 3,
-  'gpt-4o':                     5,
-  'gemini-1.5-pro':             4,
-  'claude-opus-4-5-20251101':   15,
+  'gpt-4o':                     3,
+  'claude-opus-4-5-20251101':   5,
 };
 
 /**
  * Custo real da API em EUR por 1 000 tokens (input e output separados).
- * Baseado nos preços oficiais dos fornecedores (USD × 0.93 ≈ EUR, Jun 2026).
+ * Preços oficiais dos fornecedores (USD × 0.93 ≈ EUR, conservador), out/2026.
  * inputPer1K  = custo por 1 K tokens de entrada (prompt)
  * outputPer1K = custo por 1 K tokens de saída (completion)
  */
 export const API_EUR_COST: Record<string, { inputPer1K: number; outputPer1K: number }> = {
-  'claude-haiku-4-5-20251001':  { inputPer1K: 0.000233, outputPer1K: 0.001163 }, // $0.25/$1.25 per M
+  'claude-haiku-4-5-20251001':  { inputPer1K: 0.000930, outputPer1K: 0.004650 }, // $1/$5 per M
   'gpt-4o-mini':                { inputPer1K: 0.000140, outputPer1K: 0.000558 }, // $0.15/$0.60 per M
   'claude-sonnet-4-5-20250929': { inputPer1K: 0.002790, outputPer1K: 0.013950 }, // $3/$15 per M
-  'gpt-4o':                     { inputPer1K: 0.004650, outputPer1K: 0.013950 }, // $5/$15 per M
-  'gemini-1.5-pro':             { inputPer1K: 0.001163, outputPer1K: 0.004650 }, // $1.25/$5 per M
-  'claude-opus-4-5-20251101':   { inputPer1K: 0.013950, outputPer1K: 0.069750 }, // $15/$75 per M
+  'gpt-4o':                     { inputPer1K: 0.002325, outputPer1K: 0.009300 }, // $2.50/$10 per M
+  'claude-opus-4-5-20251101':   { inputPer1K: 0.004650, outputPer1K: 0.023250 }, // $5/$25 per M
 };

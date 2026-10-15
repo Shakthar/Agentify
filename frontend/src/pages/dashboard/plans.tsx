@@ -1,17 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Navigation from '../../components/Navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { Plan, PLAN_LABELS, PLAN_COLORS } from '../../types';
 import api from '../../utils/api';
+import {
+  PLAN_PRICING, TOP_UP, CREDITS_PER_CONVERSATION, estConversations, addonPrice, money, num, pricePer1k, defaultCurrency,
+  type Currency,
+} from '../../utils/pricing';
 
 // ─── Planos ───────────────────────────────────────────────────────────────────
-const PLANS_DATA = [
-  { id: 'free',       label: 'Free',       price: 0,   credits: 1000,  creditsLabel: '1.000 (única vez)', agents: 1,  whatsapp: 1,  renewable: false, highlight: false, badge: null,             creditsPerEur: null      },
-  { id: 'starter',    label: 'Starter',    price: 59,  credits: 5000,  creditsLabel: '5.000 / mês',       agents: 1,  whatsapp: 1,  renewable: true,  highlight: true,  badge: 'Mais popular',   creditsPerEur: 0.0118    },
-  { id: 'business',   label: 'Business',   price: 159, credits: 15000, creditsLabel: '15.000 / mês',      agents: 3,  whatsapp: 3,  renewable: true,  highlight: false, badge: 'Para crescer',   creditsPerEur: 0.0106    },
-  { id: 'enterprise', label: 'Enterprise', price: 399, credits: 40000, creditsLabel: '40.000 / mês',      agents: 10, whatsapp: 10, renewable: true,  highlight: false, badge: 'Grande operação', creditsPerEur: 0.00998   },
+const PLAN_META = [
+  { id: 'free',       label: 'Free',       renewable: false, highlight: false, badge: null as string | null },
+  { id: 'starter',    label: 'Starter',    renewable: true,  highlight: true,  badge: 'Mais popular' },
+  { id: 'business',   label: 'Business',   renewable: true,  highlight: false, badge: 'Para crescer' },
+  { id: 'enterprise', label: 'Enterprise', renewable: true,  highlight: false, badge: 'Grande operação' },
 ] as const;
+
+function plansFor(cur: Currency) {
+  return PLAN_META.map(m => {
+    const p = PLAN_PRICING[m.id];
+    const { price, credits } = p[cur];
+    return {
+      ...m, price, credits, agents: p.agents, whatsapp: p.agents,
+      creditsLabel: m.renewable ? `${num(credits)} / mês` : `${num(credits)} (única vez)`,
+      conversations: estConversations(credits),
+    };
+  });
+}
 
 // ─── Skills catalog ───────────────────────────────────────────────────────────
 type SkillAvail = 'included' | 'addon' | 'unavailable';
@@ -72,6 +88,16 @@ const SKILLS: SkillDef[] = [
     addonPrice: { free: 8 },
   },
   {
+    id: 'scheduling',
+    name: 'Agendamento',
+    icon: '📅',
+    category: 'automation',
+    desc: 'Agenda consultas, reuniões ou serviços diretamente na conversa',
+    detail: 'O agente verifica disponibilidade, propõe horários e confirma marcações de consultas, reuniões, reservas ou serviços — sem sair do WhatsApp ou do Chat Web.',
+    plans: { free: 'unavailable', starter: 'addon', business: 'included', enterprise: 'included' },
+    addonPrice: { starter: 7 },
+  },
+  {
     id: 'humor',
     name: 'Detecção de Humor',
     icon: '😊',
@@ -106,13 +132,13 @@ const SKILLS: SkillDef[] = [
   // ── Analytics ───────────────────────────────────────────────────────
   {
     id: 'feedback',
-    name: 'Feedback Automático',
+    name: 'Recolha de Feedback',
     icon: '⭐',
     category: 'analytics',
-    desc: 'Recolhe avaliações pós-conversa e envia relatórios semanais',
-    detail: 'Após cada conversa, o agente pede feedback ao cliente (1-5 estrelas + comentário). Relatórios automáticos no painel com tendências e alertas de satisfação baixa.',
-    plans: { free: 'unavailable', starter: 'addon', business: 'addon', enterprise: 'included' },
-    addonPrice: { starter: 12, business: 12 },
+    desc: 'Pede avaliação (1-5 estrelas) no fim de cada conversa',
+    detail: 'Quando a conversa é resolvida, o agente pede ao cliente uma avaliação de 1 a 5 estrelas (e comentário opcional) via WhatsApp ou Chat Web. Os resultados ficam agregados no Histórico de conversas.',
+    plans: { free: 'addon', starter: 'addon', business: 'included', enterprise: 'included' },
+    addonPrice: { free: 4, starter: 4 },
   },
   {
     id: 'analytics',
@@ -157,23 +183,29 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 // ─── Infra features (tabela de planos, sem skills) ─────────────────────────
 interface FeatureRow { label: string; icon: string; values: (string | boolean | null)[]; note?: string; }
-const INFRA_FEATURES: FeatureRow[] = [
-  { label: 'Preço/mês',              icon: '💶', values: ['Grátis', '€59', '€159', '€399'] },
-  { label: 'Créditos',               icon: '💳', values: ['1.000 ¹', '5.000/mês', '15.000/mês', '40.000/mês'] },
-  { label: 'Custo/crédito',          icon: '📊', values: ['—', '€0.0118', '€0.0106', '€0.01'], note: 'Quanto mais alto o plano, mais barato fica cada crédito' },
-  { label: 'Agentes',                icon: '🤖', values: ['1', '1', '3', '10'], note: '1 agente = 1 número WhatsApp. Podes adicionar mais como addon.' },
-  { label: 'Números WhatsApp',       icon: '📱', values: ['1', '1', '3', '10'] },
-  { label: 'Chat Web',               icon: '🌐', values: [true, true, true, true] },
-  { label: 'Modelos IA',             icon: '⚡', values: ['Haiku / GPT-mini', '+ Sonnet', '+ GPT-4o + Gemini', '+ Claude Opus'], note: 'Auto-routing escolhe o modelo mais barato para cada tipo de mensagem' },
-  { label: 'Base de conhecimento',   icon: '📚', values: [true, true, true, true], note: 'PDF, Word, Excel, PPT, YouTube, Páginas web' },
-  { label: 'Rollover de créditos',   icon: '🔄', values: ['—', '🔜 Em breve', '🔜 Em breve', '🔜 Em breve'], note: 'Em breve: paga 85% dos créditos não usados para os transferir para o mês seguinte (válido 2 meses).' },
-  { label: 'Créditos extra (demand)', icon: '⚡', values: ['—', '€0.0118/crd', '€0.0106/crd', '€0.01/crd'] },
-  { label: 'Agentes extras (addon)', icon: '➕', values: ['—', '+€20/ag/mês ²', '+€15/ag/mês ²', '+€10/ag/mês'] },
-  { label: 'White-label',            icon: '🎨', values: ['—', '+€5/ag/mês ➕', '+€3/ag/mês ➕', 'Incluído'] },
-  { label: 'API Access',             icon: '🔌', values: [false, false, true, true] },
-  { label: 'Histórico conversas',    icon: '💬', values: ['30 dias', '90 dias', '1 ano', 'Ilimitado'] },
-  { label: 'Suporte',                icon: '🛟', values: ['Comunidade', 'Email', 'Email prioritário', 'SLA 24h'] },
-];
+function infraFeatures(cur: Currency): FeatureRow[] {
+  const ids = ['free', 'starter', 'business', 'enterprise'] as const;
+  const m = (eur: number) => money(addonPrice(eur, cur), cur);
+  return [
+    { label: 'Preço/mês',              icon: '💶', values: ids.map(id => PLAN_PRICING[id][cur].price === 0 ? 'Grátis' : money(PLAN_PRICING[id][cur].price, cur)) },
+    { label: 'Créditos',               icon: '💳', values: ids.map(id => id === 'free' ? `${num(PLAN_PRICING[id][cur].credits)} ¹` : `${num(PLAN_PRICING[id][cur].credits)}/mês`) },
+    { label: 'Conversas estimadas',    icon: '💬', values: ids.map(id => `≈ ${num(estConversations(PLAN_PRICING[id][cur].credits))}${id === 'free' ? '' : '/mês'}`), note: `Média de ~${CREDITS_PER_CONVERSATION} créditos por conversa (3-5 trocas). Varia com o modelo e o tamanho da base de conhecimento.` },
+    { label: 'Preço por 1.000 créditos', icon: '📊', values: ids.map(id => pricePer1k(id, cur)), note: 'Quanto mais alto o plano, mais barato fica cada crédito' },
+    { label: 'Agentes',                icon: '🤖', values: ['1', '1', '3', '10'], note: '1 agente = 1 número WhatsApp. Podes adicionar mais como addon.' },
+    { label: 'Números WhatsApp',       icon: '📱', values: ['1', '1', '3', '10'] },
+    { label: 'Chat Web',               icon: '🌐', values: [true, true, true, true] },
+    { label: 'Modelos IA',             icon: '⚡', values: ['Haiku / GPT-mini', '+ Sonnet', '+ GPT-4o', '+ Claude Opus'], note: 'Auto-routing escolhe o modelo para cada mensagem' },
+    { label: 'Base de conhecimento',   icon: '📚', values: [true, true, true, true], note: 'PDF, Word, Excel, PPT, YouTube, Páginas web' },
+    { label: 'Mensagens WhatsApp', icon: '✅', values: ['Sem créditos', 'Sem créditos', 'Sem créditos', 'Sem créditos'], note: 'O envio de mensagens não consome créditos. As tarifas da Meta (acima de 1.000 mensagens/mês por número) são faturadas pela Meta diretamente no cartão do dono do número.' },
+    { label: 'Rollover de créditos',   icon: '🔄', values: ['—', '🔜 Em breve', '🔜 Em breve', '🔜 Em breve'], note: 'Em breve: paga 85% dos créditos não usados para os transferir para o mês seguinte (válido 2 meses).' },
+    { label: 'Pacote extra 5.000 créditos', icon: '⚡', values: ['—', money(TOP_UP.starter[cur], cur), money(TOP_UP.business[cur], cur), money(TOP_UP.enterprise[cur], cur)] },
+    { label: 'Agentes extras (addon)', icon: '➕', values: ['—', `+${m(20)}/ag/mês ²`, `+${m(15)}/ag/mês ²`, `+${m(10)}/ag/mês`] },
+    { label: 'White-label',            icon: '🎨', values: ['—', `+${m(5)}/ag/mês ➕`, `+${m(3)}/ag/mês ➕`, 'Incluído'] },
+    { label: 'API Access',             icon: '🔌', values: [false, false, true, true] },
+    { label: 'Histórico conversas',    icon: '💬', values: ['30 dias', '90 dias', '1 ano', 'Ilimitado'] },
+    { label: 'Suporte',                icon: '🛟', values: ['Comunidade', 'Email', 'Email prioritário', 'SLA 24h'] },
+  ];
+}
 
 function Cell({ ok }: { ok: boolean | string | null | undefined }) {
   if (ok === null || ok === undefined || ok === false)
@@ -189,7 +221,7 @@ function Cell({ ok }: { ok: boolean | string | null | undefined }) {
   );
 }
 
-function SkillBadge({ avail, addonPrice, creditsPerTx }: { avail: SkillAvail; addonPrice?: number; creditsPerTx?: number }) {
+function SkillBadge({ avail, price, creditsPerTx, currency }: { avail: SkillAvail; price?: number; creditsPerTx?: number; currency: Currency }) {
   if (avail === 'unavailable')
     return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
   if (avail === 'included')
@@ -202,7 +234,7 @@ function SkillBadge({ avail, addonPrice, creditsPerTx }: { avail: SkillAvail; ad
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className="inline-flex items-center text-[15px] font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full whitespace-nowrap">
-        {addonPrice ? `+€${addonPrice}/mês` : 'Addon'}
+        {price ? `+${money(addonPrice(price, currency), currency)}/mês` : 'Addon'}
       </span>
       {creditsPerTx && (
         <span className="text-[14px] text-gray-400">{creditsPerTx} crd/tx</span>
@@ -219,14 +251,29 @@ export default function PlansPage() {
 
   // Subscribe modal
   type Step = 'method' | 'phone' | 'instructions';
-  type MethodId = 'stripe' | 'ifthenpay_mbway' | 'ifthenpay_multibanco';
+  type MethodId = 'stripe' | 'ifthenpay_mbway' | 'ifthenpay_multibanco' | 'pix';
   interface PayInstructions {
-    invoiceId: string; method: string; amount: number; plan: string; mock: boolean;
+    invoiceId: string; method: string; amount: number; currency: Currency; plan: string; mock: boolean;
     checkoutUrl?: string;
     mbwayPhone?: string; mbwayReference?: string;
     multibancoEntity?: string; multibancoReference?: string; multibancoExpiry?: string;
+    pixKey?: string; pixReference?: string;
     notes?: string;
   }
+
+  // Moeda: a da conta (se já é faturada em R$) ou a do browser (pt-BR → R$)
+  const [currency, setCurrency] = useState<Currency>('EUR');
+  const [currencyLocked, setCurrencyLocked] = useState(false);
+  useEffect(() => {
+    setCurrency(defaultCurrency());
+    api.get('/api/billing/pricing')
+      .then(r => {
+        if (r.data?.tenantCurrency === 'BRL') { setCurrency('BRL'); setCurrencyLocked(true); }
+      })
+      .catch(() => {});
+  }, []);
+  const PLANS_DATA = plansFor(currency);
+  const INFRA_FEATURES = infraFeatures(currency);
 
   const [modal, setModal] = useState<{ open: boolean; plan: string; price: number }>({ open: false, plan: '', price: 0 });
   const [step, setStep] = useState<Step>('method');
@@ -256,7 +303,7 @@ export default function PlansPage() {
   async function submitSubscribe(method: MethodId, mbPhone?: string) {
     setLoading(true); setModalError(null);
     try {
-      const res = await api.post('/billing/platform-subscribe', { plan: modal.plan, method, phone: mbPhone });
+      const res = await api.post('/api/billing/platform-subscribe', { plan: modal.plan, method, phone: mbPhone, currency });
       setInstructions(res.data);
       setStep('instructions');
     } catch (e: unknown) {
@@ -292,6 +339,15 @@ export default function PlansPage() {
               Plano atual: <span className={`font-medium text-xs px-2 py-0.5 rounded-full ${PLAN_COLORS[currentPlan as Plan]}`}>{PLAN_LABELS[currentPlan as Plan]}</span>
               {' · '}{includedSkills.length} skills incluídas · {availableAddons.length} skills disponíveis para adicionar
             </p>
+            <div className="mt-3 inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 text-xs">
+              {(['EUR', 'BRL'] as Currency[]).map(c => (
+                <button key={c} onClick={() => !currencyLocked && setCurrency(c)} disabled={currencyLocked && c !== currency}
+                  className={`px-3 py-1 rounded-md font-medium transition-colors ${currency === c ? 'bg-brand-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 disabled:opacity-40'}`}>
+                  {c === 'EUR' ? '€ Euro' : 'R$ Real (Brasil)'}
+                </button>
+              ))}
+            </div>
+            {currencyLocked && <p className="text-[14px] text-gray-400 mt-1">A tua conta é faturada em reais.</p>}
           </div>
 
           {/* Tab bar */}
@@ -336,15 +392,16 @@ export default function PlansPage() {
                       <div>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
                         <p className="text-2xl font-bold mt-2 text-gray-900 dark:text-gray-100">
-                          {plan.price === 0 ? 'Grátis' : `€${plan.price}`}
+                          {plan.price === 0 ? 'Grátis' : money(plan.price, currency)}
                           {plan.price > 0 && <span className="text-xs text-gray-400 font-normal">/mês</span>}
                         </p>
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1.5 flex-1">
                         <p>💳 <strong className="text-gray-700 dark:text-gray-300">{plan.creditsLabel}</strong></p>
+                        <p>💬 ≈ {num(plan.conversations)} conversas{plan.renewable ? '/mês' : ''}</p>
                         <p>🤖 <strong className="text-gray-700 dark:text-gray-300">{plan.agents} agente{plan.agents > 1 ? 's' : ''}</strong></p>
                         <p>📱 {plan.whatsapp} WhatsApp{plan.whatsapp > 1 ? 's' : ''}</p>
-                        {plan.creditsPerEur && <p className="text-green-600 dark:text-green-400 font-medium">€{plan.creditsPerEur.toFixed(4)}/crédito</p>}
+                        {plan.price > 0 && <p className="text-green-600 dark:text-green-400 font-medium">{pricePer1k(plan.id, currency)} / 1.000 créditos</p>}
                         {!plan.renewable && <p className="text-amber-600 dark:text-amber-400">⚠️ Créditos únicos</p>}
                       </div>
                       {isCurrent ? (
@@ -366,10 +423,10 @@ export default function PlansPage() {
                 <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">💡 Como funcionam os créditos?</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-blue-700 dark:text-blue-300">
                   {[
-                    { label: 'Conversa simples (1-2 trocas)', cost: '~5 créditos' },
-                    { label: 'Conversa média (3-5 trocas)', cost: '~10 créditos' },
-                    { label: 'Pedido com pagamento', cost: '~25-30 créditos' },
-                    { label: 'Conversa complexa (6+ trocas)', cost: '~20+ créditos' },
+                    { label: 'Conversa simples (1-2 trocas)', cost: '~10-20 créditos' },
+                    { label: 'Conversa média (3-5 trocas)', cost: '~30-50 créditos' },
+                    { label: 'Pedido com pagamento', cost: '~50-80 créditos + crd/tx' },
+                    { label: 'Conversa complexa (6+ trocas)', cost: '~80+ créditos' },
                   ].map(ex => (
                     <div key={ex.label} className="bg-white dark:bg-blue-900/20 rounded-lg p-2.5">
                       <p className="text-blue-500 dark:text-blue-400">{ex.label}</p>
@@ -378,7 +435,7 @@ export default function PlansPage() {
                   ))}
                 </div>
                 <p className="text-[15px] text-blue-500 dark:text-blue-400 mt-2">
-                  💡 O auto-routing de IA escolhe automaticamente o modelo mais barato para cada mensagem, poupando até 60% dos créditos.
+                  💡 1 crédito ≈ 1.000 tokens no Claude Haiku. Modelos mais capazes consomem mais (Sonnet e GPT-4o ×3, Opus ×5). O auto-routing escolhe o modelo para cada mensagem.
                 </p>
               </div>
 
@@ -504,8 +561,9 @@ export default function PlansPage() {
                               <td key={plan.id} className={`py-3 px-3 text-center ${currentPlan === plan.id ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''}`}>
                                 <SkillBadge
                                   avail={skill.plans[plan.id as 'free' | 'starter' | 'business' | 'enterprise']}
-                                  addonPrice={skill.addonPrice[plan.id]}
+                                  price={skill.addonPrice[plan.id]}
                                   creditsPerTx={skill.creditsPerTx?.[plan.id]}
+                                  currency={currency}
                                 />
                               </td>
                             ))}
@@ -524,7 +582,7 @@ export default function PlansPage() {
                   <span>Vem com o plano, sem custo extra</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="inline-block bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[15px] font-semibold">+€X/mês</span>
+                  <span className="inline-block bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[15px] font-semibold">{currency === 'BRL' ? '+R$X/mês' : '+€X/mês'}</span>
                   <span>Addon — compra no marketplace</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -582,7 +640,7 @@ export default function PlansPage() {
                                   {price !== undefined && (
                                     <div className="flex items-center justify-between text-xs">
                                       <span className="text-gray-500 dark:text-gray-400">Mensalidade</span>
-                                      <span className="font-bold text-gray-800 dark:text-gray-200">€{price}/mês</span>
+                                      <span className="font-bold text-gray-800 dark:text-gray-200">{money(addonPrice(price, currency), currency)}/mês</span>
                                     </div>
                                   )}
                                   {crTx !== undefined ? (
@@ -628,7 +686,7 @@ export default function PlansPage() {
                     {currentPlan !== 'enterprise' && ' Faz upgrade para Enterprise para desbloqueares as restantes.'}
                   </p>
                   {currentPlan !== 'enterprise' && (
-                    <button onClick={() => openModal('enterprise', 399)}
+                    <button onClick={() => openModal('enterprise', PLAN_PRICING.enterprise[currency].price)}
                       className="mt-6 btn-primary px-8 py-3">
                       Upgrade para Enterprise →
                     </button>
@@ -651,7 +709,7 @@ export default function PlansPage() {
                   {step === 'instructions' ? '📋 Instruções de Pagamento' : `Subscrever plano ${PLAN_LABELS[modal.plan as Plan]}`}
                 </h3>
                 {modal.price > 0 && step !== 'instructions' && (
-                  <p className="text-sm text-gray-500 mt-0.5">€{modal.price}/mês · renovação automática</p>
+                  <p className="text-sm text-gray-500 mt-0.5">{money(modal.price, currency)}/mês · renovação mensal</p>
                 )}
               </div>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
@@ -661,11 +719,14 @@ export default function PlansPage() {
               {step === 'method' && (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Como queres pagar?</p>
-                  {[
+                  {(currency === 'BRL' ? [
+                    { id: 'pix' as const,                  icon: '⚡', label: 'PIX',                sub: 'Brasil · ativação após confirmação do pagamento', badge: 'Recomendado' },
+                    { id: 'stripe' as const,               icon: '💳', label: 'Cartão de crédito',  sub: 'Visa, Mastercard', badge: undefined },
+                  ] : [
                     { id: 'ifthenpay_mbway' as const,     icon: '📱', label: 'MB Way',             sub: 'Portugal · 0.7% + €0.07', badge: 'Mais barato' },
-                    { id: 'ifthenpay_multibanco' as const, icon: '🏧', label: 'Multibanco / ATM',   sub: 'Portugal · 1.5% + €0.20' },
-                    { id: 'stripe' as const,               icon: '💳', label: 'Cartão Internacional', sub: 'Visa, Mastercard · 1.4% + €0.25' },
-                  ].map(m => (
+                    { id: 'ifthenpay_multibanco' as const, icon: '🏧', label: 'Multibanco / ATM',   sub: 'Portugal · 1.5% + €0.20', badge: undefined },
+                    { id: 'stripe' as const,               icon: '💳', label: 'Cartão Internacional', sub: 'Visa, Mastercard · 1.4% + €0.25', badge: undefined },
+                  ]).map(m => (
                     <button key={m.id} onClick={() => handleMethodChosen(m.id)} disabled={loading}
                       className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-all text-left">
                       <span className="text-2xl">{m.icon}</span>
@@ -712,7 +773,7 @@ export default function PlansPage() {
                     <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 space-y-3">
                       <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">🏧 Referência Multibanco</p>
                       <div className="grid grid-cols-3 gap-3">
-                        {[{ label: 'Entidade', value: instructions.multibancoEntity }, { label: 'Referência', value: instructions.multibancoReference }, { label: 'Montante', value: `€${instructions.amount.toFixed(2)}` }]
+                        {[{ label: 'Entidade', value: instructions.multibancoEntity }, { label: 'Referência', value: instructions.multibancoReference }, { label: 'Montante', value: money(instructions.amount, instructions.currency ?? 'EUR', 2) }]
                           .map(({ label, value }) => (
                             <div key={label} className="text-center">
                               <p className="text-[14px] text-blue-500 uppercase tracking-wide">{label}</p>
@@ -727,8 +788,17 @@ export default function PlansPage() {
                     <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 text-center">
                       <p className="text-sm font-semibold text-green-800 dark:text-green-200">📱 MB Way</p>
                       <p className="text-xs text-green-600 dark:text-green-400 mt-1">Pedido enviado para <strong>{instructions.mbwayPhone}</strong></p>
-                      <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-2">€{instructions.amount.toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-2">{money(instructions.amount, instructions.currency ?? 'EUR', 2)}</p>
                       <p className="text-xs text-green-500 mt-1">Confirma na app MB Way</p>
+                    </div>
+                  )}
+                  {instructions.method === 'pix' && (
+                    <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-4 space-y-2 text-center">
+                      <p className="text-sm font-semibold text-teal-800 dark:text-teal-200">⚡ Pagamento PIX</p>
+                      <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{money(instructions.amount, 'BRL', 2)}</p>
+                      <p className="text-xs text-teal-700 dark:text-teal-300">Chave PIX: <strong className="font-mono">{instructions.pixKey}</strong></p>
+                      <p className="text-xs text-teal-700 dark:text-teal-300">Na descrição do PIX indica a referência <strong className="font-mono">{instructions.pixReference}</strong></p>
+                      <p className="text-[14px] text-teal-600 dark:text-teal-400">O plano é ativado assim que confirmarmos a receção (normalmente em menos de 2h úteis).</p>
                     </div>
                   )}
                   {instructions.method === 'stripe' && (
@@ -737,7 +807,7 @@ export default function PlansPage() {
                       {instructions.checkoutUrl ? (
                         <a href={instructions.checkoutUrl} target="_blank" rel="noopener noreferrer"
                           className="block py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium">
-                          Pagar €{instructions.amount.toFixed(2)} →
+                          Pagar {money(instructions.amount, instructions.currency ?? 'EUR', 2)} →
                         </a>
                       ) : (
                         <p className="text-xs text-gray-400">Checkout não disponível (modo teste)</p>

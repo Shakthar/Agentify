@@ -208,13 +208,24 @@ const featurePlanSchema = z.object({
 }).strict();
 
 const configPatchSchema = z.object({
+  version: z.number().int().optional(), // ignorado — o servidor define a versão
   plans: z.record(
     z.object({
-      price:   z.number().min(0).max(100_000),
-      credits: z.number().int().min(0).max(10_000_000),
-      agents:  z.number().int().min(0).max(9999),
+      price:      z.number().min(0).max(100_000),
+      credits:    z.number().int().min(0).max(10_000_000),
+      agents:     z.number().int().min(0).max(9999),
+      priceBRL:   z.number().min(0).max(1_000_000).optional(),
+      creditsBRL: z.number().int().min(0).max(10_000_000).optional(),
     }).strict()
   ).optional(),
+  topUp: z.record(
+    z.object({
+      credits:  z.number().int().min(0).max(10_000_000),
+      price:    z.number().min(0).max(100_000),
+      priceBRL: z.number().min(0).max(1_000_000),
+    }).strict()
+  ).optional(),
+  fx: z.object({ BRLperEUR: z.number().min(0.1).max(100) }).strict().optional(),
   features: z.object({
     scheduling:     z.record(featurePlanSchema).optional(),
     fileUpload:     z.record(featurePlanSchema).optional(),
@@ -222,6 +233,11 @@ const configPatchSchema = z.object({
     payments:       z.record(featurePlanSchema).optional(),
     whitelabel:     z.record(featurePlanSchema).optional(),
     vendas:         z.record(featurePlanSchema).optional(),
+    feedback:       z.record(featurePlanSchema).optional(),
+    analytics:      z.record(featurePlanSchema).optional(),
+    leadGen:        z.record(featurePlanSchema).optional(),
+    customSkills:   z.record(featurePlanSchema).optional(),
+    extraAgents:    z.record(featurePlanSchema).optional(),
   }).optional(),
 }).strict();
 

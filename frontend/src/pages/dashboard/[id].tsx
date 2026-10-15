@@ -768,7 +768,7 @@ export default function AgentDetailPage() {
               { key: 'skillHandoff',        label: 'Handoff para humano', icon: '🔀', desc: 'Transfere a conversa para um agente humano com resumo automático.',            minPlan: 'free',    field: 'skillHandoff',        addonPrice: null as string | null },
               { key: 'skillDataCollection', label: 'Recolha de dados',    icon: '📋', desc: 'Recolhe informação estruturada do utilizador (formulários conversacionais).', minPlan: 'free',    field: 'skillDataCollection', addonPrice: null },
               { key: 'skillScheduling',     label: 'Agendamento',         icon: '📅', desc: 'Agenda consultas, reuniões ou serviços automaticamente.',                      minPlan: 'starter', field: 'skillScheduling',     addonPrice: '€7/mês' },
-              { key: 'skillFileUpload',     label: 'Envio de ficheiros',  icon: '📁', desc: 'Permite ao agente enviar documentos, catálogos e ficheiros ao utilizador.',    minPlan: 'starter', field: 'skillFileUpload',     addonPrice: '€5/mês' },
+              { key: 'skillFileUpload',     label: 'Envio de ficheiros',  icon: '📁', desc: 'Permite ao agente enviar documentos, catálogos e ficheiros ao utilizador.',    minPlan: 'starter', field: 'skillFileUpload',     addonPrice: '€8/mês' },
               { key: 'skillHumorDetection', label: 'Deteção de humor',    icon: '😊', desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.',                 minPlan: 'starter', field: 'skillHumorDetection', addonPrice: '€9/mês' },
             ];
 

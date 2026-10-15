@@ -90,20 +90,22 @@ npm run dev
 
 ---
 
-## 💰 Planos & Preços
+## 💰 Planos & Preços (v2 — out/2026)
 
-| Plano | Preço | Agentes | Créditos | Destaques |
-|-------|-------|---------|----------|-----------|
-| **Free** | €0 | 3 | 3.000 | Teste gratuito |
-| **Starter** | €39/mês | 10 | 10.000 | Agendamento incluído |
-| **Pro** | €89/mês | 20 | 30.000 | Análise de humor, CRM |
-| **Business** | €159/mês | 30 | 60.000 | Webhook custom |
-| **Enterprise** | €259/mês | 30+ escalável | 75.000+ | Suporte prioritário |
+Calculados para **40% de margem bruta** no pior caso (cliente consome todos os créditos). Modelo de custos: `backend/scripts/pricing-model.mjs`. Fonte de verdade: `backend/src/lib/platformConfig.ts` (backend) e `frontend/src/utils/pricing.ts` (frontend). Catálogo comercial completo: `AGENTIFY_KNOWLEDGE_BASE.md`.
 
-**Add-ons:**
-- Rollover de créditos: €10-20/mês (Pro+)
-- White-label: €50-100/mês (Starter+)
-- Skills avançadas: €10-25/agente/mês
+| Plano | Europa (€) | Créditos | Brasil (R$) | Créditos | Agentes |
+|-------|-----------|----------|-------------|----------|---------|
+| **Free** | €0 | 1.000 (uma vez) | R$0 | 1.000 (uma vez) | 1 |
+| **Starter** | €49/mês | 18.000 | R$197/mês | 12.500 | 1 |
+| **Business** | €129/mês | 49.000 | R$497/mês | 33.000 | 3 |
+| **Enterprise** | €349/mês | 134.000 | R$1.297/mês | 88.000 | 10 |
+
+- 1 crédito ≈ 1.000 tokens Haiku (Sonnet/GPT-4o ×3, Opus ×5) · ~40 créditos por conversa média
+- Mensagens WhatsApp/Instagram/Telegram não consomem créditos; as tarifas da Meta são faturadas pela Meta ao dono do número (cartão registado no onboarding)
+- Pacote extra de 5.000 créditos: €16/€15/€14 · R$89/R$84/R$79
+- Add-ons (skills, agentes extra, white-label): ver tabela na página Planos e no Knowledge Base
+- Tenants em BRL (`Tenant.billingCurrency = 'BRL'`) pagam por PIX (confirmação manual) ou cartão — migração `backend/prisma/migrations/add_billing_currency.sql`
 
 ---
 
@@ -128,14 +130,13 @@ npm run dev
 
 ## 📊 Modelos de IA Suportados
 
-| Modelo | Custo | Casos de Uso | Incluído em |
-|--------|-------|-------------|------------|
-| **Claude Haiku** | €0,001/msg | FAQ simples | Todos |
-| **GPT-4o mini** | €0,002/msg | Respostas estruturadas | Todos |
-| **Claude Sonnet 4** | €0,005/msg | Raciocínio complexo | Starter+ |
-| **GPT-4o** | €0,008/msg | Seguir instruções | Pro+ |
-| **Claude Opus 4** | €0,020/msg | Análise jurídica/médica | Enterprise |
-| **Gemini 1.5 Pro** | €0,004/msg | Contexto grande (1M tokens) | Business+ |
+| Modelo | Créditos por 1K tokens | Incluído em |
+|--------|-----------------------|------------|
+| **Claude Haiku 4.5** | 1 | Todos |
+| **GPT-4o mini** | 1 | Todos |
+| **Claude Sonnet 4.5** | 3 | Starter+ |
+| **GPT-4o** | 3 | Business+ |
+| **Claude Opus 4.5** | 5 | Enterprise |
 
 **Auto-routing:** O agente começa com Haiku, muda automaticamente para Sonnet em perguntas complexas.
 

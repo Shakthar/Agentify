@@ -58,7 +58,7 @@ O assistente de criação do Agentfy faz perguntas sobre o negócio e gera autom
 Faz upload de documentos (PDF, Word, Excel, PowerPoint), cola links de páginas web ou YouTube. O agente aprende o negócio, os produtos, os preços e o tom de comunicação.
 
 ### Passo 3 — Ativa o WhatsApp
-Conecta o número de WhatsApp via Evolution API. O agente começa a responder em minutos.
+Liga o número de WhatsApp Business pela API oficial da Meta, com o botão "Continuar com Facebook / Meta" — sem copiar tokens. O agente começa a responder em minutos. Também funciona no Instagram, Telegram e no Chat Web do site.
 
 ### Passo 4 — Monitoriza e melhora
 O dashboard mostra conversas, pedidos, receita gerada pelo agente, créditos disponíveis e clientes identificados. O dono ajusta o agente a qualquer momento.
@@ -70,133 +70,181 @@ O dashboard mostra conversas, pedidos, receita gerada pelo agente, créditos dis
 O Agentfy funciona com **créditos** — a unidade de consumo da plataforma.
 
 ### O que é um crédito?
-Cada vez que o agente processa uma mensagem, consome créditos. A quantidade depende da complexidade da interação.
+1 crédito ≈ 1.000 tokens processados pelo Claude Haiku (o modelo base). Modelos mais capazes consomem mais créditos pelo mesmo texto: Claude Sonnet e GPT-4o ×3, Claude Opus ×5, GPT-4o Mini ×1.
 
-### Exemplos de consumo:
+### Exemplos de consumo (com auto-routing e base de conhecimento):
 | Tipo de interação | Créditos aprox. |
 |---|---|
-| Conversa simples (pergunta/resposta) | 5–10 créditos |
-| Pedido com consulta à base de conhecimento | 10–20 créditos |
-| Pedido completo com pagamento MB Way | 25–30 créditos |
-| Triagem de lead + agendamento | 20–25 créditos |
+| Conversa simples (1-2 trocas) | 10–20 créditos |
+| Conversa média (3-5 trocas) | 30–50 créditos |
+| Pedido completo com pagamento | 50–80 créditos + créditos por transação |
+| Triagem de lead + agendamento | 40–60 créditos |
 
-### Auto-routing (poupança até 60%)
-O sistema seleciona automaticamente o modelo de IA mais económico para cada mensagem. Mensagens simples usam modelos leves; pedidos complexos usam modelos mais capazes. Reduz o consumo até 60% sem configuração manual.
+Para estimativas usa **~40 créditos por conversa**.
+
+### Mensagens WhatsApp e tarifas da Meta
+Os créditos do Agentfy cobrem apenas a operação de IA — **enviar mensagens não consome créditos**.
+A Meta tem a sua própria tarifa: desde 1 de outubro de 2026 cobra as mensagens de resposta acima de 1.000 por número por mês (ex.: Brasil ~R$0,035/msg, Portugal ~€0,014/msg). Essa cobrança é feita **pela Meta, diretamente no cartão que o dono do número regista na Meta** durante o onboarding. O Agentfy não cobra nada a mais por isso.
+
+### Auto-routing
+O sistema escolhe o modelo para cada mensagem: mensagens curtas usam o Haiku, conversas com mais contexto usam o Sonnet. Não é preciso configurar nada.
 
 ### O que acontece quando os créditos acabam?
-O agente para de responder. O utilizador recebe avisos a 30% e 10% dos créditos. Pode comprar créditos extra on-demand ou fazer upgrade de plano.
+O agente para de responder. O utilizador recebe avisos aos 30% e 10% dos créditos. Pode comprar um pacote de créditos extra (pedido pelo suporte) ou fazer upgrade de plano.
 
 ---
 
 ## PLANOS E PREÇOS
 
-### FREE — €0/mês
-- **1.000 créditos** (oferta única, não renováveis mensalmente)
-- 1 agente / 1 número WhatsApp
-- Chat Web incluído
-- Base de conhecimento incluída
-- Modelos: Claude Haiku, GPT-4o Mini
-- Sem suporte por email
-- **Para quem é:** Testar a plataforma sem compromisso
+Os preços são mensais, sem fidelização. Há duas tabelas: **Europa (€)** e **Brasil (R$)**. Se o lead for do Brasil (número +55, fala português do Brasil ou pergunta em reais), apresenta sempre a tabela em R$. Caso contrário, usa a tabela em €.
 
-### STARTER — €59/mês ⭐ Mais popular
-- **5.000 créditos/mês** renováveis
-- 1 agente / 1 número WhatsApp
-- Chat Web incluído
-- Base de conhecimento incluída
-- Upload de ficheiros
-- Skill Vendas disponível como addon (+€20/mês)
+| | Free | Starter ⭐ | Business | Enterprise |
+|---|---|---|---|---|
+| **Preço Europa** | €0 | **€49/mês** | **€129/mês** | **€349/mês** |
+| Créditos Europa | 1.000 (uma vez) | 18.000/mês | 49.000/mês | 134.000/mês |
+| Conversas estimadas | ≈ 25 | ≈ 450/mês | ≈ 1.250/mês | ≈ 3.350/mês |
+| **Preço Brasil** | R$0 | **R$197/mês** | **R$497/mês** | **R$1.297/mês** |
+| Créditos Brasil | 1.000 (uma vez) | 12.500/mês | 33.000/mês | 88.000/mês |
+| Conversas estimadas | ≈ 25 | ≈ 310/mês | ≈ 830/mês | ≈ 2.200/mês |
+| Agentes / números WhatsApp | 1 | 1 | 3 | 10 |
+| Pacote extra 5.000 créditos | — | €16 · R$89 | €15 · R$84 | €14 · R$79 |
+
+**Pagamento da assinatura:** Europa — MB Way, Multibanco ou cartão. Brasil — PIX ou cartão (o plano é ativado quando o pagamento é confirmado).
+
+### FREE — €0 / R$0
+- **1.000 créditos** (oferta única, não renováveis)
+- 1 agente / 1 número WhatsApp, Chat Web, base de conhecimento
+- Modelos: Claude Haiku, GPT-4o Mini
+- Suporte: documentação online
+- **Para quem é:** testar a plataforma sem compromisso
+
+### STARTER — €49/mês · R$197/mês ⭐ Mais popular
+- **18.000 créditos/mês** (Brasil: 12.500)
+- 1 agente / 1 número WhatsApp, Chat Web, base de conhecimento
+- Upload de ficheiros incluído
+- Add-ons disponíveis: Vendas + Pedidos/KDS, Pagamentos, Agendamento, Detecção de humor, Feedback, Análises avançadas, White-label
 - Modelos: + Claude Sonnet
-- Suporte por email
-- Custo por crédito: €0,0118
+- Histórico de conversas: 90 dias · Suporte por email
 - **Para quem é:** PMEs e negócios individuais que querem começar a automatizar
 
-### BUSINESS — €159/mês
-- **15.000 créditos/mês** renováveis
+### BUSINESS — €129/mês · R$497/mês
+- **49.000 créditos/mês** (Brasil: 33.000)
 - 3 agentes / 3 números WhatsApp
-- Chat Web incluído
-- Base de conhecimento incluída
-- **Skill Vendas incluída** (upselling + cross-sell + vendas proativas)
-- Skill Pagamentos incluída
-- Detecção de humor por IA incluída
-- API Access
-- Modelos: + GPT-4o, Gemini 1.5 Pro
-- Histórico de conversas: 1 ano
-- Custo por crédito: €0,0106
-- **Para quem é:** Negócios com múltiplos pontos de venda ou equipas
+- **Incluídos:** Pagamentos, Agendamento, Detecção de humor, Recolha de Feedback, Upload de ficheiros
+- Add-ons disponíveis: Vendas + Pedidos/KDS, Análises avançadas, Lead Generation, Custom Skills, White-label
+- Modelos: + GPT-4o · API Access
+- Histórico de conversas: 1 ano · Suporte por email prioritário
+- **Para quem é:** negócios com vários pontos de venda ou equipas
 
-### ENTERPRISE — €399/mês
-- **40.000 créditos/mês** renováveis
+### ENTERPRISE — €349/mês · R$1.297/mês
+- **134.000 créditos/mês** (Brasil: 88.000)
 - 10 agentes / 10 números WhatsApp
-- **TODAS as Skills incluídas**
+- **Todas as skills incluídas**, exceto Vendas + Pedidos/KDS (add-on em todos os planos)
+- **White-label incluído**
 - Claude Opus (o modelo mais avançado da Anthropic)
-- **White-label incluído** (plataforma com a tua marca)
-- SLA de 24h garantido
-- Histórico de conversas ilimitado
-- Custo por crédito: €0,00998
-- **Para quem é:** Empresas com volume alto, franquias, agências e revendedores
+- Histórico ilimitado · SLA de 24h
+- **Para quem é:** empresas com volume alto, franquias, agências e revendedores
 
 ---
 
 ## COMPARAÇÃO DE MODELOS DE IA POR PLANO
 
-| Modelo | Free | Starter | Business | Enterprise |
-|---|---|---|---|---|
-| Claude Haiku (rápido, económico) | ✓ | ✓ | ✓ | ✓ |
-| GPT-4o Mini (económico) | ✓ | ✓ | ✓ | ✓ |
-| Claude Sonnet (equilibrado) | ✗ | ✓ | ✓ | ✓ |
-| GPT-4o (avançado) | ✗ | ✗ | ✓ | ✓ |
-| Gemini 1.5 Pro | ✗ | ✗ | ✓ | ✓ |
-| Claude Opus (o melhor) | ✗ | ✗ | ✗ | ✓ |
+| Modelo | Consumo | Free | Starter | Business | Enterprise |
+|---|---|---|---|---|---|
+| Claude Haiku (rápido, económico) | ×1 | ✓ | ✓ | ✓ | ✓ |
+| GPT-4o Mini (económico) | ×1 | ✓ | ✓ | ✓ | ✓ |
+| Claude Sonnet (equilibrado) | ×3 | ✗ | ✓ | ✓ | ✓ |
+| GPT-4o (avançado) | ×3 | ✗ | ✗ | ✓ | ✓ |
+| Claude Opus (o melhor) | ×5 | ✗ | ✗ | ✗ | ✓ |
 
 ---
 
 ## SKILLS — O QUE SÃO E COMO FUNCIONAM
 
-As skills são capacidades especializadas que o agente pode ter. Algumas estão incluídas no plano, outras são addon.
+As skills são capacidades especializadas que o agente pode ter. São o grande diferencial do Agentfy: outras plataformas dizem que "pode ser desenvolvido"; no Agentfy já vêm prontas a ativar. Algumas estão incluídas no plano, outras são add-on mensal. Os preços em R$ aplicam-se a clientes do Brasil.
 
-### Skill Vendas (upselling + cross-sell + vendas proativas)
-O pacote completo de vendas com 3 capacidades:
+### Tabela de skills e add-ons
 
-- **Upselling** — o agente sugere versões premium ou complementos do que o cliente está a pedir ("Queres adicionar o acompanhamento?", "Temos um tamanho XL com 20% de desconto")
-- **Cross-sell** — sugere produtos relacionados com base no pedido atual
-- **Vendas proativas** — o agente reconhece clientes recorrentes. Analisa os últimos pedidos pagos desse número de WhatsApp e menciona proativamente os favoritos ("Olá! Da última vez pediste a pizza Margherita — queres o mesmo de sempre?")
+| Skill | Free | Starter | Business | Enterprise |
+|---|---|---|---|---|
+| Handoff para Humano | ✓ | ✓ | ✓ | ✓ |
+| Recolha de Dados | ✓ | ✓ | ✓ | ✓ |
+| Delivery / Pedidos | ✓ | ✓ | ✓ | ✓ |
+| Upload de Ficheiros | €8 · R$39 | ✓ | ✓ | ✓ |
+| Agendamento | — | €7 · R$29 | ✓ | ✓ |
+| Detecção de Humor | — | €9 · R$39 | ✓ | ✓ |
+| Vendas + Pedidos/KDS | — | €15 · R$59 | €15 · R$59 | €15 · R$59 |
+| Pagamentos | — | €15 · R$59 + 50 créditos/transação | ✓ + 20 créditos/transação | ✓ + 10 créditos/transação |
+| Recolha de Feedback | €4 · R$19 | €4 · R$19 | ✓ | ✓ |
+| Análises Avançadas | — | €18 · R$79 | €18 · R$79 | ✓ |
+| Lead Generation | — | — | €25 · R$99 | ✓ |
+| Custom Skills | — | — | €30 · R$119 | ✓ |
 
-*Disponível:* addon €20/mês no Starter · incluído no Business e Enterprise
+✓ = incluído no plano · valores = add-on por mês · — = não disponível no plano
+
+### Skill Vendas + Pedidos/KDS (upselling + cross-sell + cliente recorrente)
+O pacote completo de vendas, com o sistema de Pedidos/KDS incluído:
+- **Upselling** — sugere versões premium ou complementos no momento certo ("Queres adicionar o acompanhamento?")
+- **Cross-sell** — recomenda produtos relacionados com base no pedido atual
+- **Cliente recorrente** — analisa os últimos pedidos pagos desse número de WhatsApp e sugere os favoritos ("Olá João! Queres o teu habitual?")
+- **Pedidos/KDS** — painel de cozinha em tempo real, gestão de estados e notificações
+
+*Disponível:* add-on de €15/mês (R$59) em todos os planos pagos, incluindo Enterprise.
 
 ### Skill Pagamentos
-Aceita pagamentos diretamente no WhatsApp:
-- MB Way (Portugal)
-- PIX (Brasil)
-- Referência Multibanco
-- Outros métodos configuráveis
+Aceita pagamentos diretamente na conversa: MB Way e Multibanco (Portugal), PIX (Brasil) e cartão. Cada transação processada consome créditos.
 
-*Disponível:* addon no Starter · incluído no Business e Enterprise
+*Disponível:* add-on de €15/mês (R$59) + 50 créditos/transação no Starter · incluído no Business (20 créditos/transação) e Enterprise (10 créditos/transação).
 
 ### Skill Handoff para Humano
-Quando o cliente está frustrado, o assunto é sensível ou o agente não tem confiança suficiente, transfere automaticamente a conversa para um humano com todo o contexto preservado.
+Quando o cliente está frustrado, o assunto é sensível ou o agente não tem confiança suficiente, transfere a conversa para um humano com todo o contexto preservado.
 
-*Disponível:* todos os planos pagos
+*Disponível:* incluído em todos os planos.
+
+### Skill Recolha de Dados
+Formulários conversacionais: o agente guia o cliente para recolher nome, morada, preferências ou qualquer dado estruturado.
+
+*Disponível:* incluído em todos os planos.
+
+### Skill Delivery / Pedidos
+O agente recolhe os itens do pedido e a morada de entrega e confirma o pedido.
+
+*Disponível:* incluído em todos os planos.
 
 ### Skill Detecção de Humor
-O agente detecta o estado emocional do cliente (frustrado, satisfeito, irritado, entusiasmado) e adapta o tom. Pode acionar handoff automático quando detecta frustração elevada.
+O agente deteta o estado emocional do cliente (frustrado, satisfeito, irritado, entusiasmado) e adapta o tom. Pode acionar handoff automático quando deteta frustração elevada.
 
-*Disponível:* addon no Starter · incluído no Business e Enterprise
+*Disponível:* add-on de €9/mês (R$39) no Starter · incluído no Business e Enterprise.
 
 ### Skill Agendamento
-O agente agenda reuniões, consultas ou demonstrações diretamente na conversa.
+O agente agenda reuniões, consultas, reservas ou demonstrações diretamente na conversa.
 
-*Disponível:* addon
+*Disponível:* add-on de €7/mês (R$29) no Starter · incluído no Business e Enterprise.
 
 ### Skill Upload de Ficheiros
-O cliente pode enviar documentos, fotos ou ficheiros diretamente no WhatsApp e o agente processa-os.
+O cliente pode enviar documentos, fotos ou ficheiros na conversa e o agente processa-os (comprovativos, reclamações, contratos).
 
-*Disponível:* incluído no Starter+
+*Disponível:* add-on de €8/mês (R$39) no Free · incluído do Starter ao Enterprise.
 
 ### Skill Recolha de Feedback
-O agente pede feedback no fim de cada interação (avaliação 1-5 estrelas via WhatsApp/webchat) e agrega os resultados no dashboard (Histórico de conversas).
+No fim de cada conversa resolvida, o agente pede uma avaliação de 1 a 5 estrelas (e comentário opcional) via WhatsApp ou Chat Web. Os resultados ficam agregados no Histórico de conversas.
 
-*Disponível:* addon €4/mês no Free e Starter · incluído sem custo no Business e Enterprise
+*Disponível:* add-on de €4/mês (R$19) no Free e Starter · incluído no Business e Enterprise.
+
+### Skill Análises Avançadas
+Relatórios detalhados: volume de conversas, taxa de resolução, produtos mais pedidos, horários de pico, motivos de handoff e funil de conversão.
+
+*Disponível:* add-on de €18/mês (R$79) no Starter e Business · incluído no Enterprise.
+
+### Skill Lead Generation
+O agente qualifica leads com perguntas estratégicas, atribui pontuação e sincroniza com HubSpot, Pipedrive ou outros CRMs via webhook.
+
+*Disponível:* add-on de €25/mês (R$99) no Business · incluído no Enterprise.
+
+### Custom Skills
+Skills desenvolvidas à medida: integrações com sistemas próprios, fluxos únicos e automações específicas do negócio.
+
+*Disponível:* add-on de €30/mês (R$119) no Business · incluído no Enterprise.
 
 ---
 
@@ -213,24 +261,27 @@ O agente aprende o nome de cada cliente durante a conversa e guarda-o associado 
 
 ## ADDONS E EXTRAS
 
-### Créditos extra on-demand
-Compra créditos adicionais a qualquer momento ao preço unitário do teu plano. Sem contrato, sem prazo mínimo.
+### Pacotes de créditos extra
+Pacotes de 5.000 créditos, pedidos pelo suporte, a qualquer momento:
+- Starter: €16 (R$89)
+- Business: €15 (R$84)
+- Enterprise: €14 (R$79)
 
-### Rollover de créditos
-Créditos não usados no mês podem ser transferidos para o mês seguinte. Pagas 85% do valor dos créditos restantes (desconto de 15%). Os créditos rollover têm validade de 2 meses. Não disponível no plano Free.
+### Rollover de créditos (em breve)
+Créditos não usados no mês poderão ser transferidos para o mês seguinte, pagando 85% do seu valor (desconto de 15%), com validade de 2 meses. Não disponível no plano Free. Ainda não está ativo — não prometas datas.
 
 ### Agentes extra
-- Starter: +€20/agente/mês (máximo 3 agentes total)
-- Business: +€15/agente/mês (máximo 10 agentes total)
-- Enterprise: +€10/agente/mês (ilimitados)
+- Starter: +€20/agente/mês · R$79 (máximo 3 agentes no total)
+- Business: +€15/agente/mês · R$59 (máximo 10 agentes no total)
+- Enterprise: +€10/agente/mês · R$39 (ilimitados)
 
 ### White-label
 A plataforma com a tua marca (logo, cores, domínio personalizado). Os teus clientes não veem nenhuma referência ao Agentfy.
-- Starter: addon disponível
-- Business: addon disponível
+- Starter: +€5/agente/mês (R$19)
+- Business: +€3/agente/mês (R$19)
 - Enterprise: **incluído**
 
-**Caso de uso white-label:** Agências digitais e consultoras que querem oferecer IA conversacional como serviço próprio, sem revelar o fornecedor. Cobram a seus clientes o preço que quiserem.
+**Caso de uso white-label:** Agências digitais e consultoras que querem oferecer IA conversacional como serviço próprio, sem revelar o fornecedor. Cobram aos seus clientes o preço que quiserem.
 
 ---
 
@@ -255,7 +306,10 @@ Não. A plataforma foi desenhada para donos de negócio. O assistente de criaç�
 Com o assistente IA, menos de 10 minutos. Podes ajustar o agente a qualquer momento.
 
 **Posso usar o meu número de WhatsApp atual?**
-Sim. Conectas o teu número via Evolution API. O processo demora alguns minutos.
+Sim. O número é ligado pela API oficial da Meta (WhatsApp Business Platform), em nome do teu negócio. O processo demora alguns minutos.
+
+**Há custos da Meta por mensagem?**
+A Meta cobra as mensagens de resposta acima de 1.000 por número por mês. Essa tarifa é faturada pela própria Meta, no cartão que registas na tua conta Meta durante o onboarding do número. O Agentfy não cobra créditos por mensagem — os créditos cobrem só a IA.
 
 **1 agente = 1 WhatsApp?**
 Exatamente. Cada agente está ligado a um número dedicado. O mesmo agente pode estar integrado em simultâneo com o site, Shopify, iFood, etc.
@@ -264,13 +318,13 @@ Exatamente. Cada agente está ligado a um número dedicado. O mesmo agente pode 
 Sim. Com a Skill Pagamentos, o agente recebe pedidos, gera referências de pagamento (MB Way, PIX, Multibanco) e confirma automaticamente quando o pagamento é recebido.
 
 **O agente reconhece clientes que já compraram antes?**
-Sim, com a Skill Vendas. O agente lê o histórico de pedidos do número de WhatsApp e personaliza a conversa com base nos favoritos do cliente.
+Sim, com a Skill Vendas + Pedidos/KDS (add-on de €15/mês · R$59). O agente lê o histórico de pedidos do número de WhatsApp e personaliza a conversa com base nos favoritos do cliente.
 
 **Posso cancelar a qualquer momento?**
 Sim. Sem contratos de fidelidade. Cancelas quando quiseres. Os créditos do mês não são reembolsados.
 
 **O Agentfy funciona no Brasil?**
-Sim. Suporta PIX, responde em Português do Brasil e funciona com números de WhatsApp brasileiros.
+Sim. Há planos em reais (Starter R$197, Business R$497, Enterprise R$1.297), a assinatura paga-se por PIX ou cartão, o agente aceita PIX nas vendas, responde em Português do Brasil e funciona com números de WhatsApp brasileiros.
 
 **Posso ter um agente com a minha marca?**
 Sim, com o white-label. Os teus clientes acedem à plataforma com o teu logo, cores e domínio. Disponível como addon no Starter e Business, incluído no Enterprise.
@@ -289,6 +343,12 @@ Português, Inglês, Espanhol, Francês, Alemão, Italiano, Neerlandês e Árabe
 
 **Tenho mais do que 1 ponto de venda. Que plano devo escolher?**
 Business (3 agentes) ou Enterprise (10 agentes). Podes ainda adicionar agentes extra em qualquer plano pago.
+
+**Como escolho o plano certo?**
+Pergunta quantas conversas o negócio tem por mês e usa ~40 créditos por conversa:
+- até ~450 conversas/mês (Brasil ~310) → Starter
+- até ~1.250 conversas/mês (Brasil ~830) ou mais de 1 número → Business
+- acima disso, vários pontos de venda, franquias ou agências → Enterprise
 
 ---
 
@@ -328,7 +388,7 @@ Transfere a conversa para o Eduardo (handoff) nas seguintes situações:
 ## OBJEÇÕES COMUNS E COMO RESPONDER
 
 **"É muito caro."**
-> "Entendo. Quanto é que custas atualmente a responder mensagens no WhatsApp — em tempo teu ou da tua equipa? O Agentfy liberta esse tempo e trabalha 24/7. O plano Starter são €59/mês — equivale a 2h do teu tempo, se facturas €30/hora. Queres calcular o retorno para o teu caso?"
+> "Entendo. Quanto é que custas atualmente a responder mensagens no WhatsApp — em tempo teu ou da tua equipa? O Agentfy liberta esse tempo e trabalha 24/7. O plano Starter são €49/mês (no Brasil R$197) e cobre cerca de 450 conversas — menos de €0,11 por conversa atendida, 24/7. Queres calcular o retorno para o teu caso?"
 
 **"Já tenho alguém a responder."**
 > "Ótimo — esse alguém pode focar-se nos casos que realmente precisam de atenção humana. O Agentfy trata dos 70-80% de mensagens repetitivas automaticamente e passa ao humano só o que importa."
@@ -353,4 +413,4 @@ Transfere a conversa para o Eduardo (handoff) nas seguintes situações:
 
 ---
 
-*Última atualização: Junho 2026*
+*Última atualização: Outubro 2026 — tabela de preços v2 (EUR + BRL)*

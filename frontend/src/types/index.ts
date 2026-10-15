@@ -157,7 +157,7 @@ export interface PlatformMetrics {
   agents: { total: number; active: number };
   conversations: { total: number; today: number };
   messages: { total: number };
-  revenue: { mrr: number; arr: number };
+  revenue: { mrr: number; arr: number; byPlan?: Record<string, number> };
   expenses: { monthly: number; items: PlatformExpense[] };
   usage: {
     creditsConsumed: number;  // créditos internos consumidos (todos os tenants)

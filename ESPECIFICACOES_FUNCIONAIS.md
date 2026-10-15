@@ -106,6 +106,8 @@ Admin acessa Analytics:
 
 ## 🎨 Features por Tier
 
+> ⚠️ Secção histórica (jun/2026). Os planos e preços atuais estão no README e em `AGENTIFY_KNOWLEDGE_BASE.md`.
+
 ### Free (€0/mês)
 - 3 agentes
 - 3,000 créditos/mês

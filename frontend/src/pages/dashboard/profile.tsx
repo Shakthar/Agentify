@@ -100,7 +100,7 @@ export default function ProfilePage() {
 
   // Subscription / invoices
   interface PlatformInvoice {
-    id: string; plan: string; amount: number; method: string; status: string;
+    id: string; plan: string; amount: number; currency?: string; method: string; status: string;
     reference: string | null; entity: string | null;
     periodStart: string; periodEnd: string; paidAt: string | null; createdAt: string;
   }
@@ -594,7 +594,7 @@ export default function ProfilePage() {
                             {new Date(inv.createdAt).toLocaleDateString('pt-PT')}
                           </td>
                           <td className="py-2 px-3 text-gray-700 dark:text-gray-300 capitalize">{inv.plan}</td>
-                          <td className="py-2 px-3 font-medium text-gray-800 dark:text-gray-200">€{inv.amount.toFixed(2)}</td>
+                          <td className="py-2 px-3 font-medium text-gray-800 dark:text-gray-200">{inv.currency === 'BRL' ? 'R$' : '€'}{inv.amount.toFixed(2)}</td>
                           <td className="py-2 px-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
                             {inv.method === 'stripe' && '💳 Stripe'}
                             {inv.method === 'ifthenpay_mbway' && '📱 MB Way'}

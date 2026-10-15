@@ -465,7 +465,7 @@ router.post('/whatsapp', webhookLimiter, asyncHandler(async (req: Request & { ra
         await sendWhatsAppText(phoneId, from, result.content, effectiveToken);
         console.log(`[WhatsApp] sendWhatsAppText concluído para ${from}`);
         // Debitar crédito WA por mensagem enviada (Meta cobra por msg)
-        deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'whatsapp').catch(() => {});
+        deductWaMsgCredit(agent.tenantId, agent.id, conversation.id, 'whatsapp', from).catch(() => {});
         // Notificar responsável via WhatsApp quando handoff foi ativado
         if (result.handoff?.triggered && agent.notifyPhone) {
           const notifMsg = `🤝 *Handoff WhatsApp — ${agent.name}*\n\n📱 Cliente: +${from}\n📝 Resumo: ${result.handoff.summary}\n\n💬 Responde diretamente no WhatsApp a este número.`;

@@ -7,6 +7,7 @@ import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
 import SupportWidget from '../components/SupportWidget';
 import api from '../utils/api';
+import { PLAN_PRICING, TOP_UP, estConversations, addonPrice, money, num, defaultCurrency, type Currency } from '../utils/pricing';
 
 type AuthTab = 'login' | 'signup';
 
@@ -15,8 +16,6 @@ const PLANS = [
   {
     id: 'free',
     label: 'Free',
-    price: 0,
-    credits: '1.000',
     creditsNote: 'créditos únicos (não renovam)',
     agents: '1 agente',
     highlight: false,
@@ -27,39 +26,33 @@ const PLANS = [
   {
     id: 'starter',
     label: 'Starter',
-    price: 59,
-    credits: '5.000',
     creditsNote: 'créditos/mês renováveis',
     agents: '1 agente',
     highlight: true,
     cta: 'Começar agora',
     color: 'border-brand-500',
-    features: ['1 número WhatsApp', 'Chat Web', 'Skill Delivery + Upselling¹', 'Upload de ficheiros', 'Modelos: + Claude Sonnet', 'Suporte por email'],
+    features: ['1 número WhatsApp', 'Chat Web', 'Skill Delivery + Upload de ficheiros', 'Addons: Vendas¹, Pagamentos, Agendamento', 'Modelos: + Claude Sonnet', 'Suporte por email'],
   },
   {
     id: 'business',
     label: 'Business',
-    price: 159,
-    credits: '15.000',
     creditsNote: 'créditos/mês renováveis',
     agents: '3 agentes',
     highlight: false,
     cta: 'Escolher Business',
     color: 'border-orange-300',
-    features: ['3 números WhatsApp', 'Skills: Delivery + Vendas + Pagamentos', 'Detecção de humor IA', 'API Access', 'Modelos: + GPT-4o + Gemini', 'Histórico 1 ano'],
+    features: ['3 números WhatsApp', 'Skills: Pagamentos + Agendamento + Feedback', 'Detecção de humor IA', 'API Access', 'Modelos: + GPT-4o', 'Histórico 1 ano'],
   },
   {
     id: 'enterprise',
     label: 'Enterprise',
-    price: 399,
-    credits: '40.000',
     creditsNote: 'créditos/mês renováveis',
     agents: '10 agentes',
     highlight: false,
     cta: 'Falar com vendas',
     ctaHref: 'mailto:contact@solutions.shaklabs.tech',
     color: 'border-green-400',
-    features: ['10 números WhatsApp', 'TODAS as Skills incluídas', 'Claude Opus (melhor IA)', 'White-label incluído', 'SLA 24h', 'Histórico ilimitado'],
+    features: ['10 números WhatsApp', 'Todas as skills incluídas (exceto Vendas¹)', 'Claude Opus (melhor IA)', 'White-label incluído', 'SLA 24h', 'Histórico ilimitado'],
   },
 ];
 
@@ -82,7 +75,7 @@ const FEATURES = [
   {
     icon: '⚡',
     title: 'Poupa até 60% nos custos de IA',
-    desc: 'O auto-routing seleciona automaticamente o modelo mais económico para cada mensagem. Uma conversa que custaria €0.05 passa a custar €0.02 — sem configuração.',
+    desc: 'O auto-routing seleciona automaticamente o modelo mais económico para cada mensagem. Mensagens simples vão para modelos leves e as complexas para modelos mais capazes — sem configuração.',
   },
   {
     icon: '🔀',
@@ -99,11 +92,11 @@ const FEATURES = [
 const FAQS = [
   {
     q: 'O que é um crédito?',
-    a: 'Créditos são a unidade de consumo da plataforma. Cada mensagem trocada entre o cliente e o agente consome créditos — uma conversa simples usa ~5-10 créditos, um pedido completo com pagamento usa ~25-30 créditos. O auto-routing pode reduzir esse custo em até 60%.',
+    a: 'Créditos são a unidade de consumo da plataforma. 1 crédito ≈ 1.000 tokens no Claude Haiku (Sonnet e GPT-4o consomem 3×, Opus 5×). Uma conversa média (3-5 trocas) usa ~30-50 créditos e um pedido completo com pagamento ~50-80. O envio de mensagens não consome créditos: as tarifas da Meta (acima de 1.000 mensagens/mês por número) são faturadas pela Meta diretamente ao dono do número.',
   },
   {
     q: 'O que acontece quando os créditos acabam?',
-    a: 'O agente para de responder. Podes comprar créditos extras on-demand a qualquer momento ao preço do teu plano, ou fazer upgrade para um plano com mais créditos.',
+    a: 'O agente para de responder. Recebes avisos aos 30% e 10%. Podes comprar pacotes de 5.000 créditos extra (Starter €16 · Business €15 · Enterprise €14 — no Brasil R$89 · R$84 · R$79; pedido pelo suporte) ou fazer upgrade para um plano com mais créditos.',
   },
   {
     q: 'Posso acumular créditos não usados?',
@@ -115,7 +108,7 @@ const FAQS = [
   },
   {
     q: 'Posso adicionar mais agentes sem mudar de plano?',
-    a: 'Sim. No Starter podes adicionar até 2 agentes extra por €20/agente/mês (máx 3 total). No Business, até 7 extras por €15/agente/mês (máx 10 total). No Enterprise são ilimitados a €10/agente/mês.',
+    a: 'Sim. No Starter podes adicionar até 2 agentes extra por €20/agente/mês (máx 3 total). No Business, até 7 extras por €15/agente/mês (máx 10 total). No Enterprise são ilimitados a €10/agente/mês. No Brasil: R$79, R$59 e R$39/agente/mês.',
   },
   {
     q: 'Quanto tempo demora a criar um agente?',
@@ -148,6 +141,8 @@ export default function Home() {
   const { tenant, login, signup, loading, error, clearError, pendingTwoFactor, completeTwoFactorLogin, cancelTwoFactor, loginWithFacebookTicket } = useAuth();
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [currency, setCurrency] = useState<Currency>('EUR');
+  useEffect(() => { setCurrency(defaultCurrency()); }, []);
   const [tab, setTab] = useState<AuthTab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -411,7 +406,7 @@ export default function Home() {
                 ))}
               </div>
               <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                <p className="text-[14px] text-gray-400 text-center">Conversa real → ~25 créditos gastos</p>
+                <p className="text-[14px] text-gray-400 text-center">Conversa real → ~40 créditos gastos</p>
               </div>
             </div>
           </div>
@@ -571,14 +566,22 @@ export default function Home() {
               <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
                 Pagas pelo que usas. Sem surpresas. Quanto mais alto o plano, mais barato fica cada crédito.
               </p>
+              <div className="mt-4 inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 text-xs">
+                {(['EUR', 'BRL'] as Currency[]).map(c => (
+                  <button key={c} onClick={() => setCurrency(c)}
+                    className={`px-3 py-1 rounded-md font-medium transition-colors ${currency === c ? 'bg-brand-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}>
+                    {c === 'EUR' ? '€ Europa' : 'R$ Brasil'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Credits explainer */}
             <div className="mb-10 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 max-w-2xl mx-auto">
               <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">💡 O que é um crédito?</p>
               <p className="text-xs text-blue-700 dark:text-blue-300">
-                Uma conversa simples usa ~5-10 créditos. Um pedido completo com pagamento usa ~25-30 créditos.
-                O auto-routing usa automaticamente o modelo mais barato para cada tipo de mensagem, poupando até 60%.
+                1 crédito ≈ 1.000 tokens de IA. Uma conversa média (3-5 trocas) usa ~30-50 créditos; um pedido completo com pagamento ~50-80.
+                O auto-routing escolhe o modelo adequado para cada mensagem.
               </p>
             </div>
 
@@ -599,12 +602,13 @@ export default function Home() {
                   <div>
                     <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{plan.label}</p>
                     <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-1">
-                      {plan.price === 0 ? 'Grátis' : `€${plan.price}`}
-                      {plan.price > 0 && <span className="text-sm font-normal text-gray-400">/mês</span>}
+                      {PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].price === 0 ? 'Grátis' : money(PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].price, currency)}
+                      {PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].price > 0 && <span className="text-sm font-normal text-gray-400">/mês</span>}
                     </p>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5 space-y-1">
-                    <p>💳 <strong className="text-gray-700 dark:text-gray-200">{plan.credits}</strong> {plan.creditsNote}</p>
+                    <p>💳 <strong className="text-gray-700 dark:text-gray-200">{num(PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].credits)}</strong> {plan.creditsNote}</p>
+                    <p>💬 ≈ <strong className="text-gray-700 dark:text-gray-200">{num(estConversations(PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].credits))}</strong> conversas{plan.id === 'free' ? '' : '/mês'}</p>
                     <p>🤖 <strong className="text-gray-700 dark:text-gray-200">{plan.agents}</strong></p>
                   </div>
                   <ul className="space-y-1.5 flex-1">
@@ -639,7 +643,7 @@ export default function Home() {
             </div>
 
             <p className="text-center text-xs text-gray-400 mt-6">
-              ¹ Vendas/Upselling disponível como addon no Starter (€20/mês). Incluído no Business+.
+              ¹ Vendas + Pedidos/KDS (upselling, cross-sell, cliente recorrente): addon de {money(addonPrice(15, currency), currency)}/mês em qualquer plano pago.
               {' · '}Todos os planos incluem SSL, uptime 99.9% e backups diários.
             </p>
 
@@ -648,9 +652,9 @@ export default function Home() {
               <p className="text-sm font-bold text-orange-800 dark:text-orange-200 mb-4">➕ Addons disponíveis em qualquer plano pago</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { icon: '⚡', name: 'Créditos extras', desc: 'Compra quando precisas, ao preço do teu plano' },
+                  { icon: '⚡', name: 'Créditos extras', desc: `Pacotes de 5.000 créditos desde ${money(TOP_UP.enterprise[currency], currency)}` },
                   { icon: '🔄', name: 'Rollover', desc: '85% dos créditos não usados transferidos para o mês seguinte' },
-                  { icon: '🤖', name: 'Mais agentes', desc: 'Starter +€20/ag · Business +€15/ag · Enterprise +€10/ag' },
+                  { icon: '🤖', name: 'Mais agentes', desc: `Starter +${money(addonPrice(20, currency), currency)}/ag · Business +${money(addonPrice(15, currency), currency)}/ag · Enterprise +${money(addonPrice(10, currency), currency)}/ag` },
                   { icon: '🎨', name: 'White-label', desc: 'Portal com a tua marca, sem branding Agentfy' },
                 ].map(a => (
                   <div key={a.name} className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-orange-100 dark:border-orange-900">

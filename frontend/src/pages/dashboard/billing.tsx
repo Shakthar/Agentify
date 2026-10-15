@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../utils/constants';
 import { CreditLog, Plan, PLAN_LABELS } from '../../types';
 import api from '../../utils/api';
+import { PLAN_PRICING, money, num, type Currency, type PlanId } from '../../utils/pricing';
 
 interface BillingData {
   total: number;
@@ -23,12 +24,16 @@ interface AgentUsage {
   creditsUsed: number;
 }
 
-const PLANS = [
-  { id: 'free',       price: '€0',    agents: 1,  credits: '1.000 (único)',  label: 'Free' },
-  { id: 'starter',    price: '€59',   agents: 1,  credits: '5.000/mês',      label: 'Starter' },
-  { id: 'business',   price: '€159',  agents: 3,  credits: '15.000/mês',     label: 'Business' },
-  { id: 'enterprise', price: '€399',  agents: 10, credits: '40.000/mês',     label: 'Enterprise' },
+const PLAN_LABEL_LIST: { id: PlanId; label: string }[] = [
+  { id: 'free', label: 'Free' }, { id: 'starter', label: 'Starter' },
+  { id: 'business', label: 'Business' }, { id: 'enterprise', label: 'Enterprise' },
 ];
+const plansFor = (cur: Currency) => PLAN_LABEL_LIST.map(({ id, label }) => ({
+  id, label,
+  price: money(PLAN_PRICING[id][cur].price, cur),
+  agents: PLAN_PRICING[id].agents,
+  credits: num(PLAN_PRICING[id][cur].credits),
+}));
 
 // SVG pie chart (no external lib)
 function PieChart({ used, total }: { used: number; total: number }) {
@@ -76,9 +81,12 @@ export default function BillingPage() {
   const [agentUsage, setAgentUsage] = useState<AgentUsage[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'agents' | 'history'>('overview');
   const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState<Currency>('EUR');
+  const PLANS = plansFor(currency);
 
   useEffect(() => {
     if (!tenant) { router.replace(ROUTES.home); return; }
+    api.get('/api/billing/pricing').then(r => { if (r.data?.tenantCurrency === 'BRL') setCurrency('BRL'); }).catch(() => {});
     Promise.all([
       api.get('/api/billing/credits'),
       api.get('/api/billing/usage-by-agent'),

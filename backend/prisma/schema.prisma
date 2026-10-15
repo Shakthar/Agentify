@@ -33,7 +33,8 @@ model Tenant {
   paymentStatus         String @default("inactive") // active, overdue, inactive
 
   // Subscription (platform billing)
-  subscriptionMethod    String    @default("manual")  // stripe | ifthenpay_mbway | ifthenpay_multibanco | manual
+  subscriptionMethod    String    @default("manual")  // stripe | ifthenpay_mbway | ifthenpay_multibanco | pix | manual
+  billingCurrency       String    @default("EUR")     // EUR | BRL — define preço e créditos do plano
   subscriptionStatus    String    @default("active")  // active | suspended | pending_payment | trial
   subscriptionExpiresAt DateTime?                     // end of current paid period
   
@@ -578,8 +579,9 @@ model PlatformInvoice {
   id          String    @id @default(cuid())
   tenantId    String
   plan        String                           // plano subscrito
-  amount      Float                            // valor em euros
-  method      String                           // stripe | ifthenpay_mbway | ifthenpay_multibanco | manual
+  amount      Float                            // valor na moeda da fatura
+  currency    String    @default("EUR")        // EUR | BRL
+  method      String                           // stripe | ifthenpay_mbway | ifthenpay_multibanco | pix | manual
   status      String    @default("pending")    // pending | paid | failed | expired | cancelled
   reference   String?                          // MB Way: telefone; Multibanco: referência; Stripe: sessionId
   entity      String?                          // Multibanco: entidade (ex: 11249)

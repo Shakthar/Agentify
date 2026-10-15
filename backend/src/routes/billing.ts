@@ -3,7 +3,9 @@ import { authenticate, requireSuperAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import * as billingService from '../services/billing.service.js';
+import { getConfig } from '../lib/platformConfig.js';
 import {
+  METHODS_BY_CURRENCY,
   createSubscriptionInvoice,
   confirmPlatformPayment,
   getPlatformInvoices,
@@ -28,15 +30,26 @@ router.get('/usage-by-agent', asyncHandler(async (req: AuthenticatedRequest, res
   res.json(result);
 }));
 
+// GET /api/billing/pricing — tabela de planos, pacotes extra e add-ons (EUR + BRL)
+router.get('/pricing', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { plans, topUp, features } = getConfig();
+  res.json({
+    plans, topUp, features,
+    methodsByCurrency: METHODS_BY_CURRENCY,
+    tenantCurrency: req.tenant!.billingCurrency === 'BRL' ? 'BRL' : 'EUR',
+  });
+}));
+
 // ─── Platform subscriptions ───────────────────────────────────────────────────
 
 /**
  * POST /api/billing/platform-subscribe
- * Body: { plan, method, phone? }
+ * Body: { plan, method, phone?, currency? ('EUR' | 'BRL') }
  * Cria invoice + instrucções de pagamento (modo mock se sem credenciais reais)
  */
 router.post('/platform-subscribe', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { plan, method, phone } = req.body as { plan: string; method: PaymentMethod; phone?: string };
+  const { plan, method, phone, currency: rawCurrency } = req.body as { plan: string; method: PaymentMethod; phone?: string; currency?: string };
+  const currency = rawCurrency === 'BRL' ? 'BRL' : 'EUR';
 
   if (!plan || !method) {
     res.status(400).json({ error: 'plan e method são obrigatórios' });
@@ -51,9 +64,8 @@ router.post('/platform-subscribe', asyncHandler(async (req: AuthenticatedRequest
     res.status(400).json({ error: `Plano inválido. Valores aceites: ${validPlans.join(', ')}` });
     return;
   }
-  const allowed: PaymentMethod[] = ['stripe', 'ifthenpay_mbway', 'ifthenpay_multibanco', 'manual'];
-  if (!allowed.includes(method)) {
-    res.status(400).json({ error: 'method inválido' });
+  if (!METHODS_BY_CURRENCY[currency].includes(method)) {
+    res.status(400).json({ error: `method inválido para ${currency}` });
     return;
   }
   if (method === 'ifthenpay_mbway' && !phone) {
@@ -62,7 +74,7 @@ router.post('/platform-subscribe', asyncHandler(async (req: AuthenticatedRequest
   }
 
   const instructions = await createSubscriptionInvoice({
-    tenantId: req.tenant!.id, plan, method, phone,
+    tenantId: req.tenant!.id, plan, method, phone, currency,
   });
   res.json(instructions);
 }));
@@ -78,8 +90,9 @@ router.post('/platform-renew', asyncHandler(async (req: AuthenticatedRequest, re
   const method = (tenant.subscriptionMethod ?? 'manual') as PaymentMethod;
   const { phone } = req.body as { phone?: string };
 
+  const currency = tenant.billingCurrency === 'BRL' ? 'BRL' : 'EUR';
   const instructions = await createSubscriptionInvoice({
-    tenantId: tenant.id, plan, method, phone,
+    tenantId: tenant.id, plan, method, phone, currency,
   });
   res.json(instructions);
 }));

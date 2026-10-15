@@ -166,7 +166,7 @@ export default function CreditsPage() {
                               </div>
                               <div className="text-right">
                                 <span className="text-sm font-semibold text-green-600 dark:text-green-400">{au.waMsgsSent.toLocaleString()}</span>
-                                <p className="text-[14px] text-gray-400">{au.waCreditsUsed.toLocaleString()} créd.</p>
+                                <p className="text-[14px] text-gray-400">msgs</p>
                               </div>
                             </div>
                             <div className="mt-2 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
@@ -176,7 +176,7 @@ export default function CreditsPage() {
                         );
                       })}
                       <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-xs text-gray-400">
-                        🤖 LLM = créditos gastos em tokens do modelo de IA &nbsp;·&nbsp; 💬 WA msgs = mensagens enviadas via WhatsApp/Instagram (cada msg debita créditos do plano)
+                        🤖 LLM = créditos gastos em tokens do modelo de IA &nbsp;·&nbsp; 💬 WA msgs = mensagens enviadas via WhatsApp/Instagram (não consomem créditos — as tarifas da Meta são faturadas pela Meta ao dono do número)
                       </div>
                     </>
                   )}

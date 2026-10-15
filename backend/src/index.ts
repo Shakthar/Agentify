@@ -29,6 +29,7 @@ import { registerChatSocket } from './sockets/chat.socket.js';
 import { startIngestionWorker, stopIngestionWorker } from './workers/ingestion.worker.js';
 import { closeQueue } from './lib/queue.js';
 import { loadConfigFromDB } from './lib/platformConfig.js';
+import { ensureSchema } from './lib/schemaGuard.js';
 
 // Falha rápido se a configuração de ambiente for insegura
 validateEnv();
@@ -135,8 +136,8 @@ app.use('/api/webhooks', webhooksRouter);
 // Global error handler (must be last)
 app.use(errorHandler);
 
-// Start server
-httpServer.listen(PORT, async () => {
+// Start server (depois de garantir as colunas novas na DB)
+ensureSchema().finally(() => httpServer.listen(PORT, async () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 Socket.io ready for real-time chat`);
@@ -144,7 +145,7 @@ httpServer.listen(PORT, async () => {
   await loadConfigFromDB();
   // Inicia o worker de ingestão da base de conhecimento (se Redis disponível)
   startIngestionWorker();
-});
+}));
 
 // Graceful shutdown — fecha worker e fila de ingestão
 async function shutdown(signal: string) {

@@ -27,6 +27,7 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
       select: {
         id: true, email: true, plan: true, creditsTotal: true, creditsUsed: true, isAdmin: true,
         subscriptionMethod: true, subscriptionStatus: true, subscriptionExpiresAt: true,
+        billingCurrency: true,
       },
     });
 

@@ -1,12 +1,11 @@
 import prisma from '../lib/prisma.js';
+import { planTerms, toEur } from '../lib/platformConfig.js';
 
-const PLAN_PRICE: Record<string, number> = {
-  free: 0,
-  starter: 39,
-  pro: 89,
-  business: 159,
-  enterprise: 259,
-};
+/** Preço mensal do plano convertido para EUR (para MRR e listagens). */
+function planPriceEur(plan: string, currency: string | null | undefined): number {
+  const { price, currency: cur } = planTerms(plan, currency ?? 'EUR');
+  return Math.round(toEur(price, cur) * 100) / 100;
+}
 
 // ── Platform-wide dashboard ──────────────────────────────────────────────────
 export async function getPlatformMetrics() {
@@ -46,7 +45,7 @@ export async function getPlatformMetrics() {
     prisma.conversation.count({ where: { createdAt: { gte: monthStart } } }),
     prisma.conversation.count({ where: { createdAt: { gte: yearStart } } }),
     prisma.message.count(),
-    prisma.tenant.groupBy({ by: ['plan'], _count: { id: true }, where: { deletedAt: null } }),
+    prisma.tenant.groupBy({ by: ['plan', 'billingCurrency'], _count: { id: true }, where: { deletedAt: null } }),
     prisma.platformExpense.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.creditLog.findMany({
       where: { reason: 'chat' },
@@ -62,11 +61,13 @@ export async function getPlatformMetrics() {
 
   // Revenue
   const planBreakdown: Record<string, number> = {};
+  const revenueByPlan: Record<string, number> = {}; // € / mês (BRL convertido)
   let mrr = 0;
   for (const row of tenantsByPlan) {
-    const price = PLAN_PRICE[row.plan] ?? 0;
-    planBreakdown[row.plan] = row._count.id;
+    const price = planPriceEur(row.plan, row.billingCurrency);
+    planBreakdown[row.plan] = (planBreakdown[row.plan] ?? 0) + row._count.id;
     mrr += price * row._count.id;
+    revenueByPlan[row.plan] = (revenueByPlan[row.plan] ?? 0) + price * row._count.id;
   }
 
   // Monthly expenses (recurring) + one-time this month
@@ -102,7 +103,7 @@ export async function getPlatformMetrics() {
       thisYear: thisYearConversations,
     },
     messages: { total: totalMessages },
-    revenue: { mrr, arr: mrr * 12 },
+    revenue: { mrr, arr: mrr * 12, byPlan: revenueByPlan },
     expenses: {
       monthly: totalExpenses,
       items: expenses,
@@ -133,14 +134,14 @@ export async function getAllTenants() {
     select: {
       id: true, name: true, email: true, plan: true, createdAt: true,
       creditsTotal: true, creditsUsed: true, monthlyRecurringRevenue: true,
-      paymentStatus: true, isAdmin: true,
+      paymentStatus: true, isAdmin: true, billingCurrency: true,
       _count: { select: { agents: true, conversations: true } },
     },
   });
 
   return tenants.map((t) => ({
     ...t,
-    planPrice: PLAN_PRICE[t.plan] ?? 0,
+    planPrice: planPriceEur(t.plan, t.billingCurrency),
     creditsAvailable: t.creditsTotal - t.creditsUsed,
     creditsUsedPercent: t.creditsTotal > 0 ? Math.round((t.creditsUsed / t.creditsTotal) * 100) : 0,
   }));
@@ -173,7 +174,7 @@ export async function getTenantDetail(tenantId: string) {
       id: true, name: true, email: true, plan: true, companyName: true,
       phone: true, vatNumber: true, addressCity: true, addressCountry: true,
       creditsTotal: true, creditsUsed: true, isAdmin: true,
-      paymentStatus: true, monthlyRecurringRevenue: true,
+      paymentStatus: true, monthlyRecurringRevenue: true, billingCurrency: true,
       createdAt: true, updatedAt: true,
       brandColor: true, logoUrl: true, domain: true,
       twoFactorEnabled: true,
@@ -194,7 +195,7 @@ export async function getTenantDetail(tenantId: string) {
   if (!tenant) return null;
   return {
     ...tenant,
-    planPrice: PLAN_PRICE[tenant.plan] ?? 0,
+    planPrice: planPriceEur(tenant.plan, tenant.billingCurrency),
     creditsAvailable: tenant.creditsTotal - tenant.creditsUsed,
     creditsUsedPercent: tenant.creditsTotal > 0
       ? Math.round((tenant.creditsUsed / tenant.creditsTotal) * 100) : 0,
@@ -203,10 +204,8 @@ export async function getTenantDetail(tenantId: string) {
 
 // ── Change tenant plan ────────────────────────────────────────────────────────
 export async function changeTenantPlan(tenantId: string, plan: string, creditsOverride?: number) {
-  const PLAN_CREDITS: Record<string, number> = {
-    free: 3000, starter: 10000, pro: 30000, business: 60000, enterprise: 75000,
-  };
-  const newCredits = creditsOverride ?? PLAN_CREDITS[plan] ?? 3000;
+  const current = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { billingCurrency: true } });
+  const newCredits = creditsOverride ?? planTerms(plan, current?.billingCurrency ?? 'EUR').credits;
   return prisma.tenant.update({
     where: { id: tenantId },
     data: {

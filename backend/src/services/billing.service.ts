@@ -1,6 +1,5 @@
 import prisma from '../lib/prisma.js';
 import { NotFoundError } from '../lib/errors.js';
-import { PLAN_LIMITS, Plan } from '../types/index.js';
 
 export async function getCredits(tenantId: string) {
   const tenant = await prisma.tenant.findUnique({
@@ -48,14 +47,13 @@ export async function getUsageByAgent(tenantId: string) {
   const usage = agents.map((a) => {
     const llmCredits  = a.conversations.reduce((sum, c) => sum + c.creditsUsed, 0);
     const waMsgs      = a.waMsgsSent; // contador direto no agente (mais rápido)
-    const waCredits   = a.conversations.reduce((sum, c) => sum + c.waMsgsSent, 0); // via conversas para cross-check
     return {
       agentId:      a.id,
       agentName:    a.name,
       creditsUsed:  llmCredits,
       waMsgsSent:   waMsgs,
-      waCreditsUsed: waCredits, // créditos gastos apenas em mensagens WA
-      totalCreditsUsed: llmCredits + waCredits,
+      waCreditsUsed: 0, // mensagens de canal não consomem créditos (Meta fatura o dono do número)
+      totalCreditsUsed: llmCredits,
     };
   });
 
@@ -63,33 +61,24 @@ export async function getUsageByAgent(tenantId: string) {
 }
 
 /**
- * Debita créditos por mensagem enviada via WhatsApp ou Instagram API.
- * Chamado pelo webhook APÓS cada envio bem-sucedido ao cliente.
- * Nunca lança exceção — falhas de billing não devem bloquear o webhook.
+ * Regista cada mensagem enviada ao cliente por API de canal (WhatsApp, Instagram, Telegram).
+ * NÃO debita créditos: as tarifas da Meta são cobradas diretamente ao dono do número
+ * (cartão registado na Meta no onboarding). Os créditos cobrem só a operação de IA.
+ * Mantém os contadores waMsgsSent para métricas.
+ * Nunca lança exceção — falhas de registo não devem bloquear o webhook.
  */
 export async function deductWaMsgCredit(
   tenantId: string,
   agentId: string,
   conversationId: string,
-  channel: 'whatsapp' | 'instagram' | 'telegram',
+  _channel: 'whatsapp' | 'instagram' | 'telegram',
+  _recipient?: string,
 ): Promise<void> {
   try {
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { plan: true },
-    });
-    if (!tenant) return;
-
-    const plan = tenant.plan as Plan;
-    const cost = PLAN_LIMITS[plan]?.waMsgCreditCost ?? 6;
-
     await Promise.all([
       prisma.tenant.update({
         where: { id: tenantId },
-        data: {
-          creditsUsed: { increment: cost },
-          waMsgsSent:  { increment: 1 },
-        },
+        data: { waMsgsSent: { increment: 1 } },
       }),
       prisma.agent.update({
         where: { id: agentId },
@@ -99,16 +88,8 @@ export async function deductWaMsgCredit(
         where: { id: conversationId },
         data: { waMsgsSent: { increment: 1 } },
       }),
-      prisma.creditLog.create({
-        data: {
-          tenantId,
-          amount: -cost,
-          reason: 'wamsg',
-          details: { agentId, conversationId, channel, cost },
-        },
-      }),
     ]);
   } catch (err) {
-    console.error('[Billing] Falha ao debitar créditos WA msg:', err);
+    console.error('[Billing] Falha ao registar msg de canal:', err);
   }
 }

@@ -39,7 +39,10 @@ interface FeaturePlanConfig {
   creditsPerTx?: number;
 }
 interface PricingConfig {
+  version?: number;
+  fx?: { BRLperEUR: number };
   plans: Record<string, PC>;
+  topUp?: Record<string, { credits: number; price: number; priceBRL: number }>;
   features: {
     scheduling:     Record<string, FeaturePlanConfig>;
     fileUpload:     Record<string, FeaturePlanConfig>;
@@ -47,9 +50,14 @@ interface PricingConfig {
     payments:       Record<string, FeaturePlanConfig>;
     whitelabel:     Record<string, FeaturePlanConfig>;
     vendas:         Record<string, FeaturePlanConfig>;
+    feedback?:      Record<string, FeaturePlanConfig>;
+    analytics?:     Record<string, FeaturePlanConfig>;
+    leadGen?:       Record<string, FeaturePlanConfig>;
+    customSkills?:  Record<string, FeaturePlanConfig>;
+    extraAgents?:   Record<string, FeaturePlanConfig>;
   };
 }
-interface PC { price: number; credits: number; agents: number }
+interface PC { price: number; credits: number; agents: number; priceBRL?: number; creditsBRL?: number }
 
 // ─── Tenant detail ────────────────────────────────────────────────────────────
 interface AgentDetail {
@@ -80,7 +88,7 @@ interface PlatformMetrics {
   agents: { total: number; active: number };
   conversations: { total: number; today: number; thisMonth: number; thisYear: number };
   messages: { total: number };
-  revenue: { mrr: number; arr: number };
+  revenue: { mrr: number; arr: number; byPlan?: Record<string, number> };
   expenses: { monthly: number; items: Expense[] };
   usage: {
     creditsConsumed: number;
@@ -786,15 +794,14 @@ export default function AdminPage() {
               <div className="card">
                 <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3">Receita por plano</h3>
                 {['starter', 'business', 'enterprise'].map((plan) => {
-                  const PRICES: Record<string, number> = { starter: 59, business: 159, enterprise: 399 };
                   const count = metrics.tenants.byPlan[plan] ?? 0;
-                  const rev = count * (PRICES[plan] ?? 0);
+                  const rev = metrics.revenue.byPlan?.[plan] ?? 0;
                   if (!count) return null;
                   return (
                     <div key={plan} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
-                        <span className="text-xs text-gray-500">{count} conta{count !== 1 ? 's' : ''} × €{PRICES[plan]}</span>
+                        <span className="text-xs text-gray-500">{count} conta{count !== 1 ? 's' : ''}</span>
                       </div>
                       <span className="text-sm font-semibold text-green-600">€{rev.toFixed(2)}/mês</span>
                     </div>
@@ -898,6 +905,8 @@ export default function AdminPage() {
                             <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
                             <th className="text-left py-2 text-xs text-gray-500">Preço (€/mês)</th>
                             <th className="text-left py-2 text-xs text-gray-500">Créditos/mês</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Preço (R$/mês)</th>
+                            <th className="text-left py-2 text-xs text-gray-500">Créditos/mês (R$)</th>
                             <th className="text-left py-2 text-xs text-gray-500">Agentes máx.</th>
                           </tr>
                         </thead>
@@ -915,6 +924,14 @@ export default function AdminPage() {
                                 value={getDraftVal(['plans', plan, 'credits'], pricing.plans[plan]?.credits)}
                                 onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)}
                                 onBlur={(e) => handleNumBlur(['plans', plan, 'credits'], e.target.value)} /></td>
+                              <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input text-xs w-24"
+                                value={getDraftVal(['plans', plan, 'priceBRL'], pricing.plans[plan]?.priceBRL)}
+                                onChange={(e) => pNum(['plans', plan, 'priceBRL'], e.target.value)}
+                                onBlur={(e) => handleNumBlur(['plans', plan, 'priceBRL'], e.target.value)} /></td>
+                              <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input text-xs w-28"
+                                value={getDraftVal(['plans', plan, 'creditsBRL'], pricing.plans[plan]?.creditsBRL)}
+                                onChange={(e) => pNum(['plans', plan, 'creditsBRL'], e.target.value)}
+                                onBlur={(e) => handleNumBlur(['plans', plan, 'creditsBRL'], e.target.value)} /></td>
                               <td className="py-2"><input type="number" min="1" step="1" className="input text-xs w-20"
                                 value={getDraftVal(['plans', plan, 'agents'], pricing.plans[plan]?.agents)}
                                 onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)}
@@ -934,11 +951,16 @@ export default function AdminPage() {
                     ['payments',       '💳 Pagamentos',             true ],
                     ['whitelabel',     '🎨 White-label',            false],
                     ['vendas',         '🏷️ Vendas + Pedidos/KDS',  false],
+                    ['feedback',       '⭐ Recolha de Feedback',    false],
+                    ['analytics',      '📊 Análises Avançadas',     false],
+                    ['leadGen',        '🎯 Lead Generation',        false],
+                    ['customSkills',   '⚙️ Custom Skills',          false],
+                    ['extraAgents',    '➕ Agentes extra',           false],
                   ] as [string, string, boolean][]).map(([featureKey, featureLabel, hasCredits]) => (
                     <div key={featureKey} className="card">
                       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">{featureLabel}</h3>
                       <p className="text-[14px] text-gray-400 mb-4">
-                        {featureKey === 'whitelabel' ? 'Preço = €/agente/mês' :
+                        {featureKey === 'whitelabel' || featureKey === 'extraAgents' ? 'Preço = €/agente/mês' :
                          featureKey === 'payments'   ? 'Preço = mensalidade €/mês · Créditos = por transação' :
                          featureKey === 'vendas'     ? 'Sempre addon — inclui Pedidos/KDS. Preço = €/mês (mesmo para business/enterprise)' :
                          'Preço = addon €/mês (só relevante se mode=addon)'}
