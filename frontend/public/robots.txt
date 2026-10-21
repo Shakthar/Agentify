@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /chat/
+Disallow: /w/
+Disallow: /orders/
+Disallow: /order-status/
+Sitemap: https://agentfy.tech/sitemap.xml

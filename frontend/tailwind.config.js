@@ -7,19 +7,33 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Identidade "Azulejo" (out/2026): cobalto como única cor de ação,
+        // tinta azul-marinho e campos azul-gelo. A escala brand-* mantém os
+        // mesmos nomes, por isso o dashboard herda a nova cor sem mudanças.
         brand: {
-          50:  '#f0f4ff',
-          100: '#e0e9ff',
-          500: '#4f6ef7',
-          600: '#3b57f0',
-          700: '#2d44d4',
-          900: '#1a2875',
+          50:  '#F4F6FA',
+          100: '#EAEFF8',
+          200: '#D3DAE8',
+          300: '#A9B8E8',
+          400: '#5C77E6',
+          500: '#3657E0',
+          600: '#2346D8',
+          700: '#1C38B0',
+          800: '#18307F',
+          900: '#13213C',
         },
+        ink: { DEFAULT: '#13213C', soft: '#3A4660', mute: '#5B6680' },
+        field: '#EAEFF8',
+        mist: '#F4F6FA',
+        line: '#D3DAE8',
+        // Só para a demonstração de conversa (imita o WhatsApp).
+        wa: { header: '#008069', bubble: '#D9FDD3', wall: '#EFEAE2', tick: '#53BDEB', text: '#111B21', meta: '#667781' },
       },
       fontFamily: {
         // src/pages/_document.tsx aplica --font-sans (Inter, via next/font) ao <html>.
         // Cai para o stack por omissão do Tailwind se a variavel nao existir.
         sans: ['var(--font-sans)', ...defaultTheme.fontFamily.sans],
+        display: ['var(--font-display)', 'var(--font-sans)', ...defaultTheme.fontFamily.sans],
       },
       // Escala de tamanhos de fonte do Tailwind (defaultTheme.fontSize) x1.4,
       // a pedido do Eduardo (05/09) por as letras terem ficado pequenas.

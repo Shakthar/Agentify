@@ -6,135 +6,39 @@ import { useAuth } from '../hooks/useAuth';
 import { ROUTES } from '../utils/constants';
 import Logo from '../components/Logo';
 import SupportWidget from '../components/SupportWidget';
+import WhatsAppDemo from '../components/landing/WhatsAppDemo';
+import LandingSeo from '../components/landing/LandingSeo';
+import { LANDING_COPY, landingLocale } from '../components/landing/copy';
 import api from '../utils/api';
-import { PLAN_PRICING, TOP_UP, estConversations, addonPrice, money, num, defaultCurrency, type Currency } from '../utils/pricing';
+import { PLAN_PRICING, TOP_UP, estConversations, money, num, defaultCurrency, type Currency, type PlanId } from '../utils/pricing';
 
 type AuthTab = 'login' | 'signup';
 
-// ─── Pricing plans (landingpage copy) ────────────────────────────────────────
-const PLANS = [
-  {
-    id: 'free',
-    label: 'Free',
-    creditsNote: 'créditos únicos (não renovam)',
-    agents: '1 agente',
-    highlight: false,
-    cta: 'Começar grátis',
-    color: 'border-gray-200',
-    features: ['1 número WhatsApp', 'Chat Web', 'Base de conhecimento', 'Handoff + Recolha de dados', 'Modelos: Haiku / GPT-mini'],
-  },
-  {
-    id: 'starter',
-    label: 'Starter',
-    creditsNote: 'créditos/mês renováveis',
-    agents: '1 agente',
-    highlight: true,
-    cta: 'Começar agora',
-    color: 'border-brand-500',
-    features: ['1 número WhatsApp', 'Chat Web', 'Upload de ficheiros incluído', 'Addons: Vendas + Delivery¹, Pagamentos, Agendamento', 'Modelos: + Claude Sonnet', 'Suporte por email'],
-  },
-  {
-    id: 'business',
-    label: 'Business',
-    creditsNote: 'créditos/mês renováveis',
-    agents: '3 agentes',
-    highlight: false,
-    cta: 'Escolher Business',
-    color: 'border-orange-300',
-    features: ['3 números WhatsApp', 'Skills: Pagamentos + Agendamento + Feedback', 'Detecção de humor IA', 'API Access', 'Modelos: + GPT-4o', 'Histórico 1 ano'],
-  },
-  {
-    id: 'enterprise',
-    label: 'Enterprise',
-    creditsNote: 'créditos/mês renováveis',
-    agents: '10 agentes',
-    highlight: false,
-    cta: 'Falar com vendas',
-    ctaHref: 'mailto:contact@solutions.shaklabs.tech',
-    color: 'border-green-400',
-    features: ['10 números WhatsApp', 'Todas as skills incluídas (exceto Vendas¹ e Custom)', 'Claude Opus (melhor IA)', 'White-label incluído', 'SLA 24h', 'Histórico ilimitado'],
-  },
-];
+const PLAN_ORDER: PlanId[] = ['free', 'starter', 'business', 'enterprise'];
+const SALES_EMAIL = 'mailto:contact@solutions.shaklabs.tech';
 
-const FEATURES = [
-  {
-    icon: '🤖',
-    title: 'Pronto em menos de 10 minutos',
-    desc: 'O assistente de criação faz-te as perguntas certas e configura tudo por ti. Sem código, sem IT, sem reuniões. Na primeira tarde já estás a receber pedidos.',
-  },
-  {
-    icon: '📱',
-    title: 'O teu número de WhatsApp, não um genérico',
-    desc: 'Conecta o teu número real em minutos. Os clientes falam com "Pizzaria Roma" — não com um bot anónimo. A taxa de abertura do WhatsApp é 5× superior ao email.',
-  },
-  {
-    icon: '📚',
-    title: 'Aprende o teu negócio, não um genérico',
-    desc: 'Faz upload do teu menu, lista de preços, FAQs ou cola um link. Em segundos o agente sabe o que vendes, como vendes e como tratas os clientes.',
-  },
-  {
-    icon: '⚡',
-    title: 'Poupa até 60% nos custos de IA',
-    desc: 'O auto-routing seleciona automaticamente o modelo mais económico para cada mensagem. Mensagens simples vão para modelos leves e as complexas para modelos mais capazes — sem configuração.',
-  },
-  {
-    icon: '🔀',
-    title: 'Nunca perde um cliente difícil',
-    desc: 'Quando o cliente está frustrado ou o assunto é complexo, o agente avisa a tua equipa e passa a conversa com o contexto completo. Zero perda de informação.',
-  },
-  {
-    icon: '🛡️',
-    title: 'Dados na EU, conformidade RGPD',
-    desc: 'Servidores em Portugal/EU, encriptação AES-256, exportação e eliminação de dados a pedido. Auditoria disponível. Ideal para negócios europeus com obrigações legais.',
-  },
-];
+function Check({ className = 'text-brand-600' }: { className?: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`shrink-0 ${className}`}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
 
-const FAQS = [
-  {
-    q: 'O que é um crédito?',
-    a: 'Créditos são a unidade de consumo da plataforma. 1 crédito ≈ 1.000 tokens no Claude Haiku (Sonnet e GPT-4o consomem 3×, Opus 5×). Uma conversa média (3-5 trocas) usa ~30-50 créditos e um pedido completo com pagamento ~50-80. O envio de mensagens não consome créditos: as tarifas da Meta (acima de 1.000 mensagens/mês por número) são faturadas pela Meta diretamente ao dono do número.',
-  },
-  {
-    q: 'O que acontece quando os créditos acabam?',
-    a: 'O agente para de responder. Recebes avisos aos 30% e 10%. Podes comprar pacotes de 5.000 créditos extra (Starter €16 · Business €15 · Enterprise €14 — no Brasil R$99 · R$89 · R$79; pedido pelo suporte) ou fazer upgrade para um plano com mais créditos.',
-  },
-  {
-    q: 'Posso acumular créditos não usados?',
-    a: '🔜 Em breve: o addon Rollover vai permitir pagar 85% do valor dos créditos não usados para os transferir para o mês seguinte (validade de 2 meses). Por agora, os créditos não usados não transitam de mês — créditos do plano Free também não são renováveis.',
-  },
-  {
-    q: '1 agente = 1 WhatsApp?',
-    a: 'Exatamente. Cada agente está ligado a um número de WhatsApp dedicado. No entanto, um agente pode estar integrado com múltiplas plataformas em simultâneo (Shopify, iFood, POS, etc.).',
-  },
-  {
-    q: 'Posso adicionar mais agentes sem mudar de plano?',
-    a: 'Sim. No Starter podes adicionar até 2 agentes extra por €20/agente/mês (máx 3 total). No Business, até 7 extras por €15/agente/mês (máx 10 total). No Enterprise são ilimitados a €10/agente/mês. No Brasil: R$119, R$89 e R$59/agente/mês.',
-  },
-  {
-    q: 'Quanto tempo demora a criar um agente?',
-    a: 'Com o assistente de criação IA, menos de 10 minutos. O assistente recolhe informações sobre o teu negócio, gera o system prompt e sugere as skills adequadas. Podes sempre ajustar depois.',
-  },
-  {
-    q: 'Posso entrar com o Facebook em vez de criar password?',
-    a: 'Sim. No ecrã de login/registo tens o botão "Continuar com Facebook" — cria conta ou entra automaticamente com o teu perfil do Facebook. Se já tiveres conta com email/password, também podes associar a tua conta do Facebook depois, na aba de Perfil (útil se o email do Facebook for diferente do email da tua conta).',
-  },
-  {
-    q: 'Como ligo o meu WhatsApp Business ao agente?',
-    a: 'Dentro do agente, na aba WhatsApp, clica em "Continuar com Facebook / Meta" — autentica com a tua conta Meta e o agente fica ligado ao teu número WhatsApp Business automaticamente, sem precisares de copiar tokens. Só falta confirmar o Phone Number ID e, se for pedido, introduzir o PIN de 6 dígitos para ativar o número. Também existe uma opção de configuração manual para quem prefere gerir o token diretamente na Meta for Developers.',
-  },
-  {
-    q: 'Como ligo a minha conta do Instagram ao agente?',
-    a: 'Dentro do agente, na aba Instagram, clica em "Continuar com Facebook" — abre-se um popup de autenticação e, depois de aceitares, o agente fica ligado à tua conta Instagram Business automaticamente, sem copiar tokens. É preciso que a conta Instagram seja do tipo Business/Criador e esteja ligada a uma Página do Facebook. Também há uma opção manual, para quem prefere configurar via Meta for Developers.',
-  },
-  {
-    q: 'Posso definir um horário em que o agente não trabalha?',
-    a: 'Sim. Na aba de cada canal (WhatsApp, Instagram e Telegram) existe um bloco "Horário de funcionamento" onde defines dias de semana e fins de semana com janelas diferentes (ex: só ativo das 9h às 18h) e, opcionalmente, uma mensagem automática para quando alguém escrever fora desse horário (ex: "Estamos fechados, respondemos às 9h 🙏"). Fora da janela definida, o agente não responde normalmente — fica em silêncio ou envia essa mensagem, consoante configures.',
-  },
-  {
-    q: 'O meu número de WhatsApp corre o risco de ser banido?',
-    a: 'Não. O Agentfy liga-se ao teu número através da API oficial da Meta para empresas (WhatsApp Cloud API) — nunca através de automações não-oficiais que simulam o WhatsApp Web e que são a causa mais comum de bloqueios. O número fica sempre registado em teu nome na Meta, e as mensagens proativas (iniciadas pelo agente) respeitam os limites diário/mensal que tu defines, para nunca gerar picos que pareçam spam.',
-  },
-];
+function Cross() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="shrink-0 text-ink-mute">
+      <path d="M6 12h12" />
+    </svg>
+  );
+}
+
+const CHANNEL_ICONS: Record<string, JSX.Element> = {
+  0: <path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z" />,
+  1: <><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" /></>,
+  2: <path d="m21 4-18 7 6 2 2 6 3-4 5 4z" />,
+  3: <><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M8 21h8M12 18v3" /></>,
+};
 
 export default function Home() {
   const router = useRouter();
@@ -150,6 +54,9 @@ export default function Home() {
   const [company, setCompany] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const loc = landingLocale(router.locale);
+  const c = LANDING_COPY[loc];
   const [fbLoading, setFbLoading] = useState(false);
   const [fbError, setFbError] = useState<string | null>(null);
   const authRef = useRef<HTMLDivElement>(null);
@@ -162,7 +69,15 @@ export default function Home() {
   // troca o ticket de curta duração pelos tokens de sessão reais.
   useEffect(() => {
     if (!router.isReady) return;
-    const { fbTicket, fbAuthError } = router.query as { fbTicket?: string; fbAuthError?: string };
+    const { fbTicket, fbAuthError, signup: signupParam } = router.query as { fbTicket?: string; fbAuthError?: string; signup?: string };
+
+    // Links "Criar conta" das páginas de setor (/para/[slug]) chegam com ?signup=1.
+    if (signupParam && !fbTicket && !fbAuthError) {
+      setTab('signup');
+      setAuthOpen(true);
+      router.replace(router.pathname, undefined, { shallow: true });
+      return;
+    }
 
     if (fbAuthError) {
       setFbError(fbAuthError);
@@ -226,32 +141,54 @@ export default function Home() {
     } catch { setTwoFactorCode(''); }
   };
 
+  const nav = [
+    { href: '#como', label: c.nav.how },
+    { href: '#porque', label: c.nav.compare },
+    { href: '#setores', label: c.nav.sectors },
+    { href: '#precos', label: c.nav.pricing },
+    { href: '#faq', label: c.nav.faq },
+  ];
+  const otherLocales = (['pt', 'es', 'en'] as const);
+
   return (
     <>
       <Head>
-        <title>Agentfy — Agentes de IA para Atendimento no WhatsApp</title>
-        <meta name="description" content="Cria agentes de IA para atendimento ao cliente no WhatsApp em minutos. Sem código. Créditos renováveis. GDPR compliant." />
+        <title>{c.meta.title}</title>
+        <meta name="description" content={c.meta.description} />
       </Head>
+      <LandingSeo copy={c} locale={loc} />
 
+      <div className="min-h-screen bg-white font-sans text-ink">
       {/* ─── Navbar ─── */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo size={36} />
-          <div className="hidden md:flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
-            <a href="#features" className="hover:text-gray-900 dark:hover:text-white transition-colors">Funcionalidades</a>
-            <a href="#pricing" className="hover:text-gray-900 dark:hover:text-white transition-colors">Preços</a>
-            <a href="#faq" className="hover:text-gray-900 dark:hover:text-white transition-colors">FAQ</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => openAuth('login')} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors px-3 py-1.5">
-              Entrar
-            </button>
-            <button onClick={() => openAuth('signup')} className="btn-primary text-sm px-4 py-2">
-              Começar grátis →
+      <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-4 px-4 md:px-8">
+          <Link href="/" locale={loc} aria-label="Agentfy" className="shrink-0"><Logo size={36} /></Link>
+          <nav aria-label="Principal" className="hidden items-center gap-7 text-[17px] font-medium lg:flex">
+            {nav.map((n) => <a key={n.href} href={n.href} className="hover:text-brand-600">{n.label}</a>)}
+          </nav>
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="hidden items-center gap-1 text-[15px] md:flex" aria-label="Idioma">
+              {otherLocales.map((l) => (
+                <Link key={l} href="/" locale={l} className={`rounded px-1.5 py-1 font-semibold uppercase ${l === loc ? 'text-ink' : 'text-ink-mute hover:text-ink'}`} aria-current={l === loc ? 'true' : undefined}>{l}</Link>
+              ))}
+            </div>
+            <button onClick={() => openAuth('login')} className="hidden min-h-[44px] px-2 text-[17px] font-medium hover:text-brand-600 sm:block">{c.nav.login}</button>
+            <button onClick={() => openAuth('signup')} className="min-h-[44px] rounded-[10px] bg-brand-600 px-4 text-[17px] font-semibold text-white hover:bg-brand-700">{c.nav.cta}</button>
+            <button onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-controls="mobile-menu" aria-label={c.nav.menu} className="flex h-11 w-11 items-center justify-center rounded-lg border border-line lg:hidden">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
             </button>
           </div>
         </div>
-      </nav>
+        {menuOpen && (
+          <nav id="mobile-menu" aria-label={c.nav.menu} className="border-t border-line px-4 pb-4 lg:hidden">
+            {nav.map((n) => <a key={n.href} href={n.href} onClick={() => setMenuOpen(false)} className="block py-3 text-[19px] font-medium">{n.label}</a>)}
+            <div className="flex gap-3 pt-2">
+              {otherLocales.map((l) => <Link key={l} href="/" locale={l} className="py-2 text-[17px] font-semibold uppercase">{l}</Link>)}
+              <button onClick={() => { setMenuOpen(false); openAuth('login'); }} className="ml-auto py-2 text-[17px] font-medium">{c.nav.login}</button>
+            </div>
+          </nav>
+        )}
+      </header>
 
       {/* ─── Auth Modal / Panel ─── */}
       {(authOpen || pendingTwoFactor) && (
@@ -349,408 +286,267 @@ export default function Home() {
         </div>
       )}
 
-      <div className="pt-16">
+
+      <main>
         {/* ─── Hero ─── */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-brand-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 pt-20 pb-24 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <span className="inline-block text-xs font-semibold bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-3 py-1 rounded-full mb-6">
-              🇵🇹 Feito para Portugal e Brasil · GDPR Compliant
-            </span>
-            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6 leading-tight">
-              O teu negócio perde vendas<br />
-              <span className="text-brand-600 dark:text-brand-400">enquanto dormes.</span><br />
-              <span className="text-2xl md:text-3xl font-semibold text-gray-600 dark:text-gray-300">O Agentfy resolve isso.</span>
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
-              Um agente de IA no teu WhatsApp que responde, processa pedidos e aceita pagamentos — 24 horas por dia, 7 dias por semana.
-              Sem código. Pronto em menos de 10 minutos.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button onClick={() => openAuth('signup')} className="btn-primary text-base px-8 py-3 shadow-lg hover:shadow-brand-200 dark:hover:shadow-brand-900 transition-shadow">
-                Começar grátis — sem cartão →
-              </button>
-              <a href="#pricing" className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors px-4 py-3">
-                Ver preços ↓
-              </a>
+        <section className="mx-auto grid max-w-[1280px] gap-12 px-4 pb-16 pt-12 md:px-8 lg:grid-cols-12 lg:gap-8 lg:pt-20">
+          <div className="flex flex-col gap-7 lg:col-span-6 lg:pt-6">
+            <h1 className="font-display text-[46px] font-extrabold leading-[1.0] tracking-[-0.035em] sm:text-[64px] xl:text-[80px]">{c.hero.title}</h1>
+            <p className="max-w-[580px] text-[20px] leading-[1.55] text-ink-soft md:text-[22px]">{c.hero.sub}</p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button onClick={() => openAuth('signup')} className="min-h-[56px] rounded-xl bg-brand-600 px-7 text-[20px] font-semibold text-white hover:bg-brand-700">{c.hero.cta}</button>
+              <a href="#porque" className="flex min-h-[56px] items-center justify-center rounded-xl border-[1.5px] border-line px-6 text-[19px] font-semibold hover:border-ink">{c.hero.secondary}</a>
             </div>
-            <p className="text-xs text-gray-400 mt-4">1.000 créditos grátis para testar · Upgrade quando precisar</p>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[17px] text-ink-soft">
+              {c.hero.checks.map((t) => <li key={t} className="flex items-center gap-2"><Check />{t}</li>)}
+            </ul>
           </div>
+          <div className="lg:col-span-5 lg:col-start-8">
+            <WhatsAppDemo demo={c.demo} />
+          </div>
+        </section>
 
-          {/* WhatsApp mockup */}
-          <div className="max-w-sm mx-auto mt-14">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {/* WA header */}
-              <div className="bg-green-600 px-4 py-3 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">🤖</div>
-                <div>
-                  <p className="text-white text-sm font-semibold">Agente Pizzaria Roma</p>
-                  <p className="text-green-200 text-xs">Online • responde em segundos</p>
-                </div>
-              </div>
-              {/* Messages */}
-              <div className="p-4 space-y-3 bg-[#e5ddd5] dark:bg-gray-700 text-sm">
-                {[
-                  { from: 'user', text: 'Olá! Queria pedir uma margherita grande e uma coca-cola 🍕' },
-                  { from: 'bot', text: 'Olá! Com certeza 😊\nMargherita Grande (€12.50) + Coca-Cola (€2.50)\nTotal: €15.00\n\nEnvio para a morada registada?\nPagamento: MB Way ou Dinheiro?' },
-                  { from: 'user', text: 'MB Way sim! Para Rua das Flores 12, Lisboa' },
-                  { from: 'bot', text: '✅ Pedido confirmado!\nTempo estimado: 35 min\nReferência MB Way enviada para o teu telemóvel 📱' },
-                ].map((m, i) => (
-                  <div key={i} className={`flex ${m.from === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-line shadow-sm
-                      ${m.from === 'user'
-                        ? 'bg-green-100 dark:bg-green-900 text-gray-800 dark:text-gray-200 rounded-br-none'
-                        : 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}>
-                      {m.text}
-                    </div>
-                  </div>
+        {/* ─── Omnichat ─── */}
+        <section className="bg-mist">
+          <div className="mx-auto grid max-w-[1280px] gap-10 px-4 py-20 md:px-8 lg:grid-cols-12">
+            <div className="flex flex-col gap-4 lg:col-span-4">
+              <h2 className="font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] md:text-[52px]">{c.omni.title}</h2>
+              <p className="text-[19px] leading-[1.55] text-ink-soft">{c.omni.sub}</p>
+            </div>
+            <div className="flex flex-col gap-4 lg:col-span-7 lg:col-start-6">
+              <ul className="grid gap-4 sm:grid-cols-2">
+                {c.omni.channels.map((ch, i) => (
+                  <li key={ch.name} className="flex items-start gap-4 rounded-2xl bg-white p-6">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-field text-brand-600">
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{CHANNEL_ICONS[i]}</svg>
+                    </span>
+                    <span className="flex flex-col gap-1"><span className="text-[21px] font-semibold">{ch.name}</span><span className="text-[17px] text-ink-soft">{ch.desc}</span></span>
+                  </li>
                 ))}
-              </div>
-              <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                <p className="text-[14px] text-gray-400 text-center">Conversa real → ~40 créditos gastos</p>
-              </div>
+              </ul>
+              <p className="flex items-center gap-3 rounded-2xl bg-ink px-6 py-5 text-[18px] text-white"><Check className="text-white" />{c.omni.inboxNote}</p>
             </div>
           </div>
         </section>
 
-        {/* ─── Social Proof ─── */}
-        <section className="py-10 px-4 bg-white dark:bg-gray-900 border-y border-gray-100 dark:border-gray-800">
-          <div className="max-w-4xl mx-auto">
-            <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">
-              Negócios que já automatizaram o atendimento com Agentfy
-            </p>
-            {/* Logos placeholder */}
-            <div className="flex flex-wrap items-center justify-center gap-8 mb-10 opacity-60">
-              {['Pizzaria Roma', 'Clínica Saúde+', 'Loja Moda PT', 'Auto Reparações SA', 'Academia Fit'].map(name => (
-                <span key={name} className="text-sm font-bold text-gray-400 dark:text-gray-500 tracking-tight">{name}</span>
-              ))}
+        {/* ─── Como funciona ─── */}
+        <section id="como" className="mx-auto max-w-[1280px] scroll-mt-24 px-4 py-24 md:px-8">
+          <h2 className="mb-10 max-w-[900px] font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] md:text-[56px]">{c.how.title}</h2>
+          <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {c.how.steps.map((s) => (
+              <li key={s.title} className="flex flex-col gap-3 border-t-[3px] border-ink pt-5">
+                <span className="font-display text-[40px] font-extrabold text-brand-600">{s.time}</span>
+                <span className="text-[22px] font-semibold">{s.title}</span>
+                <span className="text-[18px] leading-[1.55] text-ink-soft">{s.desc}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* ─── Porque não a IA da Meta ─── */}
+        <section id="porque" className="scroll-mt-24 bg-ink text-white">
+          <div className="mx-auto max-w-[1280px] px-4 py-24 md:px-8">
+            <div className="mb-12 flex max-w-[900px] flex-col gap-4">
+              <h2 className="font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] md:text-[60px]">{c.vsMeta.title}</h2>
+              <p className="text-[20px] leading-[1.55] text-[#C8D2E6]">{c.vsMeta.sub}</p>
             </div>
-            {/* Testimonials */}
-            <div className="grid md:grid-cols-3 gap-5">
-              {[
-                {
-                  quote: 'Antes perdíamos 30% dos pedidos fora de horário. Agora o agente responde às 3h da manhã e o cliente fica satisfeito.',
-                  author: 'Miguel S.',
-                  role: 'Dono · Pizzaria Roma, Lisboa',
-                },
-                {
-                  quote: 'Configurei em 8 minutos. Sem IT, sem contratos. O agente já tratou de mais de 400 conversas este mês.',
-                  author: 'Ana P.',
-                  role: 'Gestora · Loja Moda PT, Porto',
-                },
-                {
-                  quote: 'O handoff automático para humanos é o que nos convenceu. Quando o cliente está irritado, o agente passa para a equipa com o contexto todo.',
-                  author: 'Rui F.',
-                  role: 'CEO · Clínica Saúde+, Braga',
-                },
-              ].map(t => (
-                <div key={t.author} className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">"{t.quote}"</p>
-                  <div>
-                    <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{t.author}</p>
-                    <p className="text-[15px] text-gray-400">{t.role}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto rounded-2xl bg-white text-ink">
+              <table className="w-full min-w-[720px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-line">
+                    <th scope="col" className="w-[22%] px-6 py-5 text-[16px] font-semibold text-ink-mute"><span className="sr-only">{c.vsMeta.colTopic || '—'}</span></th>
+                    <th scope="col" className="w-[42%] bg-field px-6 py-5"><span className="flex items-center gap-3 font-display text-[24px] font-extrabold"><Logo size={28} showText={false} />{c.vsMeta.colUs}</span></th>
+                    <th scope="col" className="px-6 py-5 text-[20px] font-semibold text-ink-soft">{c.vsMeta.colThem}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {c.vsMeta.rows.map((r) => (
+                    <tr key={r.topic} className="border-b border-line last:border-b-0">
+                      <th scope="row" className="px-6 py-5 align-top text-[18px] font-semibold">{r.topic}</th>
+                      <td className="bg-field px-6 py-5 align-top text-[18px] leading-[1.5]"><span className="flex gap-3"><Check />{r.us}</span></td>
+                      <td className="px-6 py-5 align-top text-[18px] leading-[1.5] text-ink-soft"><span className="flex gap-3"><Cross />{r.them}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            <p className="mt-4 text-[15px] text-[#AEB9D1]">{c.vsMeta.footnote}</p>
           </div>
         </section>
 
-        {/* ─── Proteção do número de WhatsApp ─── */}
-        <section className="py-14 px-4 bg-gradient-to-br from-green-50 via-white to-brand-50 dark:from-green-950/20 dark:via-gray-900 dark:to-gray-950 border-y border-green-100 dark:border-green-900/30">
-          <div className="max-w-4xl mx-auto text-center">
-            <span className="inline-block text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-3 py-1 rounded-full mb-4">
-              🛡️ O teu número está seguro
-            </span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white mb-3">
-              Zero risco de ficares banido do WhatsApp
-            </h2>
-            <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Ao contrário de automações não-oficiais que simulam um telemóvel, o Agentfy liga-se ao teu número
-              através da API oficial da Meta para empresas — a mesma que a Meta disponibiliza a grandes marcas.
-              Não há truques nem simulação de app: é o canal aprovado, e o teu número fica protegido.
-            </p>
-            <div className="grid md:grid-cols-3 gap-5 text-left">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-green-100 dark:border-green-900/30 shadow-sm">
-                <span className="text-2xl mb-2 block">✅</span>
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">API oficial da Meta</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  Usamos exclusivamente a WhatsApp Cloud API oficial — nunca automações não-oficiais que replicam
-                  o WhatsApp Web e arriscam bloqueios.
-                </p>
+        {/* ─── Diferenciais + passagem para humano ─── */}
+        <section className="mx-auto max-w-[1280px] px-4 py-24 md:px-8">
+          <h2 className="mb-10 font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] md:text-[56px]">{c.diffs.title}</h2>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="flex flex-col gap-4 rounded-[22px] bg-ink p-8 text-white md:p-10 lg:col-span-2 lg:row-span-2">
+              <h3 className="font-display text-[32px] font-extrabold leading-[1.08] md:text-[40px]">{c.handoff.title}</h3>
+              <p className="max-w-[640px] text-[19px] leading-[1.55] text-[#C8D2E6]">{c.handoff.desc}</p>
+              <div className="mt-2 flex max-w-[540px] flex-col gap-1.5 rounded-2xl bg-white p-5 text-ink">
+                <span className="text-[14px] font-semibold uppercase tracking-wide text-brand-600">{c.handoff.cardLabel}</span>
+                <span className="text-[19px] font-semibold">{c.handoff.cardText}</span>
+                <span className="text-[16px] text-ink-soft">{c.handoff.cardMeta}</span>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-green-100 dark:border-green-900/30 shadow-sm">
-                <span className="text-2xl mb-2 block">⏱️</span>
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">Limites de envio automáticos</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  Nas mensagens iniciadas pelo agente (proativas), defines um limite diário e mensal — o Agentfy
-                  respeita-os sempre, para nunca haver picos de envio que pareçam spam.
-                </p>
-              </div>
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-green-100 dark:border-green-900/30 shadow-sm">
-                <span className="text-2xl mb-2 block">🔒</span>
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">O número continua teu</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  O número fica sempre registado em teu nome na Meta. Não guardamos credenciais paralelas nem
-                  dependemos de sessões que possam expirar ou ser detetadas como automação.
-                </p>
-              </div>
+              <p className="mt-auto flex items-center gap-3 pt-4 text-[17px] text-[#C8D2E6]"><Check className="text-white" />{c.handoff.copilot}</p>
             </div>
-          </div>
-        </section>
-
-        {/* ─── Stats ─── */}
-        <section className="bg-gray-900 dark:bg-gray-950 py-12 px-4">
-          <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {[
-              { value: '< 10 min', label: 'Para criar um agente' },
-              { value: '24/7', label: 'O agente nunca dorme' },
-              { value: '–60%', label: 'Créditos poupados com auto-routing' },
-              { value: '8 idiomas', label: 'Suportados nativamente' },
-            ].map(s => (
-              <div key={s.label}>
-                <p className="text-3xl font-extrabold text-white">{s.value}</p>
-                <p className="text-sm text-gray-400 mt-1">{s.label}</p>
+            {c.diffs.items.map((d) => (
+              <div key={d.title} className="flex flex-col gap-3 rounded-[22px] bg-field p-8">
+                <h3 className="text-[23px] font-semibold leading-tight">{d.title}</h3>
+                <p className="text-[18px] leading-[1.55] text-ink-soft">{d.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ─── Features ─── */}
-        <section id="features" className="py-20 px-4 bg-white dark:bg-gray-900">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Tudo o que precisas para automatizar o atendimento</h2>
-              <p className="text-gray-500 dark:text-gray-400">Sem contratos, sem integrações complexas, sem equipa de TI.</p>
+        {/* ─── Anti-ban ─── */}
+        <section className="border-y border-line bg-mist">
+          <div className="mx-auto grid max-w-[1280px] gap-10 px-4 py-20 md:px-8 lg:grid-cols-12">
+            <div className="flex flex-col gap-4 lg:col-span-5">
+              <h2 className="font-display text-[36px] font-extrabold leading-[1.05] tracking-[-0.03em] md:text-[48px]">{c.antiBan.title}</h2>
+              <p className="text-[19px] leading-[1.55] text-ink-soft">{c.antiBan.desc}</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
-              {FEATURES.map(f => (
-                <div key={f.title} className="p-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 hover:border-brand-200 dark:hover:border-brand-800 transition-colors">
-                  <div className="text-3xl mb-3">{f.icon}</div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{f.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{f.desc}</p>
-                </div>
+            <ul className="grid gap-4 sm:grid-cols-3 lg:col-span-7">
+              {c.antiBan.points.map((p) => (
+                <li key={p.title} className="flex flex-col gap-2 rounded-2xl bg-white p-6">
+                  <Check />
+                  <span className="text-[20px] font-semibold">{p.title}</span>
+                  <span className="text-[17px] leading-[1.5] text-ink-soft">{p.desc}</span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </section>
 
-        {/* ─── How it works ─── */}
-        <section className="py-20 px-4 bg-brand-50 dark:bg-gray-950">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Como funciona?</h2>
-              <p className="text-gray-500 dark:text-gray-400">3 passos para ter o teu agente ativo</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                { step: '01', icon: '💬', title: 'Configura com IA', desc: 'O assistente de criação faz-te perguntas sobre o teu negócio e gera tudo automaticamente — nome, personalidade, skills e base de conhecimento.' },
-                { step: '02', icon: '📚', title: 'Treina o agente', desc: 'Faz upload dos teus PDFs, menus, listas de produtos ou cola um link do YouTube. O agente aprende o teu negócio em segundos.' },
-                { step: '03', icon: '📱', title: 'Ativa o WhatsApp', desc: 'Conecta o teu número de WhatsApp e liga ao teu site. O agente começa a responder imediatamente.' },
-              ].map(s => (
-                <div key={s.step} className="text-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-brand-600 text-white text-lg font-bold mb-4">{s.step}</div>
-                  <div className="text-2xl mb-2">{s.icon}</div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{s.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{s.desc}</p>
-                </div>
-              ))}
-            </div>
+        {/* ─── Setores ─── */}
+        <section id="setores" className="mx-auto max-w-[1280px] scroll-mt-24 px-4 py-24 md:px-8">
+          <div className="mb-10 flex max-w-[860px] flex-col gap-3">
+            <h2 className="font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] md:text-[56px]">{c.sectors.title}</h2>
+            <p className="text-[19px] text-ink-soft">{c.sectors.sub}</p>
           </div>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {c.sectors.items.map((s) => (
+              <li key={s.slug}>
+                <Link href={`/para/${s.slug}`} locale={loc} className="group flex h-full flex-col gap-3 rounded-2xl border-[1.5px] border-line p-7 hover:border-brand-600">
+                  <span className="text-[22px] font-semibold">{s.title}</span>
+                  <span className="text-[17px] leading-[1.5] text-ink-soft">{s.desc}</span>
+                  <span className="mt-auto pt-3 text-[16px] font-semibold text-brand-600 group-hover:underline">{c.sectors.more}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
 
-        {/* ─── Pricing ─── */}
-        <section id="pricing" className="py-20 px-4 bg-white dark:bg-gray-900">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-4">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Preços simples baseados em créditos</h2>
-              <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
-                Pagas pelo que usas. Sem surpresas. Quanto mais alto o plano, mais barato fica cada crédito.
-              </p>
-              <div className="mt-4 inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 text-xs">
-                {(['EUR', 'BRL'] as Currency[]).map(c => (
-                  <button key={c} onClick={() => setCurrency(c)}
-                    className={`px-3 py-1 rounded-md font-medium transition-colors ${currency === c ? 'bg-brand-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}>
-                    {c === 'EUR' ? '€ Europa' : 'R$ Brasil'}
+        {/* ─── Preços ─── */}
+        <section id="precos" className="scroll-mt-24 bg-mist">
+          <div className="mx-auto max-w-[1280px] px-4 py-24 md:px-8">
+            <div className="mb-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+              <div className="flex max-w-[760px] flex-col gap-3">
+                <h2 className="font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] md:text-[56px]">{c.pricing.title}</h2>
+                <p className="text-[19px] text-ink-soft">{c.pricing.sub}</p>
+              </div>
+              <div role="group" aria-label="Moeda" className="inline-flex self-start rounded-xl border border-line bg-white p-1 lg:self-auto">
+                {(['EUR', 'BRL'] as Currency[]).map((cur) => (
+                  <button key={cur} onClick={() => setCurrency(cur)} aria-pressed={currency === cur}
+                    className={`min-h-[44px] rounded-lg px-4 text-[17px] font-semibold ${currency === cur ? 'bg-ink text-white' : 'text-ink-soft hover:text-ink'}`}>
+                    {cur === 'EUR' ? c.pricing.currencyEUR : c.pricing.currencyBRL}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Credits explainer */}
-            <div className="mb-10 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 max-w-2xl mx-auto">
-              <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">💡 O que é um crédito?</p>
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                1 crédito ≈ 1.000 tokens de IA. Uma conversa média (3-5 trocas) usa ~30-50 créditos; um pedido completo com pagamento ~50-80.
-                O auto-routing escolhe o modelo adequado para cada mensagem.
-              </p>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {PLAN_ORDER.map((id) => {
+                const p = PLAN_PRICING[id][currency];
+                const plan = c.pricing.plans[id];
+                const highlight = id === 'starter';
+                return (
+                  <div key={id} className={`relative flex flex-col gap-5 rounded-[20px] bg-white p-7 ${highlight ? 'border-2 border-brand-600' : 'border-[1.5px] border-line'}`}>
+                    {highlight && <span className="absolute -top-3.5 left-7 rounded-full bg-brand-600 px-3 py-1 text-[14px] font-semibold text-white">{c.pricing.popular}</span>}
+                    <div className="flex flex-col gap-1">
+                      <span className={`text-[18px] font-semibold ${highlight ? 'text-brand-600' : ''}`}>{id.charAt(0).toUpperCase() + id.slice(1)}</span>
+                      <span className="font-display text-[48px] font-extrabold leading-none">
+                        {p.price === 0 ? c.pricing.free : money(p.price, currency)}
+                        {p.price > 0 && <span className="font-sans text-[18px] font-medium text-ink-soft">{c.pricing.month}</span>}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1 rounded-xl bg-field p-4 text-[16px]">
+                      <span><strong className="text-[20px]">≈ {num(estConversations(p.credits))}</strong> {c.pricing.conversations}{id === 'free' ? '' : c.pricing.month}</span>
+                      <span className="text-ink-soft">{num(p.credits)} {id === 'free' ? c.pricing.creditsOnce : c.pricing.credits} · {c.pricing.agents(PLAN_PRICING[id].agents)}</span>
+                    </div>
+                    <ul className="flex flex-1 flex-col gap-2">
+                      {plan.features.map((f) => <li key={f} className="flex gap-2 text-[16px] leading-snug"><Check />{f}</li>)}
+                    </ul>
+                    {id === 'enterprise' ? (
+                      <a href={SALES_EMAIL} className="flex min-h-[48px] items-center justify-center rounded-xl border-[1.5px] border-ink text-[17px] font-semibold hover:bg-ink hover:text-white">{plan.cta}</a>
+                    ) : (
+                      <button onClick={() => openAuth('signup')} className={`min-h-[48px] rounded-xl text-[17px] font-semibold ${highlight ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border-[1.5px] border-ink hover:bg-ink hover:text-white'}`}>{plan.cta}</button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="grid md:grid-cols-4 gap-5">
-              {PLANS.map(plan => (
-                <div
-                  key={plan.id}
-                  className={`relative rounded-2xl border-2 p-6 flex flex-col gap-4 transition-all
-                    ${plan.highlight
-                      ? 'border-brand-500 shadow-xl shadow-brand-100 dark:shadow-brand-900/20 bg-white dark:bg-gray-800'
-                      : `${plan.color} bg-white dark:bg-gray-900`}`}
-                >
-                  {plan.highlight && (
-                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[15px] font-bold px-3 py-1 rounded-full whitespace-nowrap">
-                      ⭐ Mais popular
-                    </span>
-                  )}
-                  <div>
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{plan.label}</p>
-                    <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-1">
-                      {PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].price === 0 ? 'Grátis' : money(PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].price, currency)}
-                      {PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].price > 0 && <span className="text-sm font-normal text-gray-400">/mês</span>}
-                    </p>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5 space-y-1">
-                    <p>💳 <strong className="text-gray-700 dark:text-gray-200">{num(PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].credits)}</strong> {plan.creditsNote}</p>
-                    <p>💬 ≈ <strong className="text-gray-700 dark:text-gray-200">{num(estConversations(PLAN_PRICING[plan.id as keyof typeof PLAN_PRICING][currency].credits))}</strong> conversas{plan.id === 'free' ? '' : '/mês'}</p>
-                    <p>🤖 <strong className="text-gray-700 dark:text-gray-200">{plan.agents}</strong></p>
-                  </div>
-                  <ul className="space-y-1.5 flex-1">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-start gap-1.5 text-xs text-gray-600 dark:text-gray-300">
-                        <span className="text-green-500 mt-0.5 flex-shrink-0">✓</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  {(plan as { ctaHref?: string }).ctaHref ? (
-                    <a
-                      href={(plan as { ctaHref?: string }).ctaHref}
-                      className={`block w-full text-center text-sm py-2.5 px-4 rounded-xl font-semibold transition-colors
-                        bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200`}
-                    >
-                      {plan.cta} →
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => openAuth('signup')}
-                      className={`w-full text-sm py-2.5 px-4 rounded-xl font-semibold transition-colors
-                        ${plan.highlight
-                          ? 'bg-brand-600 hover:bg-brand-700 text-white'
-                          : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'}`}
-                    >
-                      {plan.cta} →
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <p className="text-center text-xs text-gray-400 mt-6">
-              ¹ Vendas + Delivery/Pedidos + KDS (pedidos, upselling, cross-sell, cliente recorrente): addon de {money(addonPrice(25, currency), currency)} no Starter, {money(addonPrice(20, currency), currency)} no Business e {money(addonPrice(15, currency), currency)} no Enterprise, por mês.
-              {' · '}Todos os planos incluem SSL, uptime 99.9% e backups diários.
-            </p>
-
-            {/* Addons row */}
-            <div className="mt-10 p-5 rounded-2xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10">
-              <p className="text-sm font-bold text-orange-800 dark:text-orange-200 mb-4">➕ Addons disponíveis em qualquer plano pago</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { icon: '⚡', name: 'Créditos extras', desc: `Pacotes de 5.000 créditos desde ${money(TOP_UP.enterprise[currency], currency)}` },
-                  { icon: '🔄', name: 'Rollover', desc: '85% dos créditos não usados transferidos para o mês seguinte' },
-                  { icon: '🤖', name: 'Mais agentes', desc: `Starter +${money(addonPrice(20, currency), currency)}/ag · Business +${money(addonPrice(15, currency), currency)}/ag · Enterprise +${money(addonPrice(10, currency), currency)}/ag` },
-                  { icon: '🎨', name: 'White-label', desc: 'Portal com a tua marca, sem branding Agentfy' },
-                ].map(a => (
-                  <div key={a.name} className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-orange-100 dark:border-orange-900">
-                    <span className="text-xl">{a.icon}</span>
-                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mt-1">{a.name}</p>
-                    <p className="text-[15px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{a.desc}</p>
-                  </div>
+            <p className="mt-6 text-[16px] text-ink-soft">{c.pricing.creditExplainer}</p>
+            <div className="mt-10 flex flex-col gap-4">
+              <h3 className="text-[22px] font-semibold">{c.pricing.addonsTitle}</h3>
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {c.pricing.addons.map((a, i) => (
+                  <li key={a.title} className="flex flex-col gap-1 rounded-xl bg-white p-5">
+                    <span className="text-[18px] font-semibold">{a.title}</span>
+                    <span className="text-[16px] text-ink-soft">{i === 0 ? `${a.desc} · ${money(TOP_UP.enterprise[currency], currency)}–${money(TOP_UP.starter[currency], currency)}` : a.desc}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
-          </div>
-        </section>
-
-        {/* ─── Use cases ─── */}
-        <section className="py-16 px-4 bg-gray-50 dark:bg-gray-950">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-10">Para que tipo de negócios?</h2>
-            <div className="grid md:grid-cols-3 gap-5">
-              {[
-                { icon: '🍕', type: 'Restaurantes & Delivery', cases: ['Pedidos via WhatsApp', 'Menu interativo', 'Confirmação de reservas', 'Pagamento por MB Way / PIX'] },
-                { icon: '🛒', type: 'E-commerce & Lojas', cases: ['Suporte ao cliente 24/7', 'Estado do pedido', 'Devoluções e trocas', 'Upselling automático'] },
-                { icon: '🏢', type: 'Serviços & B2B', cases: ['Agendamento de reuniões', 'Triagem de leads', 'Suporte técnico nível 1', 'Recolha de feedback'] },
-              ].map(uc => (
-                <div key={uc.type} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-                  <div className="text-3xl mb-2">{uc.icon}</div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">{uc.type}</h3>
-                  <ul className="space-y-1.5">
-                    {uc.cases.map(c => (
-                      <li key={c} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
-                        <span className="text-brand-500">·</span>{c}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            <p className="mt-6 text-[15px] leading-[1.5] text-ink-mute">{c.pricing.footnote}</p>
           </div>
         </section>
 
         {/* ─── FAQ ─── */}
-        <section id="faq" className="py-20 px-4 bg-white dark:bg-gray-900">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-10">Perguntas frequentes</h2>
-            <div className="space-y-3">
-              {FAQS.map((faq, i) => (
-                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-left bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{faq.q}</span>
-                    <span className={`text-gray-400 ml-4 transition-transform flex-shrink-0 ${openFaq === i ? 'rotate-180' : ''}`}>▾</span>
+        <section id="faq" className="mx-auto max-w-[900px] scroll-mt-24 px-4 py-24 md:px-8">
+          <h2 className="mb-8 font-display text-[40px] font-extrabold tracking-[-0.03em] md:text-[52px]">{c.faq.title}</h2>
+          <div className="divide-y divide-line border-y border-line">
+            {c.faq.items.map((f, i) => (
+              <div key={f.q}>
+                <h3>
+                  <button onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} aria-controls={`faq-${i}`}
+                    className="flex min-h-[64px] w-full items-center justify-between gap-6 py-4 text-left text-[20px] font-semibold">
+                    {f.q}
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className={`shrink-0 transition-transform ${openFaq === i ? 'rotate-45' : ''}`}><path d="M12 5v14M5 12h14" /></svg>
                   </button>
-                  {openFaq === i && (
-                    <div className="px-5 pb-4 pt-1 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
-                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{faq.a}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ─── CTA Bottom ─── */}
-        <section className="py-20 px-4 bg-gradient-to-br from-brand-600 to-brand-700 dark:from-brand-800 dark:to-gray-900">
-          <div className="max-w-xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">Pronto para começar?</h2>
-            <p className="text-brand-100 mb-8">
-              Cria a tua conta grátis hoje. 1.000 créditos incluídos para testares sem compromisso.
-            </p>
-            <button onClick={() => openAuth('signup')} className="bg-white text-brand-700 hover:bg-brand-50 text-sm font-bold px-8 py-3.5 rounded-xl shadow-lg transition-colors">
-              Criar conta grátis — sem cartão →
-            </button>
-          </div>
-        </section>
-
-        {/* ─── Footer ─── */}
-        <footer className="bg-gray-900 dark:bg-gray-950 py-12 px-4">
-          <div className="max-w-5xl mx-auto">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <Logo size={32} />
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400">
-                <Link href="/privacy-policy" className="hover:text-gray-200 transition-colors">Política de Privacidade</Link>
-                <Link href="/terms-of-service" className="hover:text-gray-200 transition-colors">Termos de Serviço</Link>
-                <Link href="/data-deletion" className="hover:text-gray-200 transition-colors">Eliminação de Dados</Link>
-                <a href="mailto:contact@solutions.shaklabs.tech" className="hover:text-gray-200 transition-colors">contact@solutions.shaklabs.tech</a>
+                </h3>
+                <div id={`faq-${i}`} hidden={openFaq !== i} className="pb-6 text-[18px] leading-[1.6] text-ink-soft">{f.a}</div>
               </div>
-            </div>
-            <div className="mt-8 pt-6 border-t border-gray-800 text-center text-xs text-gray-600">
-              © {new Date().getFullYear()} Agentfy by Shaklabs.tech · Feito em Portugal 🇵🇹 · GDPR Compliant
-            </div>
+            ))}
           </div>
-        </footer>
+        </section>
+
+        {/* ─── CTA final ─── */}
+        <section className="px-4 pb-24 md:px-8">
+          <div className="mx-auto flex max-w-[1280px] flex-col items-start gap-6 rounded-[28px] bg-brand-600 px-8 py-14 text-white md:flex-row md:items-center md:justify-between md:px-14">
+            <div className="flex flex-col gap-2">
+              <h2 className="font-display text-[36px] font-extrabold leading-[1.05] tracking-[-0.03em] md:text-[48px]">{c.cta.title}</h2>
+              <p className="text-[19px] text-white/85">{c.cta.sub}</p>
+            </div>
+            <button onClick={() => openAuth('signup')} className="min-h-[56px] shrink-0 rounded-xl bg-white px-8 text-[19px] font-semibold text-ink hover:bg-field">{c.cta.button}</button>
+          </div>
+        </section>
+      </main>
+
+      <footer className="bg-ink text-white">
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 py-12 md:flex-row md:items-center md:justify-between md:px-8">
+          <Logo size={32} inverted />
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-6 gap-y-2 text-[16px] text-[#C8D2E6]">
+            <Link href="/privacy-policy" className="hover:text-white">{c.footer.privacy}</Link>
+            <Link href="/terms-of-service" className="hover:text-white">{c.footer.terms}</Link>
+            <Link href="/data-deletion" className="hover:text-white">{c.footer.deletion}</Link>
+            <a href="mailto:contact@solutions.shaklabs.tech" className="hover:text-white">contact@solutions.shaklabs.tech</a>
+          </nav>
+        </div>
+        <div className="mx-auto max-w-[1280px] border-t border-white/10 px-4 py-6 text-[14px] text-[#AEB9D1] md:px-8">
+          © {new Date().getFullYear()} Agentfy · Shaklabs · {c.footer.made}
+        </div>
+      </footer>
       </div>
-      {/* ─── Support Widget ─── */}
       <SupportWidget />
     </>
   );
