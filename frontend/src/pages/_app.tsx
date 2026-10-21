@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Head from 'next/head';
 import Script from 'next/script';
 import i18n from '../lib/i18n';
+import { inter, bricolage } from '../lib/fonts';
 import '../styles/globals.css';
 
 // Aplica o tema salvo ANTES do primeiro render para evitar flash branco
@@ -34,6 +35,15 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <ThemeScript />
+      {/* As fontes do next/font têm de ser importadas no _app (o _document não
+          carrega CSS no cliente); expõe-nas como variáveis no :root para o
+          Tailwind (font-sans / font-display). */}
+      <style jsx global>{`
+        :root {
+          --font-sans: ${inter.style.fontFamily};
+          --font-display: ${bricolage.style.fontFamily};
+        }
+      `}</style>
       {/* Facebook SDK — Embedded Signup (WhatsApp) */}
       <Script
         id="facebook-sdk-init"

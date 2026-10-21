@@ -1,9 +1,8 @@
 import { Html, Head, Main, NextScript } from 'next/document';
-import { inter, bricolage } from '../lib/fonts';
 
 export default function Document() {
   return (
-    <Html className={`${inter.variable} ${bricolage.variable}`}>
+    <Html>
       <Head />
       <body>
         <Main />
