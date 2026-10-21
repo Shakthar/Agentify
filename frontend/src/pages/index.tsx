@@ -291,11 +291,11 @@ export default function Home() {
         {/* ─── Hero ─── */}
         <section className="mx-auto grid max-w-[1280px] gap-12 px-4 pb-16 pt-12 md:px-8 lg:grid-cols-12 lg:gap-8 lg:pt-20">
           <div className="flex flex-col gap-7 lg:col-span-6 lg:pt-6">
-            <h1 className="font-display text-[46px] font-extrabold leading-[1.0] tracking-[-0.035em] sm:text-[64px] xl:text-[80px]">{c.hero.title}</h1>
+            <h1 className="font-display text-[46px] font-extrabold leading-[1.0] tracking-[-0.035em] sm:text-[60px] xl:text-[70px]">{c.hero.title}</h1>
             <p className="max-w-[580px] text-[20px] leading-[1.55] text-ink-soft md:text-[22px]">{c.hero.sub}</p>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button onClick={() => openAuth('signup')} className="min-h-[56px] rounded-xl bg-brand-600 px-7 text-[20px] font-semibold text-white hover:bg-brand-700">{c.hero.cta}</button>
-              <a href="#porque" className="flex min-h-[56px] items-center justify-center rounded-xl border-[1.5px] border-line px-6 text-[19px] font-semibold hover:border-ink">{c.hero.secondary}</a>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <button onClick={() => openAuth('signup')} className="min-h-[56px] whitespace-nowrap rounded-xl bg-brand-600 px-7 text-[19px] font-semibold text-white hover:bg-brand-700">{c.hero.cta}</button>
+              <a href="#porque" className="flex min-h-[56px] items-center justify-center rounded-xl border-[1.5px] border-line px-6 text-[18px] font-semibold hover:border-ink sm:whitespace-nowrap">{c.hero.secondary}</a>
             </div>
             <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[17px] text-ink-soft">
               {c.hero.checks.map((t) => <li key={t} className="flex items-center gap-2"><Check />{t}</li>)}
