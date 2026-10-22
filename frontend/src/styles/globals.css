@@ -3,30 +3,80 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
+  :root {
+    --app-frame: 234 239 248;   /* #EAEFF8 campo azul-gelo */
+    --app-sheet: 255 255 255;
+    --app-raised: 244 246 250;  /* #F4F6FA */
+    --app-edge: 216 222 234;    /* #D8DEEA */
+    --app-rule: 233 237 244;
+    --app-control: 190 200 220;
+    --app-ink: 19 33 60;        /* #13213C */
+    --app-muted: 70 82 108;     /* 7:1 em branco */
+    --app-faint: 91 102 128;    /* 5.5:1 em branco */
+    --app-accent: 35 70 216;    /* #2346D8 cobalto */
+    --app-accent-ink: 255 255 255;
+    --app-accent-soft: 234 239 252;
+    --app-pos: 23 122 76;
+    --app-pos-soft: 220 250 229;
+    --app-neg: 196 36 42;
+    --app-neg-soft: 255 237 234;
+    --app-warn: 146 64 14;
+    --app-warn-soft: 255 247 230;
   }
-  h1, h2, h3, h4, h5, h6 {
-    @apply dark:text-white;
+  .dark {
+    --app-frame: 10 15 29;
+    --app-sheet: 17 24 43;
+    --app-raised: 24 33 57;
+    --app-edge: 38 50 79;
+    --app-rule: 30 41 66;
+    --app-control: 70 86 120;
+    --app-ink: 236 241 250;
+    --app-muted: 178 190 214;
+    --app-faint: 150 163 190;
+    --app-accent: 116 144 242;
+    --app-accent-ink: 10 15 29;
+    --app-accent-soft: 30 42 80;
+    --app-pos: 86 214 146;
+    --app-pos-soft: 20 48 36;
+    --app-neg: 242 118 128;
+    --app-neg-soft: 60 24 30;
+    --app-warn: 246 196 96;
+    --app-warn-soft: 58 44 18;
+  }
+  body {
+    @apply bg-app-frame text-app-ink antialiased;
   }
 }
 
 @layer components {
+  /* Uma ação primária por ecrã: cobalto sólido. Pressão com scale(0.97). */
   .btn-primary {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-app-accent text-app-accent-ink text-sm font-semibold
+      transition-[transform,background-color] duration-150 ease-out hover:bg-app-accent/90 active:scale-[0.97]
+      disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/40;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-      dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700;
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border border-app-control bg-app-sheet text-app-ink text-sm font-semibold
+      transition-[transform,background-color] duration-150 ease-out hover:bg-app-raised active:scale-[0.97]
+      disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/40;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-3 rounded-lg text-app-muted text-sm font-semibold
+      transition-[transform,background-color,color] duration-150 ease-out hover:bg-app-raised hover:text-app-ink active:scale-[0.97];
   }
   .input {
-    @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none
-      dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500;
+    @apply block w-full h-10 rounded-lg border border-app-edge bg-app-sheet px-3 text-sm text-app-ink placeholder:text-app-faint
+      outline-none focus:border-app-accent focus:ring-2 focus:ring-app-accent/20;
   }
+  textarea.input { @apply h-auto py-2; }
+  /* Painel: um degrau de tom e uma linha de 1px, sem sombra. */
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm p-6 transition-shadow duration-200 hover:shadow-md
-      dark:bg-gray-900 dark:border-gray-700;
+    @apply bg-app-sheet rounded-xl border border-app-edge p-5;
   }
+  .panel-title { @apply text-base font-semibold text-app-ink; }
+  .label { @apply text-sm text-app-muted; }
+  .num { font-variant-numeric: tabular-nums; }
 }
 
 /* Overrides globais para dark mode — evita ter de actualizar cada página */

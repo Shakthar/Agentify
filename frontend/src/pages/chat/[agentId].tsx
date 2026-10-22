@@ -48,19 +48,25 @@ export default function PublicChatPage() {
   }, [agentId]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Head><title>Agentfy — {agentName}</title></Head>
-      <div className="w-full max-w-md h-[600px]">
+    <div className="flex h-[100dvh] flex-col bg-mist text-ink sm:items-center sm:justify-center sm:p-6" style={{ colorScheme: 'light' }}>
+      <Head>
+        <title>{state === 'ready' ? agentName : 'Chat'}</title>
+        <meta name="color-scheme" content="light" />
+        <meta name="robots" content="noindex" />
+      </Head>
+      <div className="flex min-h-0 w-full flex-1 flex-col sm:max-w-md sm:flex-none sm:h-[min(44rem,calc(100dvh-5rem))]">
         {state === 'loading' && (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-400 text-sm">A ligar ao agente...</p>
+          <div className="flex h-full flex-col items-center justify-center gap-3" role="status">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-line border-t-brand-600" />
+            <p className="text-sm text-ink-mute">A ligar ao agente…</p>
           </div>
         )}
 
         {state === 'error' && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <p className="text-gray-500 text-sm">{errorMsg}</p>
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center" role="alert">
+            <p className="text-base font-semibold">Não foi possível ligar</p>
+            <p className="text-sm text-ink-mute">{errorMsg}</p>
+            <button onClick={() => router.reload()} className="mt-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-medium">Tentar de novo</button>
           </div>
         )}
 
@@ -72,11 +78,7 @@ export default function PublicChatPage() {
           />
         )}
       </div>
-
-      {/* Powered by */}
-      <p className="fixed bottom-3 right-4 text-xs text-gray-300">
-        Powered by <span className="text-brand-400 font-medium">Agentfy</span>
-      </p>
+      <p className="py-2 text-center text-[11px] text-ink-mute sm:pb-0 sm:pt-3">Com tecnologia Agentfy</p>
     </div>
   );
 }

@@ -21,11 +21,11 @@ function fmtBytes(n: number) {
 }
 
 function mimeIcon(mime: string) {
-  if (mime === 'application/pdf') return '📄';
-  if (mime.startsWith('image/')) return '🖼️';
-  if (mime.includes('word')) return '📝';
-  if (mime.includes('excel') || mime.includes('spreadsheet')) return '📊';
-  return '📎';
+  if (mime === 'application/pdf') return 'PDF';
+  if (mime.startsWith('image/')) return 'Imagem';
+  if (mime.includes('word')) return 'Word';
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'Excel';
+  return 'Ficheiro';
 }
 
 export default function AgentDocs({ agentId }: Props) {
@@ -84,98 +84,91 @@ export default function AgentDocs({ agentId }: Props) {
     }
   };
 
-  if (loading) return <div className="p-6 text-sm text-gray-500 dark:text-gray-400 animate-pulse">A carregar documentos…</div>;
+  if (loading) {
+    return (
+      <div className="space-y-3" aria-busy="true" aria-label="A carregar documentos">
+        <span className="block h-5 w-1/3 rounded bg-app-raised" />
+        <span className="block h-16 w-full rounded-xl bg-app-raised" />
+        <span className="block h-16 w-full rounded-xl bg-app-raised" />
+      </div>
+    );
+  }
+
+  const ok = uploadMsg?.startsWith('✓');
 
   return (
-    <div className="space-y-6">
-      {/* Explicação */}
-      <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
-        <p className="text-sm text-blue-800 dark:text-blue-300">
-          <strong>Como funciona:</strong> os ficheiros aqui carregados ficam disponíveis para o agente enviar directamente aos clientes quando solicitado.
-          O agente conhece os nomes e descrições — basta o cliente pedir (ex: <em>"podes enviar-me o menu?"</em>) e o agente envia o PDF automaticamente pelo WhatsApp ou disponibiliza o link no chat web.
-        </p>
-      </div>
-
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10">
       {/* Upload */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Adicionar documento</p>
-        <input
-          type="text"
-          value={docName}
-          onChange={(e) => setDocName(e.target.value)}
-          placeholder="Nome do documento (opcional — usa o nome do ficheiro se em branco)"
-          className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
-        <input
-          type="text"
-          value={docDesc}
-          onChange={(e) => setDocDesc(e.target.value)}
-          placeholder="Descrição breve (opcional — ajuda o agente a saber quando enviar)"
-          className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.txt,.xlsx,.xls"
-          onChange={handleUpload}
-          disabled={uploading}
-          className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
-        />
-        <p className="text-xs text-gray-400 dark:text-gray-500">PDF, DOCX, imagens, TXT, XLSX · Máx. 20 MB</p>
-        {uploading && <p className="text-xs text-blue-600 animate-pulse">A carregar…</p>}
-        {uploadMsg && (
-          <p className={`text-xs ${uploadMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{uploadMsg}</p>
-        )}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-app-ink">Documentos para enviar</h2>
+          <p className="mt-1 text-sm text-app-muted">
+            Ficheiros que o agente envia quando o cliente pede: a ementa, o menu de grupos, a tabela de preços. Pelo WhatsApp vai o
+            ficheiro; no chat do site, o link.
+          </p>
+        </div>
+        <div className="space-y-3 rounded-xl border border-app-edge p-4">
+          <div>
+            <label htmlFor="docName" className="mb-1 block text-sm font-medium text-app-ink">Nome</label>
+            <input id="docName" type="text" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="Ex.: Ementa de outono" className="input" />
+            <p className="mt-1 text-xs text-app-faint">Opcional. Em branco, usa o nome do ficheiro.</p>
+          </div>
+          <div>
+            <label htmlFor="docDesc" className="mb-1 block text-sm font-medium text-app-ink">Quando enviar</label>
+            <input id="docDesc" type="text" value={docDesc} onChange={(e) => setDocDesc(e.target.value)} placeholder="Ex.: quando pedem a ementa ou os preços" className="input" />
+            <p className="mt-1 text-xs text-app-faint">Opcional. Ajuda o agente a escolher o ficheiro certo.</p>
+          </div>
+          <div>
+            <label htmlFor="docFile" className="mb-1 block text-sm font-medium text-app-ink">Ficheiro</label>
+            <input
+              id="docFile"
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.txt,.xlsx,.xls"
+              onChange={handleUpload}
+              disabled={uploading}
+              className="block w-full cursor-pointer text-sm text-app-muted file:mr-3 file:h-9 file:rounded-lg file:border file:border-solid file:border-app-control file:bg-app-sheet file:px-4 file:text-sm file:font-semibold file:text-app-ink hover:file:bg-app-raised disabled:opacity-50"
+            />
+            <p className="mt-1 text-xs text-app-faint">PDF, Word, imagens, TXT ou Excel, até 20 MB. Carrega assim que escolher.</p>
+          </div>
+          {uploading && <p className="text-sm text-app-muted">A carregar…</p>}
+          {uploadMsg && (
+            <p role="status" className={`rounded-lg px-3 py-2 text-sm ${ok ? 'bg-app-pos-soft text-app-pos' : 'bg-app-neg-soft text-app-neg'}`}>{uploadMsg.replace(/^[✓✗]\s*/, '')}</p>
+          )}
+        </div>
       </div>
 
       {/* Lista */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {docs.length} documento{docs.length !== 1 ? 's' : ''} disponíve{docs.length !== 1 ? 'is' : 'l'}
+      <section className="self-start overflow-hidden rounded-xl border border-app-edge bg-app-sheet">
+        <div className="flex items-center justify-between px-5 py-3">
+          <span className="text-sm font-semibold text-app-ink">
+            <span className="num">{docs.length}</span> documento{docs.length !== 1 ? 's' : ''} disponíve{docs.length !== 1 ? 'is' : 'l'}
           </span>
-          <button onClick={() => void refresh()} className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">↻ Atualizar</button>
+          <button type="button" onClick={() => void refresh()} className="text-sm font-semibold text-app-accent hover:underline">Atualizar</button>
         </div>
 
         {docs.length === 0 ? (
-          <p className="p-6 text-sm text-gray-400 dark:text-gray-500 text-center">
-            Nenhum documento ainda. Carrega um ficheiro acima.
+          <p className="border-t border-app-rule px-5 py-6 text-sm text-app-muted">
+            Ainda não há documentos. Carregue a ementa em PDF: é o que os clientes pedem mais vezes.
           </p>
         ) : (
-          <ul className="divide-y divide-gray-50 dark:divide-gray-700">
+          <ul>
             {docs.map((doc) => (
-              <li key={doc.id} className="px-4 py-3 flex items-center gap-3">
-                <span className="text-xl select-none">{mimeIcon(doc.mimeType)}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{doc.name}</p>
-                  {doc.description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{doc.description}</p>
-                  )}
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{doc.fileName} · {fmtBytes(doc.fileSize)}</p>
+              <li key={doc.id} className="flex items-center gap-4 border-t border-app-rule px-5 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-app-ink">{doc.name}</p>
+                  {doc.description && <p className="truncate text-sm text-app-muted">{doc.description}</p>}
+                  <p className="mt-0.5 truncate text-xs text-app-faint">{mimeIcon(doc.mimeType)} · {doc.fileName} · <span className="num">{fmtBytes(doc.fileSize)}</span></p>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <a
-                    href={doc.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1.5 rounded text-gray-400 dark:text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors text-sm"
-                    title="Abrir"
-                  >
-                    ↗
-                  </a>
-                  <button
-                    onClick={() => void handleDelete(doc.id, doc.name)}
-                    className="p-1.5 rounded text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-sm"
-                    title="Apagar"
-                  >
-                    ✕
-                  </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="btn-ghost h-8 px-2">Abrir ↗</a>
+                  <button type="button" onClick={() => void handleDelete(doc.id, doc.name)} className="btn-ghost h-8 px-2 hover:text-app-neg">Apagar</button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

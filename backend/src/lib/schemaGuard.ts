@@ -8,6 +8,9 @@ import prisma from './prisma.js';
 const STATEMENTS = [
   `ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "billingCurrency" TEXT NOT NULL DEFAULT 'EUR'`,
   `ALTER TABLE "PlatformInvoice" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'EUR'`,
+  `CREATE TABLE IF NOT EXISTS "PageView" ("id" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "path" VARCHAR(300) NOT NULL, "referrerHost" TEXT, "utmSource" TEXT, "utmMedium" TEXT, "utmCampaign" TEXT, "locale" TEXT, "country" VARCHAR(2), "device" TEXT NOT NULL, "visitorHash" TEXT NOT NULL, "isBot" BOOLEAN NOT NULL DEFAULT false, CONSTRAINT "PageView_pkey" PRIMARY KEY ("id"))`,
+  `CREATE INDEX IF NOT EXISTS "PageView_createdAt_idx" ON "PageView"("createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "PageView_path_idx" ON "PageView"("path")`,
 ];
 
 export async function ensureSchema(): Promise<void> {

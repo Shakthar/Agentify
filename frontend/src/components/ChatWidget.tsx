@@ -93,29 +93,30 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
 
   if (!conversation) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
-        <p className="text-gray-500 dark:text-gray-400 text-sm">Clique para iniciar uma conversa de teste com o agente</p>
-        <button className="btn-primary" onClick={startConversation} disabled={starting}>
-          {starting ? 'A iniciar...' : 'Iniciar conversa'}
+      <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-app-edge px-5 py-8">
+        <p className="text-sm font-semibold text-app-ink">Conversa de teste</p>
+        <p className="text-sm text-app-muted">Abre uma conversa nova como se fosse um cliente no site. Gasta créditos como uma conversa real.</p>
+        <button type="button" className="btn-primary mt-1" onClick={startConversation} disabled={starting}>
+          {starting ? 'A iniciar…' : 'Iniciar conversa'}
         </button>
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {error && <p role="alert" className="rounded-lg bg-app-neg-soft px-3 py-2 text-sm text-app-neg">{error}</p>}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[480px] border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
+    <div className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-app-edge bg-app-sheet">
       {/* Header */}
-      <div className="bg-brand-600 text-white px-4 py-3 flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-green-400" />
-        <span className="text-sm font-medium">Agente online</span>
-        <span className="ml-auto text-xs opacity-70">conv: {conversation.id.slice(-6)}</span>
+      <div className="flex items-center gap-2 border-b border-app-rule px-4 py-3">
+        <span className="h-2 w-2 rounded-full bg-app-pos" aria-hidden="true" />
+        <span className="text-sm font-semibold text-app-ink">Agente a responder</span>
+        <span className="num ml-auto font-mono text-xs text-app-faint">conversa {conversation.id.slice(-6)}</span>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-gray-800">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
         {messages.length === 0 && (
-          <p className="text-center text-gray-400 dark:text-gray-500 text-sm pt-8">Escreva uma mensagem para começar</p>
+          <p className="pt-8 text-center text-sm text-app-muted">Escreva a primeira mensagem, por exemplo: “Têm mesa para 4 hoje às 20h?”</p>
         )}
         {messages.map((msg) => (
           <div
@@ -124,8 +125,8 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
           >
             <div className={`max-w-[80%] rounded-2xl text-sm leading-relaxed ${
               msg.role === 'user'
-                ? 'bg-brand-600 text-white rounded-br-sm px-4 py-2 whitespace-pre-wrap'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm'
+                ? 'whitespace-pre-wrap rounded-br-sm bg-app-accent px-4 py-2 text-app-accent-ink'
+                : 'rounded-bl-sm bg-app-raised text-app-ink'
             }`}>
               {msg.role === 'assistant' ? (() => {
                 const docMatch = msg.content.match(/\[DOC:(https?:\/\/[^|]+)\|([^\]]+)\]/);
@@ -138,53 +139,48 @@ export default function ChatWidget({ agentId, tenantId, visitorId }: Props) {
                         href={docMatch[1]}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 text-brand-600 dark:text-brand-400 hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors"
+                        className="mt-2 flex items-center gap-2 rounded-lg border border-app-edge bg-app-sheet px-3 py-2 text-app-accent transition-colors hover:bg-app-raised"
                       >
-                        <span>📎</span>
-                        <span className="text-xs font-medium truncate">{docMatch[2]}</span>
-                        <span className="text-xs text-gray-400 ml-auto shrink-0">Download</span>
+                        <span className="truncate text-xs font-semibold">{docMatch[2]}</span>
+                        <span className="ml-auto shrink-0 text-xs text-app-muted">Descarregar</span>
                       </a>
                     )}
                   </div>
                 );
-              })() : <span className="px-4 py-2 block whitespace-pre-wrap">{msg.content}</span>}
+              })() : <span className="block whitespace-pre-wrap px-4 py-2">{msg.content}</span>}
             </div>
           </div>
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 dark:bg-gray-700 px-4 py-3 rounded-2xl rounded-bl-sm">
-              <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </span>
-            </div>
+            <div className="rounded-2xl rounded-bl-sm bg-app-raised px-4 py-2 text-sm text-app-muted">A escrever…</div>
           </div>
         )}
         {error && (
-          <p className="text-center text-red-500 text-xs">{error}</p>
+          <p role="alert" className="text-center text-xs text-app-neg">{error}</p>
         )}
         <div ref={endRef} />
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex gap-2 items-end bg-white dark:bg-gray-800">
+      <div className="flex items-end gap-2 border-t border-app-rule p-3">
         <textarea
-          className="flex-1 resize-none rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 max-h-28"
+          aria-label="Mensagem"
+          className="input max-h-28 flex-1 resize-none"
           rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Escreva uma mensagem..."
+          placeholder="Escreva uma mensagem…"
           disabled={sending}
         />
         <button
-          className="btn-primary h-9 px-3"
+          type="button"
+          className="btn-primary"
           onClick={sendMessage}
           disabled={!input.trim() || sending}
         >
-          ↑
+          Enviar
         </button>
       </div>
     </div>

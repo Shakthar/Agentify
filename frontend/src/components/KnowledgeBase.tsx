@@ -50,27 +50,31 @@ function fmtBytes(b: number): string {
 
 function typeIcon(t: KBDocument['type']) {
   const map: Record<string, string> = {
-    pdf: '📄', docx: '📝', csv: '📊', text: '📃',
-    youtube: '▶️', website: '🌐',
+    pdf: 'PDF', docx: 'Word', csv: 'CSV', text: 'Texto',
+    youtube: 'YouTube', website: 'Site',
   };
-  return map[t] ?? '📎';
+  return map[t] ?? 'Ficheiro';
 }
+
+const PILL = 'inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium';
 
 function statusBadge(doc: KBDocument) {
   switch (doc.status) {
     case 'completed':
-      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">✓ Indexado ({doc.chunkCount} chunks)</span>;
+      return <span className={`${PILL} bg-app-pos-soft text-app-pos`}>Pronto</span>;
     case 'processing':
-      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 animate-pulse">⟳ A processar…</span>;
+      return <span className={`${PILL} bg-app-accent-soft text-app-accent`}>A processar</span>;
     case 'pending':
-      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700">⏳ Na fila</span>;
+      return <span className={`${PILL} bg-app-raised text-app-muted`}>Na fila</span>;
     case 'failed':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700" title={doc.error ?? ''}>
-          ✕ Falhou
-        </span>
-      );
+      return <span className={`${PILL} bg-app-neg-soft text-app-neg`} title={doc.error ?? ''}>Falhou</span>;
   }
+}
+
+function Msg({ m }: { m: string | null }) {
+  if (!m) return null;
+  const ok = m.startsWith('✓');
+  return <p role="status" className={`rounded-lg px-3 py-2 text-sm ${ok ? 'bg-app-pos-soft text-app-pos' : 'bg-app-neg-soft text-app-neg'}`}>{m.replace(/^✓\s*/, '')}</p>;
 }
 
 // ── Componente ─────────────────────────────────────────────────────────────
@@ -270,254 +274,245 @@ export default function KnowledgeBase({ agentId }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────
 
   const storagePercent = storageLimit > 0 ? Math.min(100, Math.round((storageUsed / storageLimit) * 100)) : 0;
-  const storageColor = storagePercent >= 90 ? 'bg-red-500' : storagePercent >= 70 ? 'bg-yellow-400' : 'bg-blue-500';
+  const storageColor = storagePercent >= 90 ? 'bg-app-neg' : storagePercent >= 70 ? 'bg-app-warn' : 'bg-app-accent';
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-500 dark:text-gray-400 animate-pulse">A carregar base de conhecimento…</div>;
+    return (
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]" aria-busy="true" aria-label="A carregar a base de conhecimento">
+        <div className="space-y-3">
+          <span className="block h-6 w-1/3 rounded bg-app-raised" />
+          <span className="block h-14 w-full rounded-xl bg-app-raised" />
+          <span className="block h-14 w-full rounded-xl bg-app-raised" />
+        </div>
+        <span className="block h-64 w-full rounded-xl bg-app-raised" />
+      </div>
+    );
   }
 
+  const MODES: { id: AddMode; label: string }[] = [
+    { id: 'file', label: 'Ficheiro' },
+    { id: 'url', label: 'Link' },
+    { id: 'text', label: 'Texto' },
+    { id: 'enrich', label: 'Perguntas da IA' },
+  ];
+  const ready = docs.filter((d) => d.status === 'completed').length;
+
   return (
-    <div className="space-y-6">
-      {/* Barra de armazenamento */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-        <div className="flex justify-between items-baseline mb-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Armazenamento da KB</span>
-          <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{plan}</span>
-        </div>
-        <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div className={`h-2 rounded-full transition-all ${storageColor}`} style={{ width: `${storagePercent}%` }} />
-        </div>
-        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 text-right">
-          {fmtBytes(storageUsed)} / {fmtBytes(storageLimit)} usados
-        </p>
-        {storagePercent >= 90 && (
-          <p className="mt-1 text-xs text-red-600 font-medium">Armazenamento quase esgotado. Faça upgrade do plano.</p>
-        )}
-      </div>
-
-      {/* Painel de adição */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-        {/* Tabs */}
-        <div className="flex border-b border-gray-100 dark:border-gray-700">
-          {(['file', 'url', 'text', 'enrich'] as AddMode[]).map((m) => {
-            const labels: Record<AddMode, string> = { file: '📎 Ficheiro', url: '🔗 URL', text: '✏️ Texto', enrich: '🧠 Enriquecer com IA' };
-            return (
-              <button
-                key={m}
-                onClick={() => setAddMode(m)}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-                  addMode === m
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-b-2 border-blue-600'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                {labels[m]}
-              </button>
-            );
-          })}
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-8">
+      {/* O que o agente sabe */}
+      <section className="min-w-0">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-app-ink">O que o agente sabe</h2>
+            <p className="mt-1 text-sm text-app-muted">Ementa, preços, horários, alergénios, políticas da casa. O agente consulta isto antes de responder.</p>
+          </div>
+          <button type="button" onClick={() => void refresh()} className="text-sm font-semibold text-app-accent hover:underline">Atualizar</button>
         </div>
 
-        <div className="p-4 space-y-3">
-          {/* Upload de ficheiro */}
-          {addMode === 'file' && (
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Formatos suportados: PDF, DOCX, CSV, TXT, MD · Máximo 10 MB</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.csv,.txt,.md"
-                onChange={handleFileUpload}
-                disabled={uploading}
-                className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
-              />
-              {uploading && <p className="text-xs text-blue-600 mt-1 animate-pulse">A enviar…</p>}
-              {uploadMsg && (
-                <p className={`text-xs mt-1 ${uploadMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{uploadMsg}</p>
-              )}
+        {/* Armazenamento */}
+        <div className="mb-4 rounded-xl border border-app-edge px-4 py-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+            <span className="text-app-muted"><span className="num font-semibold text-app-ink">{ready}</span> de <span className="num">{docs.length}</span> fontes prontas</span>
+            <span className="num text-app-muted">{fmtBytes(storageUsed)} de {fmtBytes(storageLimit)} <span className="capitalize text-app-faint">· plano {plan}</span></span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-app-raised" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={storagePercent} aria-label="Armazenamento usado">
+            <div className={`h-full rounded-full ${storageColor}`} style={{ width: `${storagePercent}%` }} />
+          </div>
+          {storagePercent >= 90 && (
+            <p className="mt-2 text-sm font-medium text-app-neg">O espaço está quase cheio. Apague fontes antigas ou mude de plano.</p>
+          )}
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-app-edge bg-app-sheet">
+          {error && (
+            <div className="m-4 flex flex-wrap items-center gap-3 rounded-lg bg-app-neg-soft px-4 py-3 text-sm text-app-neg">
+              <span>Não foi possível carregar a base de conhecimento.</span>
+              <button type="button" onClick={() => void refresh()} className="font-semibold underline underline-offset-2">Tentar de novo</button>
             </div>
           )}
 
-          {/* URL */}
+          {docs.length === 0 && !error && (
+            <div className="px-5 py-8">
+              <p className="text-sm font-semibold text-app-ink">O agente ainda não sabe nada sobre o negócio.</p>
+              <p className="mt-1 text-sm text-app-muted">Comece pela ementa em PDF ou pelo link do site. Leva um minuto a processar.</p>
+            </div>
+          )}
+
+          <ul>
+            {docs.map((doc, i) => (
+              <li key={doc.id} className={`flex items-start gap-4 px-5 py-4 ${i > 0 ? 'border-t border-app-rule' : ''}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-app-ink">{doc.fileName ?? doc.sourceUrl ?? 'Sem título'}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-app-muted">
+                    <span>{typeIcon(doc.type)}</span>
+                    {doc.contentBytes > 0 && <span className="num">{fmtBytes(doc.contentBytes)}</span>}
+                    {doc.status === 'completed' && <span className="num">{doc.chunkCount} excertos</span>}
+                    <span className="num text-app-faint">{new Date(doc.createdAt).toLocaleDateString('pt-PT')}</span>
+                  </div>
+                  {doc.status === 'failed' && doc.error && (
+                    <p className="mt-1 text-sm text-app-neg">{doc.error}</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                  {statusBadge(doc)}
+                  <div className="flex gap-1">
+                    {(doc.status === 'failed' || doc.status === 'completed') && (
+                      <button type="button" onClick={() => void handleReingest(doc.id)} className="btn-ghost h-8 px-2 text-xs">
+                        {doc.status === 'failed' ? 'Tentar de novo' : 'Reprocessar'}
+                      </button>
+                    )}
+                    <button type="button" onClick={() => void handleDelete(doc.id)} className="btn-ghost h-8 px-2 text-xs hover:text-app-neg">Apagar</button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* Ensinar o agente */}
+      <section className="rounded-xl border border-app-edge bg-app-sheet lg:sticky lg:top-4">
+        <div className="px-5 pt-4">
+          <h2 className="text-base font-semibold text-app-ink">Acrescentar conhecimento</h2>
+        </div>
+        <div role="tablist" aria-label="Forma de acrescentar" className="mt-3 flex gap-4 overflow-x-auto border-b border-app-rule px-5">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={addMode === m.id}
+              onClick={() => setAddMode(m.id)}
+              className={`-mb-px shrink-0 border-b-2 pb-2.5 text-sm font-medium transition-colors ${addMode === m.id ? 'border-app-ink text-app-ink' : 'border-transparent text-app-muted hover:text-app-ink'}`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-4 p-5">
+          {addMode === 'file' && (
+            <>
+              <p className="text-sm text-app-muted">PDF, Word, CSV, TXT ou Markdown, até 10 MB. Começa a processar assim que escolher o ficheiro.</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                aria-label="Ficheiro"
+                accept=".pdf,.docx,.csv,.txt,.md"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="block w-full cursor-pointer text-sm text-app-muted file:mr-3 file:h-9 file:rounded-lg file:border file:border-solid file:border-app-control file:bg-app-sheet file:px-4 file:text-sm file:font-semibold file:text-app-ink hover:file:bg-app-raised disabled:opacity-50"
+              />
+              {uploading && <p className="text-sm text-app-muted">A enviar…</p>}
+              <Msg m={uploadMsg} />
+            </>
+          )}
+
           {addMode === 'url' && (
-            <div className="space-y-2">
-              <div className="flex gap-2">
+            <>
+              <p className="text-sm text-app-muted">O agente lê a página do site ou a transcrição do vídeo.</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <select
+                  aria-label="Tipo de link"
                   value={urlType}
                   onChange={(e) => setUrlType(e.target.value as 'youtube' | 'website')}
-                  className="border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-2 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700"
+                  className="input h-auto py-2 sm:w-36"
                 >
-                  <option value="website">Website</option>
+                  <option value="website">Site</option>
                   <option value="youtube">YouTube</option>
                 </select>
                 <input
                   type="url"
+                  aria-label="Endereço"
                   value={urlVal}
                   onChange={(e) => setUrlVal(e.target.value)}
-                  placeholder={urlType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://exemplo.com/artigo'}
-                  className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder={urlType === 'youtube' ? 'https://youtube.com/watch?v=…' : 'https://restaurante.pt/ementa'}
+                  className="input flex-1"
                   disabled={addingUrl}
                 />
-                <button
-                  onClick={handleAddUrl}
-                  disabled={addingUrl || !urlVal.trim()}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {addingUrl ? '…' : 'Adicionar'}
-                </button>
               </div>
-              {urlMsg && (
-                <p className={`text-xs ${urlMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{urlMsg}</p>
-              )}
-            </div>
+              <button type="button" onClick={handleAddUrl} disabled={addingUrl || !urlVal.trim()} className="btn-secondary">
+                {addingUrl ? 'A adicionar…' : 'Adicionar link'}
+              </button>
+              <Msg m={urlMsg} />
+            </>
           )}
 
-          {/* Texto */}
           {addMode === 'text' && (
-            <div className="space-y-2">
+            <>
               <input
                 type="text"
+                aria-label="Título"
                 value={textTitle}
                 onChange={(e) => setTextTitle(e.target.value)}
-                placeholder="Título (opcional)"
-                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="Título (opcional), ex.: Política de reservas"
+                className="input"
                 disabled={addingText}
               />
               <textarea
+                aria-label="Texto"
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
-                placeholder="Cole aqui o texto que o agente deve aprender…"
-                rows={5}
-                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
+                placeholder="Cole aqui o que o agente deve saber: pratos do dia, alergénios, regras de cancelamento…"
+                rows={10}
+                className="input resize-y leading-relaxed"
                 disabled={addingText}
               />
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-400 dark:text-gray-500">{textContent.length.toLocaleString()} / 1 000 000 carateres</span>
-                <button
-                  onClick={handleAddText}
-                  disabled={addingText || !textContent.trim()}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {addingText ? '…' : 'Adicionar'}
+              <div className="flex items-center justify-between gap-3">
+                <span className="num text-xs text-app-faint">{textContent.length.toLocaleString('pt-PT')} / 1 000 000 caracteres</span>
+                <button type="button" onClick={handleAddText} disabled={addingText || !textContent.trim()} className="btn-secondary">
+                  {addingText ? 'A adicionar…' : 'Adicionar texto'}
                 </button>
               </div>
-              {textMsg && (
-                <p className={`text-xs ${textMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{textMsg}</p>
-              )}
-            </div>
+              <Msg m={textMsg} />
+            </>
           )}
 
-          {/* Enriquecer com IA */}
           {addMode === 'enrich' && (
-            <div className="space-y-3">
+            <>
               {!enrichQuestions && (
                 <>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    A IA lê o system prompt do agente e tudo o que já está na base de conhecimento, e gera perguntas
-                    para te ajudar a preencher lacunas que os clientes provavelmente vão perguntar.
+                  <p className="text-sm text-app-muted">
+                    A IA lê as instruções do agente e o que já está aqui, e faz-lhe as perguntas que os clientes provavelmente vão fazer e
+                    ainda não têm resposta.
                   </p>
-                  <button
-                    onClick={handleGenerateEnrichQuestions}
-                    disabled={enrichLoading}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {enrichLoading ? '✨ A gerar perguntas…' : '✨ Gerar perguntas com IA'}
+                  <button type="button" onClick={handleGenerateEnrichQuestions} disabled={enrichLoading} className="btn-secondary">
+                    {enrichLoading ? 'A preparar perguntas…' : 'Gerar perguntas'}
                   </button>
                 </>
               )}
 
               {enrichQuestions && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {enrichQuestions.map((q, i) => (
                     <div key={i}>
-                      <label className="block text-sm text-gray-700 dark:text-gray-200 mb-1">{i + 1}. {q}</label>
+                      <label htmlFor={`enrich${i}`} className="mb-1 block text-sm font-medium text-app-ink"><span className="num text-app-faint">{i + 1}.</span> {q}</label>
                       <textarea
+                        id={`enrich${i}`}
                         value={enrichAnswers[i] ?? ''}
                         onChange={(e) => setEnrichAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
-                        placeholder="A tua resposta…"
+                        placeholder="A sua resposta"
                         rows={2}
-                        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
+                        className="input resize-y"
                       />
                     </div>
                   ))}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSubmitEnrichAnswers}
-                      disabled={enrichSubmitting}
-                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      {enrichSubmitting ? '…' : 'Guardar respostas na base de conhecimento'}
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={handleSubmitEnrichAnswers} disabled={enrichSubmitting} className="btn-secondary">
+                      {enrichSubmitting ? 'A guardar…' : 'Guardar respostas'}
                     </button>
-                    <button
-                      onClick={() => { setEnrichQuestions(null); setEnrichAnswers({}); setEnrichMsg(null); }}
-                      className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
+                    <button type="button" onClick={() => { setEnrichQuestions(null); setEnrichAnswers({}); setEnrichMsg(null); }} className="btn-ghost">
                       Cancelar
                     </button>
                   </div>
                 </div>
               )}
 
-              {enrichMsg && (
-                <p className={`text-xs ${enrichMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{enrichMsg}</p>
-              )}
-            </div>
+              <Msg m={enrichMsg} />
+            </>
           )}
         </div>
-      </div>
-
-      {/* Lista de documentos */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{docs.length} documento{docs.length !== 1 ? 's' : ''}</span>
-          <button onClick={() => void refresh()} className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">↻ Atualizar</button>
-        </div>
-
-        {error && <p className="p-4 text-sm text-red-600">{error}</p>}
-
-        {docs.length === 0 && !error && (
-          <p className="p-6 text-sm text-gray-400 dark:text-gray-500 text-center">Nenhum documento ainda. Adicione um ficheiro, URL ou texto acima.</p>
-        )}
-
-        <ul className="divide-y divide-gray-50 dark:divide-gray-700">
-          {docs.map((doc) => (
-            <li key={doc.id} className="px-4 py-3 flex items-start gap-3">
-              <span className="text-lg mt-0.5 select-none">{typeIcon(doc.type)}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                  {doc.fileName ?? doc.sourceUrl ?? 'Sem título'}
-                </p>
-                <div className="mt-0.5 flex flex-wrap gap-2 items-center">
-                  {statusBadge(doc)}
-                  {doc.contentBytes > 0 && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">{fmtBytes(doc.contentBytes)}</span>
-                  )}
-                  {doc.status === 'failed' && doc.error && (
-                    <span className="text-xs text-red-500 truncate max-w-xs" title={doc.error}>{doc.error}</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                {(doc.status === 'failed' || doc.status === 'completed') && (
-                  <button
-                    onClick={() => void handleReingest(doc.id)}
-                    title="Reingerir"
-                    className="p-1.5 rounded text-gray-400 dark:text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors text-sm"
-                  >
-                    ↺
-                  </button>
-                )}
-                <button
-                  onClick={() => void handleDelete(doc.id)}
-                  title="Apagar"
-                    className="p-1.5 rounded text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+      </section>
     </div>
   );
 }

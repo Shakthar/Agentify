@@ -159,131 +159,143 @@ export default function AgentValidation({ agent, onAgentUpdate }: Props) {
     }
   };
 
+  const ok = (m: string) => m.startsWith('✓');
+  const msgText = (m: string) => m.replace(/^✓\s*/, '');
+
   return (
-    <div className="flex items-start gap-3 py-3">
-      <span className="text-lg shrink-0 w-7 text-center mt-0.5">🛡️</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Validação de contactos</span>
-            {active && <span className="text-[14px] text-green-600 dark:text-green-400">● Ativa</span>}
-          </div>
-          <button
-            type="button"
-            onClick={handleToggle}
-            disabled={toggling}
-            aria-label={active ? 'Desativar Validação de contactos' : 'Ativar Validação de contactos'}
-            className={`shrink-0 w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${active ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-          >
-            <span className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${active ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
+    <li className="border-t border-app-rule py-4 first:border-t-0 first:pt-0">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-semibold text-app-ink">Só contactos aprovados</span>
+          <p className="mt-1 text-sm text-app-muted">
+            Só os números aprovados (WhatsApp e Telegram) falam com o agente. Os outros recebem uma recusa automática, sem gastar
+            créditos. Não se aplica ao Instagram, porque a Meta não mostra o número de quem escreve.
+          </p>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
-          Só números de telefone aprovados (WhatsApp e Telegram) podem falar com o agente — os restantes recebem uma
-          recusa automática sem consumir créditos. Não se aplica ao Instagram (a Meta não expõe o número do remetente aí).
-        </p>
-
-        {active && (
-          <div className="mt-4 space-y-4 border-t border-gray-100 dark:border-gray-700 pt-4">
-            {/* Mensagem de recusa */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mensagem de recusa</label>
-              <textarea
-                className="input w-full h-16 resize-none text-sm"
-                placeholder={DEFAULT_BLOCKED_MESSAGE}
-                value={msgDraft}
-                onChange={(e) => setMsgDraft(e.target.value)}
-                onBlur={handleSaveMessage}
-                disabled={savingMsg}
-              />
-              <p className="text-[14px] text-gray-400 mt-1">Enviada no máximo 1x por dia ao mesmo contacto. Deixa em branco para usar a mensagem padrão.</p>
-            </div>
-
-            {/* Adicionar contacto */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Adicionar contacto</label>
-              <div className="flex flex-wrap gap-2">
-                <input
-                  type="text"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="Nº de telefone (ex: 351912345678)"
-                  className="flex-1 min-w-[180px] border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  disabled={adding}
-                />
-                <input
-                  type="text"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  placeholder="Nome/etiqueta (opcional)"
-                  className="flex-1 min-w-[140px] border border-gray-200 dark:border-gray-600 rounded-lg text-sm px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  disabled={adding}
-                />
-                <button
-                  onClick={handleAddContact}
-                  disabled={adding || !newPhone.trim()}
-                  className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                >
-                  {adding ? '…' : 'Adicionar'}
-                </button>
-              </div>
-              {addMsg && <p className={`text-xs mt-1 ${addMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{addMsg}</p>}
-            </div>
-
-            {/* Importar ficheiro */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Importar de ficheiro</label>
-              <p className="text-[14px] text-gray-400 mb-2">Ficheiro .csv ou .txt — uma coluna com o número, opcionalmente uma segunda com o nome. Exporta o teu Excel/Sheets como CSV.</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.txt"
-                onChange={handleImport}
-                disabled={importing}
-                className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer disabled:opacity-50"
-              />
-              {importing && <p className="text-xs text-brand-600 mt-1 animate-pulse">A importar…</p>}
-              {importMsg && <p className={`text-xs mt-1 ${importMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{importMsg}</p>}
-            </div>
-
-            {/* Lista de contactos aprovados */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Contactos aprovados ({total})</label>
-                <button onClick={() => void refresh()} className="text-[14px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">↻ Atualizar</button>
-              </div>
-              {listError && <p className="text-xs text-red-600">{listError}</p>}
-              {loading && <p className="text-xs text-gray-400 animate-pulse">A carregar…</p>}
-              {!loading && contacts.length === 0 && !listError && (
-                <p className="text-xs text-gray-400 dark:text-gray-500 italic">Nenhum contacto aprovado ainda — adiciona um acima ou importa um ficheiro.</p>
-              )}
-              {contacts.length > 0 && (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {contacts.map((c) => (
-                        <tr key={c.id}>
-                          <td className="px-3 py-2 font-mono text-gray-700 dark:text-gray-200 whitespace-nowrap">+{c.phone}</td>
-                          <td className="px-3 py-2 text-gray-500 dark:text-gray-400 truncate">{c.label ?? '—'}</td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              onClick={() => void handleDeleteContact(c.id)}
-                              title="Remover"
-                              className="p-1 rounded text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={active}
+          onClick={handleToggle}
+          disabled={toggling}
+          aria-label={active ? 'Desativar Validação de contactos' : 'Ativar Validação de contactos'}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent/40 disabled:opacity-60 ${active ? 'bg-app-accent' : 'bg-app-control'}`}
+        >
+          <span className={`h-5 w-5 rounded-full bg-app-sheet transition-transform ${active ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
       </div>
-    </div>
+
+      {active && (
+        <div className="mt-4 space-y-5 border-t border-app-rule pt-4">
+          {/* Mensagem de recusa */}
+          <div>
+            <label htmlFor="valBlockedMsg" className="mb-1 block text-sm font-medium text-app-ink">Mensagem de recusa</label>
+            <textarea
+              id="valBlockedMsg"
+              className="input h-20 resize-y"
+              placeholder={DEFAULT_BLOCKED_MESSAGE}
+              value={msgDraft}
+              onChange={(e) => setMsgDraft(e.target.value)}
+              onBlur={handleSaveMessage}
+              disabled={savingMsg}
+            />
+            <p className="mt-1 text-xs text-app-faint">Enviada no máximo uma vez por dia ao mesmo contacto. Em branco, usa a mensagem padrão. Guarda-se ao sair do campo.</p>
+          </div>
+
+          {/* Adicionar contacto */}
+          <div>
+            <span className="mb-1 block text-sm font-medium text-app-ink">Adicionar contacto</span>
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                aria-label="Número de telefone"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="Telefone (ex: 351912345678)"
+                className="input num min-w-[180px] flex-1"
+                disabled={adding}
+              />
+              <input
+                type="text"
+                aria-label="Nome ou etiqueta"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder="Nome (opcional)"
+                className="input min-w-[140px] flex-1"
+                disabled={adding}
+              />
+              <button type="button" onClick={handleAddContact} disabled={adding || !newPhone.trim()} className="btn-secondary">
+                {adding ? 'A adicionar…' : 'Adicionar'}
+              </button>
+            </div>
+            {addMsg && <p role="status" className={`mt-1 text-xs ${ok(addMsg) ? 'text-app-pos' : 'text-app-neg'}`}>{msgText(addMsg)}</p>}
+          </div>
+
+          {/* Importar ficheiro */}
+          <div>
+            <label htmlFor="valImport" className="mb-1 block text-sm font-medium text-app-ink">Importar de ficheiro</label>
+            <p className="mb-2 text-xs text-app-faint">Ficheiro .csv ou .txt: uma coluna com o número e, se quiser, outra com o nome. No Excel ou Sheets, exporte como CSV.</p>
+            <input
+              id="valImport"
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.txt"
+              onChange={handleImport}
+              disabled={importing}
+              className="block w-full cursor-pointer text-sm text-app-muted file:mr-3 file:h-9 file:rounded-lg file:border file:border-solid file:border-app-control file:bg-app-sheet file:px-4 file:text-sm file:font-semibold file:text-app-ink hover:file:bg-app-raised disabled:opacity-50"
+            />
+            {importing && <p className="mt-1 text-xs text-app-muted">A importar…</p>}
+            {importMsg && <p role="status" className={`mt-1 text-xs ${ok(importMsg) ? 'text-app-pos' : 'text-app-neg'}`}>{msgText(importMsg)}</p>}
+          </div>
+
+          {/* Lista de contactos aprovados */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium text-app-ink">Contactos aprovados <span className="num font-normal text-app-faint">{total}</span></span>
+              <button type="button" onClick={() => void refresh()} className="text-sm font-semibold text-app-accent hover:underline">Atualizar</button>
+            </div>
+            {listError && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg bg-app-neg-soft px-3 py-2 text-sm text-app-neg">
+                <span>Não foi possível carregar os contactos.</span>
+                <button type="button" onClick={() => void refresh()} className="font-semibold underline underline-offset-2">Tentar de novo</button>
+              </div>
+            )}
+            {loading && (
+              <div className="space-y-2" aria-label="A carregar">
+                <span className="block h-4 w-2/3 rounded bg-app-raised" />
+                <span className="block h-4 w-1/2 rounded bg-app-raised" />
+              </div>
+            )}
+            {!loading && contacts.length === 0 && !listError && (
+              <p className="rounded-lg border border-dashed border-app-edge px-4 py-3 text-sm text-app-muted">Ainda não há contactos aprovados. Adicione um acima ou importe um ficheiro.</p>
+            )}
+            {contacts.length > 0 && (
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-app-edge">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {contacts.map((c, i) => (
+                      <tr key={c.id} className={i > 0 ? 'border-t border-app-rule' : ''}>
+                        <td className="num whitespace-nowrap px-3 py-2 text-app-ink">+{c.phone}</td>
+                        <td className="truncate px-3 py-2 text-app-muted">{c.label ?? '—'}</td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteContact(c.id)}
+                            aria-label={`Remover +${c.phone}`}
+                            className="rounded px-2 py-1 text-xs font-semibold text-app-muted transition-colors hover:bg-app-neg-soft hover:text-app-neg"
+                          >
+                            Remover
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </li>
   );
 }

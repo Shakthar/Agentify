@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
-import Navigation from '../../components/Navigation';
+import AppLayout from '../../components/app/AppLayout';
+import { EmptyState, PageHeader, Panel, Pill, Tabs, cx } from '../../components/app/ui';
+import { UsageBar, fmt, isoDate } from '../../components/app/billingParts';
 import { useAuth } from '../../hooks/useAuth';
-import { Plan, PLAN_LABELS, PLAN_COLORS } from '../../types';
+import { Plan, PLAN_LABELS } from '../../types';
 import api from '../../utils/api';
 import {
   PLAN_PRICING, TOP_UP, CREDITS_PER_CONVERSATION, estConversations, addonPrice, money, num, pricePer1k, defaultCurrency,
-  type Currency,
+  type Currency, type PlanId,
 } from '../../utils/pricing';
 
 // ─── Planos ───────────────────────────────────────────────────────────────────
@@ -164,11 +166,11 @@ const SKILLS: SkillDef[] = [
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {
-  base: '🧱 Skills Base',
-  automation: '⚙️ Automação',
-  revenue: '💰 Revenue',
-  analytics: '📊 Analytics',
-  custom: '🛠️ Custom',
+  base: 'Skills base',
+  automation: 'Automação',
+  revenue: 'Receita',
+  analytics: 'Análise',
+  custom: 'À medida',
 };
 
 // ─── Infra features (tabela de planos, sem skills) ─────────────────────────
@@ -187,7 +189,7 @@ function infraFeatures(cur: Currency): FeatureRow[] {
     { label: 'Modelos IA',             icon: '⚡', values: ['Haiku / GPT-mini', '+ Sonnet', '+ GPT-4o', '+ Claude Opus'], note: 'Auto-routing escolhe o modelo para cada mensagem' },
     { label: 'Base de conhecimento',   icon: '📚', values: [true, true, true, true], note: 'PDF, Word, Excel, PPT, YouTube, Páginas web' },
     { label: 'Mensagens WhatsApp', icon: '✅', values: ['Sem créditos', 'Sem créditos', 'Sem créditos', 'Sem créditos'], note: 'O envio de mensagens não consome créditos. As tarifas da Meta (acima de 1.000 mensagens/mês por número) são faturadas pela Meta diretamente no cartão do dono do número.' },
-    { label: 'Rollover de créditos',   icon: '🔄', values: ['—', '🔜 Em breve', '🔜 Em breve', '🔜 Em breve'], note: 'Em breve: paga 85% dos créditos não usados para os transferir para o mês seguinte (válido 2 meses).' },
+    { label: 'Rollover de créditos',   icon: '🔄', values: ['—', 'Em breve', 'Em breve', 'Em breve'], note: 'Em breve: paga 85% dos créditos não usados para os transferir para o mês seguinte (válido 2 meses).' },
     { label: 'Pacote extra 5.000 créditos', icon: '⚡', values: ['—', money(TOP_UP.starter[cur], cur), money(TOP_UP.business[cur], cur), money(TOP_UP.enterprise[cur], cur)] },
     { label: 'Agentes extras (addon)', icon: '➕', values: ['—', `+${m(20)}/ag/mês ²`, `+${m(15)}/ag/mês ²`, `+${m(10)}/ag/mês`] },
     { label: 'White-label',            icon: '🎨', values: ['—', `+${m(5)}/ag/mês ➕`, `+${m(3)}/ag/mês ➕`, 'Incluído'] },
@@ -197,44 +199,53 @@ function infraFeatures(cur: Currency): FeatureRow[] {
   ];
 }
 
+const TIER = ['free', 'starter', 'business', 'enterprise'] as const;
+const HISTORY: Record<string, string> = { free: '30 dias', starter: '90 dias', business: '1 ano', enterprise: 'ilimitado' };
+const HAS_API: Record<string, boolean> = { free: false, starter: false, business: true, enterprise: true };
+
+/** O que muda ao passar de um plano para outro, em frases factuais. */
+function consequences(from: PlanId, to: PlanId, cur: Currency): string[] {
+  const a = PLAN_PRICING[from], b = PLAN_PRICING[to];
+  const out: string[] = [];
+  const pa = a[cur].price, pb = b[cur].price;
+  out.push(pa === 0 ? `Passa a pagar ${money(pb, cur)} por mês.` : pb === 0 ? 'Deixa de pagar mensalidade.' : `A mensalidade passa de ${money(pa, cur)} para ${money(pb, cur)} por mês.`);
+  out.push(to === 'free'
+    ? `Os créditos passam a ${num(b[cur].credits)}, atribuídos uma única vez e sem renovação.`
+    : `Créditos: ${num(a[cur].credits)}${from === 'free' ? ' (únicos)' : ''} → ${num(b[cur].credits)} por mês.`);
+  if (a.agents !== b.agents) out.push(`Agentes incluídos: ${a.agents} → ${b.agents}.`);
+  if (HISTORY[from] !== HISTORY[to]) out.push(`Histórico de conversas: ${HISTORY[from]} → ${HISTORY[to]}.`);
+  if (HAS_API[from] !== HAS_API[to]) out.push(HAS_API[to] ? 'Ganha acesso à API.' : 'Perde o acesso à API.');
+  const lost = SKILLS.filter(s => s.plans[from] === 'included' && s.plans[to] !== 'included').length;
+  const gained = SKILLS.filter(s => s.plans[from] !== 'included' && s.plans[to] === 'included').length;
+  if (gained) out.push(gained === 1 ? '1 skill passa a estar incluída.' : `${gained} skills passam a estar incluídas.`);
+  if (lost) out.push(lost === 1 ? '1 skill deixa de estar incluída (fica como addon ou indisponível).' : `${lost} skills deixam de estar incluídas (ficam como addon ou indisponíveis).`);
+  return out;
+}
+
 function Cell({ ok }: { ok: boolean | string | null | undefined }) {
-  if (ok === null || ok === undefined || ok === false)
-    return <span className="text-gray-300 dark:text-gray-600">—</span>;
+  if (ok === null || ok === undefined || ok === false) return <span className="text-app-faint">—</span>;
   if (typeof ok === 'string') {
-    const isAddon = ok.includes('➕');
-    return <span className={`text-xs ${isAddon ? 'text-orange-600 dark:text-orange-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>{ok}</span>;
+    const addon = ok.includes('➕');
+    const txt = ok.replace('➕', '').trim();
+    return <span className={cx('num', txt === '—' ? 'text-app-faint' : 'text-app-ink')}>{txt}{addon && <span className="text-app-faint"> · addon</span>}</span>;
   }
-  return (
-    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30">
-      <span className="text-green-600 dark:text-green-400 text-xs font-bold">✓</span>
-    </span>
-  );
+  return <span className="text-app-ink">Sim</span>;
 }
 
 function SkillBadge({ avail, price, creditsPerTx, currency }: { avail: SkillAvail; price?: number; creditsPerTx?: number; currency: Currency }) {
-  if (avail === 'unavailable')
-    return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
-  if (avail === 'included')
-    return (
-      <span className="inline-flex items-center gap-1 text-[15px] font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">
-        ✓ Incluído
-      </span>
-    );
-  // addon
+  if (avail === 'unavailable') return <span className="text-app-faint">—</span>;
+  if (avail === 'included') return <span className="font-medium text-app-pos">Incluído</span>;
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className="inline-flex items-center text-[15px] font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full whitespace-nowrap">
-        {price ? `+${money(addonPrice(price, currency), currency)}/mês` : 'Addon'}
-      </span>
-      {creditsPerTx && (
-        <span className="text-[14px] text-gray-400">{creditsPerTx} crd/tx</span>
-      )}
-    </div>
+    <span className="inline-flex flex-col items-end">
+      <span className="num whitespace-nowrap font-medium text-app-ink">{price ? `+${money(addonPrice(price, currency), currency)}/mês` : 'Addon'}</span>
+      {creditsPerTx && <span className="num text-xs text-app-faint">{creditsPerTx} créditos/tx</span>}
+    </span>
   );
 }
-
 export default function PlansPage() {
   const { tenant } = useAuth();
+  const [usage, setUsage] = useState<{ used: number; total: number } | null>(null);
+  const [mobilePlan, setMobilePlan] = useState<PlanId | null>(null);
 
   type MainTab = 'plans' | 'skills' | 'marketplace';
   const [mainTab, setMainTab] = useState<MainTab>('plans');
@@ -261,6 +272,9 @@ export default function PlansPage() {
         if (r.data?.tenantCurrency === 'BRL') { setCurrency('BRL'); setCurrencyLocked(true); }
       })
       .catch(() => {});
+  }, []);
+  useEffect(() => {
+    api.get('/api/billing/credits').then(r => { if (typeof r.data?.total === 'number') setUsage({ used: r.data.used, total: r.data.total }); }).catch(() => {});
   }, []);
   const PLANS_DATA = plansFor(currency);
   const INFRA_FEATURES = infraFeatures(currency);
@@ -314,438 +328,414 @@ export default function PlansPage() {
 
   // Categorias únicas
   const categories = Array.from(new Set(SKILLS.map(s => s.category)));
+  const primaryId: PlanId | null = (() => {
+    const hi = PLANS_DATA.find(p => p.highlight);
+    if (hi && PLANS_DATA.findIndex(p => p.id === hi.id) > currentIdx) return hi.id;
+    const next = PLANS_DATA[currentIdx + 1];
+    return next ? next.id : null;
+  })();
+  const mp: PlanId = mobilePlan ?? currentPlan;
+  const curData = PLANS_DATA[currentIdx];
+  const days = tenant.subscriptionExpiresAt ? Math.ceil((new Date(tenant.subscriptionExpiresAt).getTime() - Date.now()) / 86400000) : null;
+  const status = tenant.subscriptionStatus;
+
+  // Contorno acento só no plano recomendado: bordas nas células da coluna.
+  const hiIdx = PLANS_DATA.findIndex(p => p.highlight);
+  const colEdge = (j: number, pos: 'top' | 'mid' | 'bottom') =>
+    j === hiIdx ? cx('border-x border-app-accent', pos === 'top' && 'rounded-t-lg border-t', pos === 'bottom' && 'rounded-b-lg border-b') : '';
+  const curTint = (j: number) => (PLANS_DATA[j].id === currentPlan ? 'bg-app-raised/60' : '');
+
+  function PlanAction({ plan, block, full }: { plan: (typeof PLANS_DATA)[number]; block?: boolean; full?: boolean }) {
+    if (plan.id === currentPlan) return <span className={cx('text-sm font-medium text-app-muted', block && 'block text-center')}>Plano atual</span>;
+    const isUpgrade = currentIdx < PLANS_DATA.findIndex(p => p.id === plan.id);
+    return (
+      <button
+        onClick={() => plan.price > 0 && openModal(plan.id, plan.price)}
+        disabled={plan.price === 0}
+        aria-label={plan.price === 0 ? 'Plano gratuito' : `${isUpgrade ? 'Subir' : 'Descer'} para ${plan.label}`}
+        className={cx(plan.id === primaryId ? 'btn-primary' : 'btn-secondary', 'w-full disabled:cursor-not-allowed disabled:opacity-50')}
+      >
+        {plan.price === 0 ? 'Gratuito' : isUpgrade ? (full ? `Subir para ${plan.label}` : 'Subir') : (full ? `Descer para ${plan.label}` : 'Descer')}
+      </button>
+    );
+  }
+
+  const MobilePlanPicker = () => (
+    <div className="mb-4 grid grid-cols-4 gap-0.5 rounded-lg border border-app-control p-0.5 md:hidden" role="tablist" aria-label="Plano a ver">
+      {PLANS_DATA.map(p => (
+        <button key={p.id} role="tab" aria-selected={mp === p.id} onClick={() => setMobilePlan(p.id)}
+          className={cx('rounded-md px-1 py-1.5 text-xs font-medium', mp === p.id ? 'bg-app-raised text-app-ink' : 'text-app-muted')}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="flex min-h-screen">
+    <AppLayout wide>
       <Head><title>Agentfy — Planos e Skills</title></Head>
-      <Navigation />
-      <main className="flex-1 p-6 overflow-y-auto">
-        <div className="max-w-6xl mx-auto">
-
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Planos e Skills</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-              Plano atual: <span className={`font-medium text-xs px-2 py-0.5 rounded-full ${PLAN_COLORS[currentPlan as Plan]}`}>{PLAN_LABELS[currentPlan as Plan]}</span>
-              {' · '}{includedSkills.length} skills incluídas · {availableAddons.length} skills disponíveis para adicionar
-            </p>
-            <div className="mt-3 inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 text-xs">
+      <PageHeader
+        title="Planos"
+        subtitle={<>Plano {PLAN_LABELS[currentPlan as Plan]} · {includedSkills.length} skills incluídas · {availableAddons.length} disponíveis como addon</>}
+        actions={
+          <div className="flex items-center gap-3">
+            {currencyLocked && <span className="text-xs text-app-faint">Conta faturada em reais</span>}
+            <div className="inline-flex rounded-lg border border-app-control p-0.5 text-sm" role="group" aria-label="Moeda">
               {(['EUR', 'BRL'] as Currency[]).map(c => (
-                <button key={c} onClick={() => !currencyLocked && setCurrency(c)} disabled={currencyLocked && c !== currency}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${currency === c ? 'bg-brand-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 disabled:opacity-40'}`}>
-                  {c === 'EUR' ? '€ Euro' : 'R$ Real (Brasil)'}
+                <button key={c} onClick={() => !currencyLocked && setCurrency(c)} disabled={currencyLocked && c !== currency} aria-pressed={currency === c}
+                  className={cx('rounded-md px-3 py-1 font-medium transition-colors disabled:opacity-40', currency === c ? 'bg-app-raised text-app-ink' : 'text-app-muted hover:text-app-ink')}>
+                  {c === 'EUR' ? 'EUR €' : 'BRL R$'}
                 </button>
               ))}
             </div>
-            {currencyLocked && <p className="text-[14px] text-gray-400 mt-1">A tua conta é faturada em reais.</p>}
           </div>
+        }
+      />
 
-          {/* Tab bar */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1">
-            {([
-              { key: 'plans',       label: '📋 Planos',           sub: 'Comparar planos e preços' },
-              { key: 'skills',      label: '🧩 Skills por plano', sub: 'O que vem com cada plano' },
-              { key: 'marketplace', label: '🛒 Marketplace',      sub: `${availableAddons.length} skills disponíveis` },
-            ] as { key: MainTab; label: string; sub: string }[]).map(t => (
-              <button key={t.key} onClick={() => setMainTab(t.key)}
-                className={`group px-4 pb-3 pt-1 text-left transition-colors border-b-2 ${
-                  mainTab === t.key
-                    ? 'border-brand-600 text-brand-700 dark:text-brand-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                }`}>
-                <span className="text-sm font-semibold block">{t.label}</span>
-                <span className="text-[15px] text-gray-400 hidden sm:block">{t.sub}</span>
-              </button>
-            ))}
-          </div>
+      <Tabs<MainTab>
+        label="Planos e skills"
+        value={mainTab}
+        onChange={setMainTab}
+        tabs={[
+          { id: 'plans', label: 'Planos' },
+          { id: 'skills', label: 'Skills por plano' },
+          { id: 'marketplace', label: 'Marketplace', count: availableAddons.length },
+        ]}
+      />
 
-          {/* ═══════════════════════════════════════════════════════════
-              ABA 1 — PLANOS
-          ═══════════════════════════════════════════════════════════ */}
-          {mainTab === 'plans' && (
-            <>
-              {/* Plan cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {PLANS_DATA.map((plan) => {
-                  const isCurrent = currentPlan === plan.id;
-                  const isUpgrade = currentIdx < PLANS_DATA.findIndex(p => p.id === plan.id);
-                  return (
-                    <div key={plan.id} className={`relative rounded-xl border-2 p-5 flex flex-col gap-3 transition-all
-                      ${plan.highlight ? 'border-brand-500 shadow-md' : 'border-gray-200 dark:border-gray-700'}
-                      ${isCurrent ? 'bg-brand-50 dark:bg-brand-900/10' : 'bg-white dark:bg-gray-900'}`}>
-                      {plan.badge && (
-                        <span className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[14px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap
-                          ${plan.highlight ? 'bg-brand-600 text-white' : 'bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800'}`}>
-                          {plan.badge}
-                        </span>
-                      )}
-                      <div>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
-                        <p className="text-2xl font-bold mt-2 text-gray-900 dark:text-gray-100">
-                          {plan.price === 0 ? 'Grátis' : money(plan.price, currency)}
-                          {plan.price > 0 && <span className="text-xs text-gray-400 font-normal">/mês</span>}
-                        </p>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1.5 flex-1">
-                        <p>💳 <strong className="text-gray-700 dark:text-gray-300">{plan.creditsLabel}</strong></p>
-                        <p>💬 ≈ {num(plan.conversations)} conversas{plan.renewable ? '/mês' : ''}</p>
-                        <p>🤖 <strong className="text-gray-700 dark:text-gray-300">{plan.agents} agente{plan.agents > 1 ? 's' : ''}</strong></p>
-                        <p>📱 {plan.whatsapp} WhatsApp{plan.whatsapp > 1 ? 's' : ''}</p>
-                        {plan.price > 0 && <p className="text-green-600 dark:text-green-400 font-medium">{pricePer1k(plan.id, currency)} / 1.000 créditos</p>}
-                        {!plan.renewable && <p className="text-amber-600 dark:text-amber-400">⚠️ Créditos únicos</p>}
-                      </div>
-                      {isCurrent ? (
-                        <span className="text-center text-xs text-brand-600 dark:text-brand-400 font-medium py-1.5 bg-brand-100 dark:bg-brand-900/30 rounded-lg">✓ Plano atual</span>
-                      ) : (
-                        <button onClick={() => plan.price > 0 && openModal(plan.id, plan.price)}
-                          className={`text-xs py-2 px-3 rounded-lg font-medium transition-colors ${
-                            isUpgrade ? 'bg-brand-600 hover:bg-brand-700 text-white' : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
-                          {plan.price === 0 ? 'Plano gratuito' : isUpgrade ? 'Fazer upgrade →' : 'Fazer downgrade'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Credits explainer */}
-              <div className="mb-6 p-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10">
-                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">💡 Como funcionam os créditos?</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-blue-700 dark:text-blue-300">
-                  {[
-                    { label: 'Conversa simples (1-2 trocas)', cost: '~10-20 créditos' },
-                    { label: 'Conversa média (3-5 trocas)', cost: '~30-50 créditos' },
-                    { label: 'Pedido com pagamento', cost: '~50-80 créditos + crd/tx' },
-                    { label: 'Conversa complexa (6+ trocas)', cost: '~80+ créditos' },
-                  ].map(ex => (
-                    <div key={ex.label} className="bg-white dark:bg-blue-900/20 rounded-lg p-2.5">
-                      <p className="text-blue-500 dark:text-blue-400">{ex.label}</p>
-                      <p className="font-bold mt-0.5">{ex.cost}</p>
-                    </div>
-                  ))}
+      {/* ── Planos ── */}
+      {mainTab === 'plans' && (
+        <div className="space-y-6">
+          {/* Plano atual e utilização primeiro */}
+          <Panel>
+            <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:gap-10">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-semibold text-app-ink">Plano {PLAN_LABELS[currentPlan as Plan]}</h2>
+                  {status === 'active' && <Pill tone="pos" dot>Ativo</Pill>}
+                  {status === 'trial' && <Pill tone="accent">Período de teste</Pill>}
+                  {status === 'pending_payment' && <Pill tone="warn">Aguarda pagamento</Pill>}
+                  {status === 'suspended' && <Pill tone="neg">Suspenso</Pill>}
                 </div>
-                <p className="text-[15px] text-blue-500 dark:text-blue-400 mt-2">
-                  💡 1 crédito ≈ 1.000 tokens no Claude Haiku. Modelos mais capazes consomem mais (Sonnet e GPT-4o ×3, Opus ×5). O auto-routing escolhe o modelo para cada mensagem.
+                <p className="num mt-2 text-2xl font-semibold text-app-ink">
+                  {curData.price === 0 ? 'Grátis' : money(curData.price, currency)}
+                  {curData.price > 0 && <span className="text-sm font-normal text-app-muted"> / mês</span>}
+                </p>
+                <p className="mt-1 text-sm text-app-muted">
+                  {curData.agents} agente{curData.agents > 1 ? 's' : ''} · {curData.creditsLabel}
+                  {tenant.subscriptionExpiresAt && <> · renova a <span className="num">{isoDate(tenant.subscriptionExpiresAt)}</span>{days !== null && days > 0 ? <span className="text-app-faint"> ({days} dias)</span> : null}</>}
                 </p>
               </div>
+              <div className="md:border-l md:border-app-rule md:pl-10">
+                {usage ? (
+                  <UsageBar used={usage.used} total={usage.total} />
+                ) : (
+                  <p className="text-sm text-app-muted">Créditos incluídos: <span className="num font-medium text-app-ink">{fmt(curData.credits)}</span>{currentPlan === 'free' ? ' (únicos)' : ' por mês'}.</p>
+                )}
+              </div>
+            </div>
+          </Panel>
 
-              {/* Infra comparison table */}
-              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
-                <table className="w-full text-sm min-w-[620px]">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 w-52">Funcionalidade</th>
-                      {PLANS_DATA.map(plan => (
-                        <th key={plan.id} className={`py-3 px-3 text-center relative ${currentPlan === plan.id ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}>
-                          {currentPlan === plan.id && (
-                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[14px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
-                          )}
-                          <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
-                        </th>
+          {/* Comparação: tabela de colunas, uma só marcada */}
+          <section aria-label="Comparação de planos">
+            <MobilePlanPicker />
+            {/* Mobile: um plano de cada vez */}
+            <div className="md:hidden">
+              {PLANS_DATA.filter(p => p.id === mp).map(plan => (
+                <div key={plan.id}>
+                  <div className={cx('mb-3 rounded-xl border p-4', plan.highlight ? 'border-app-accent' : 'border-app-edge')}>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-base font-semibold text-app-ink">{plan.label}</h3>
+                      {plan.highlight && <Pill tone="accent">Recomendado</Pill>}
+                    </div>
+                    <p className="num mt-1 text-2xl font-semibold text-app-ink">{plan.price === 0 ? 'Grátis' : money(plan.price, currency)}{plan.price > 0 && <span className="text-sm font-normal text-app-muted"> / mês</span>}</p>
+                    <div className="mt-3"><PlanAction plan={plan} full /></div>
+                  </div>
+                  <dl>
+                    {INFRA_FEATURES.slice(1).map((f, i) => (
+                      <div key={i} className="flex items-start justify-between gap-4 border-t border-app-rule py-2.5 text-sm">
+                        <dt className="min-w-0 text-app-muted">{f.label}</dt>
+                        <dd className="shrink-0 text-right"><Cell ok={f.values[PLANS_DATA.findIndex(p => p.id === plan.id)]} /></dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop */}
+            <div className="hidden md:block">
+              <table className="w-full border-separate border-spacing-0 text-sm">
+                <thead>
+                  <tr>
+                    <th className="w-[26%] pb-3 pr-4 text-left align-bottom text-xs font-medium text-app-muted">Funcionalidade</th>
+                    {PLANS_DATA.map((plan, j) => (
+                      <th key={plan.id} className={cx('px-4 pb-4 pt-4 text-left align-bottom font-normal', colEdge(j, 'top'), curTint(j))}>
+                        <div className="flex h-5 items-center gap-2">
+                          <span className="text-base font-semibold text-app-ink">{plan.label}</span>
+                          {plan.highlight && <Pill tone="accent">Recomendado</Pill>}
+                          {plan.id === currentPlan && <Pill>Atual</Pill>}
+                        </div>
+                        <p className="num mt-2 text-2xl font-semibold text-app-ink">{plan.price === 0 ? 'Grátis' : money(plan.price, currency)}</p>
+                        <p className="text-xs text-app-faint">{plan.price === 0 ? 'sem prazo' : 'por mês'}</p>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {INFRA_FEATURES.slice(1).map((feature, i) => (
+                    <tr key={i}>
+                      <td className="border-t border-app-rule py-2.5 pr-4 align-top">
+                        <span className="text-app-ink">{feature.label}</span>
+                        {feature.note && <p className="mt-0.5 text-xs leading-snug text-app-faint">{feature.note}</p>}
+                      </td>
+                      {feature.values.map((val, j) => (
+                        <td key={j} className={cx('border-t border-app-rule px-4 py-2.5 align-top', colEdge(j, 'mid'), curTint(j))}>
+                          <Cell ok={val} />
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {INFRA_FEATURES.map((feature, i) => (
-                      <tr key={i} className={`border-b border-gray-100 dark:border-gray-700/50 last:border-0 ${i % 2 === 0 ? '' : 'bg-gray-50/40 dark:bg-gray-800/20'}`}>
-                        <td className="py-2.5 px-4">
-                          <div className="flex items-start gap-1.5">
-                            <span className="text-sm mt-0.5">{feature.icon}</span>
-                            <div>
-                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{feature.label}</span>
-                              {feature.note && <p className="text-[14px] text-gray-400 mt-0.5 leading-tight">{feature.note}</p>}
-                            </div>
-                          </div>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="border-t border-app-rule" />
+                    {PLANS_DATA.map((plan, j) => (
+                      <td key={plan.id} className={cx('border-t border-app-rule px-4 py-4', colEdge(j, 'bottom'), curTint(j))}>
+                        <PlanAction plan={plan} block />
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+
+          {/* Consequências de mudar */}
+          <Panel title="O que muda se mudar de plano">
+            <div className="divide-y divide-app-rule">
+              {PLANS_DATA.filter(p => p.id !== currentPlan).map(p => {
+                const up = PLANS_DATA.findIndex(x => x.id === p.id) > currentIdx;
+                return (
+                  <div key={p.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6">
+                    <p className="text-sm font-medium text-app-ink">{up ? 'Subir para' : 'Descer para'} {p.label}</p>
+                    <ul className="space-y-0.5 text-sm text-app-muted">
+                      {consequences(currentPlan, p.id as PlanId, currency).map((c, k) => <li key={k}>{c}</li>)}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 border-t border-app-rule pt-3 text-sm text-app-muted">
+              A mudança só fica ativa depois de o pagamento ser confirmado. A subscrição renova todos os meses até ser cancelada.
+            </p>
+          </Panel>
+
+          {/* Créditos */}
+          <Panel title="Como funcionam os créditos">
+            <dl className="grid gap-x-8 text-sm md:grid-cols-2">
+              {[
+                { label: 'Conversa simples (1-2 trocas)', cost: '~10-20 créditos' },
+                { label: 'Conversa média (3-5 trocas)', cost: '~30-50 créditos' },
+                { label: 'Pedido com pagamento', cost: '~50-80 créditos + créditos/tx' },
+                { label: 'Conversa complexa (6+ trocas)', cost: '~80+ créditos' },
+              ].map(ex => (
+                <div key={ex.label} className="flex items-baseline justify-between gap-4 border-t border-app-rule py-2.5">
+                  <dt className="text-app-muted">{ex.label}</dt>
+                  <dd className="num font-medium text-app-ink">{ex.cost}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 text-sm text-app-muted">
+              1 crédito corresponde a cerca de 1.000 tokens no Claude Haiku. Modelos mais capazes consomem mais (Sonnet e GPT-4o ×3, Opus ×5); o auto-routing escolhe o modelo para cada mensagem.
+            </p>
+          </Panel>
+
+          <div className="space-y-1 text-xs text-app-faint">
+            <p>¹ Créditos Free são atribuídos uma única vez e não renovam. Suba de plano para ter créditos mensais renováveis.</p>
+            <p>² Starter: máx. 3 agentes no total · Business: máx. 10 · Enterprise: ilimitados.</p>
+            <p>1 agente = 1 número WhatsApp. Um agente pode integrar várias plataformas (Shopify, iFood, etc.) em simultâneo.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Skills por plano ── */}
+      {mainTab === 'skills' && (
+        <div>
+          <p className="mb-5 max-w-2xl text-sm text-app-muted">
+            As skills são capacidades adicionais que diferenciam cada agente. Cada agente pode ter um conjunto diferente de skills ativas.
+          </p>
+          <MobilePlanPicker />
+          {/* Mobile */}
+          <div className="md:hidden">
+            {categories.map(cat => (
+              <div key={cat} className="mb-5">
+                <h3 className="mb-1 text-sm font-semibold text-app-ink">{CATEGORY_LABELS[cat]}</h3>
+                {SKILLS.filter(s => s.category === cat).map(skill => (
+                  <div key={skill.id} className="flex items-start justify-between gap-4 border-t border-app-rule py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-app-ink">{skill.name}</p>
+                      <p className="text-xs text-app-faint">{skill.desc}</p>
+                    </div>
+                    <div className="shrink-0 text-right"><SkillBadge avail={skill.plans[mp]} price={skill.addonPrice[mp]} creditsPerTx={skill.creditsPerTx?.[mp]} currency={currency} /></div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          {/* Desktop */}
+          <div className="hidden md:block">
+            <table className="w-full border-separate border-spacing-0 text-sm">
+              <thead>
+                <tr className="text-left text-xs text-app-muted">
+                  <th className="w-[40%] py-2 pr-4 font-medium">Skill</th>
+                  {PLANS_DATA.map((plan, j) => (
+                    <th key={plan.id} className={cx('px-4 py-2 text-right font-medium', curTint(j), plan.id === currentPlan && 'text-app-ink')}>
+                      {plan.label}{plan.id === currentPlan && <span className="ml-1.5 font-normal text-app-faint">atual</span>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map(cat => (
+                  <>
+                    <tr key={`cat-${cat}`}>
+                      <td colSpan={5} className="border-t border-app-rule pb-1 pt-5 text-sm font-semibold text-app-ink">{CATEGORY_LABELS[cat]}</td>
+                    </tr>
+                    {SKILLS.filter(s => s.category === cat).map(skill => (
+                      <tr key={skill.id}>
+                        <td className="border-t border-app-rule py-2.5 pr-4 align-top">
+                          <p className="font-medium text-app-ink">{skill.name}</p>
+                          <p className="text-xs leading-snug text-app-faint">{skill.desc}</p>
+                          {skill.creditsPerTx && <p className="text-xs text-app-muted">Mais créditos por transação, conforme o plano.</p>}
                         </td>
-                        {feature.values.map((val, j) => (
-                          <td key={j} className={`py-2.5 px-3 text-center ${currentPlan === PLANS_DATA[j].id ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''}`}>
-                            <Cell ok={val} />
+                        {PLANS_DATA.map((plan, j) => (
+                          <td key={plan.id} className={cx('border-t border-app-rule px-4 py-2.5 text-right align-top', curTint(j))}>
+                            <SkillBadge avail={skill.plans[plan.id as PlanId]} price={skill.addonPrice[plan.id]} creditsPerTx={skill.creditsPerTx?.[plan.id]} currency={currency} />
                           </td>
                         ))}
                       </tr>
                     ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-gray-200 dark:border-gray-700">
-                      <td className="py-4 px-4" />
-                      {PLANS_DATA.map(plan => (
-                        <td key={plan.id} className={`py-4 px-3 text-center ${currentPlan === plan.id ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''}`}>
-                          {currentPlan === plan.id ? (
-                            <span className="text-xs text-brand-600 font-medium">✓ Atual</span>
-                          ) : (
-                            <button onClick={() => plan.price > 0 && openModal(plan.id, plan.price)}
-                              className={`w-full text-xs py-2 px-3 rounded-lg font-medium transition-colors ${
-                                currentIdx < PLANS_DATA.findIndex(p => p.id === plan.id)
-                                  ? 'bg-brand-600 hover:bg-brand-700 text-white'
-                                  : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300'}`}>
-                              {plan.price === 0 ? 'Grátis' : currentIdx < PLANS_DATA.findIndex(p => p.id === plan.id) ? 'Upgrade →' : 'Downgrade'}
-                            </button>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-
-              {/* Notes */}
-              <div className="text-[15px] text-gray-400 space-y-1">
-                <p>¹ Créditos Free são atribuídos uma única vez e não renovam. Faz upgrade para créditos mensais renováveis.</p>
-                <p>² Starter: máx 3 agentes total · Business: máx 10 agentes total · Enterprise: ilimitados.</p>
-                <p>· 1 Agente = 1 número WhatsApp. Um agente pode integrar múltiplas plataformas (Shopify, iFood, etc.) em simultâneo.</p>
-              </div>
-            </>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════
-              ABA 2 — SKILLS POR PLANO
-          ═══════════════════════════════════════════════════════════ */}
-          {mainTab === 'skills' && (
-            <>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                As skills são capacidades adicionais que diferencia cada agente. Cada agente pode ter um conjunto diferente de skills ativas.
-              </p>
-
-              {/* Skills matrix table */}
-              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
-                <table className="w-full text-sm min-w-[620px]">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 w-64">Skill</th>
-                      {PLANS_DATA.map(plan => (
-                        <th key={plan.id} className={`py-3 px-3 text-center relative ${currentPlan === plan.id ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}>
-                          {currentPlan === plan.id && (
-                            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-[14px] px-2 py-0.5 rounded-full whitespace-nowrap">Atual</span>
-                                                 )}
-                          <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[plan.id as Plan]}`}>{plan.label}</span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.map(cat => (
-                      <>
-                        {/* Category header */}
-                        <tr key={`cat-${cat}`} className="bg-gray-100 dark:bg-gray-800">
-                          <td colSpan={5} className="py-2 px-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            {CATEGORY_LABELS[cat]}
-                          </td>
-                        </tr>
-                        {SKILLS.filter(s => s.category === cat).map((skill, i) => (
-                          <tr key={skill.id} className={`border-b border-gray-100 dark:border-gray-700/50 last:border-0 ${i % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-gray-800/10'}`}>
-                            <td className="py-3 px-4">
-                              <div className="flex items-start gap-2">
-                                <span className="text-lg mt-0.5">{skill.icon}</span>
-                                <div>
-                                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{skill.name}</p>
-                                  <p className="text-[15px] text-gray-400 mt-0.5 leading-tight">{skill.desc}</p>
-                                  {skill.creditsPerTx && (
-                                    <p className="text-[14px] text-purple-500 dark:text-purple-400 mt-0.5">
-                                      + créditos por transação conforme plano
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            {PLANS_DATA.map(plan => (
-                              <td key={plan.id} className={`py-3 px-3 text-center ${currentPlan === plan.id ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''}`}>
-                                <SkillBadge
-                                  avail={skill.plans[plan.id as 'free' | 'starter' | 'business' | 'enterprise']}
-                                  price={skill.addonPrice[plan.id]}
-                                  creditsPerTx={skill.creditsPerTx?.[plan.id]}
-                                  currency={currency}
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Legenda */}
-              <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-block bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[15px] font-semibold">✓ Incluído</span>
-                  <span>Vem com o plano, sem custo extra</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-block bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[15px] font-semibold">{currency === 'BRL' ? '+R$X/mês' : '+€X/mês'}</span>
-                  <span>Addon — compra no marketplace</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-300 font-bold">—</span>
-                  <span>Não disponível neste plano</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════
-              ABA 3 — MARKETPLACE DE SKILLS
-          ═══════════════════════════════════════════════════════════ */}
-          {mainTab === 'marketplace' && (
-            <>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Skills disponíveis para adicionar ao teu plano <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${PLAN_COLORS[currentPlan as Plan]}`}>{PLAN_LABELS[currentPlan as Plan]}</span>
-                  </p>
-                  {availableAddons.length === 0 && (
-                    <p className="text-sm text-green-600 dark:text-green-400 mt-1 font-medium">
-                      🎉 O teu plano já inclui todas as skills disponíveis!
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {availableAddons.length > 0 ? (
-                <>
-                  {categories.map(cat => {
-                    const catSkills = availableAddons.filter(s => s.category === cat);
-                    if (!catSkills.length) return null;
-                    return (
-                      <div key={cat} className="mb-8">
-                        <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                          {CATEGORY_LABELS[cat]}
-                        </h3>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          {catSkills.map(skill => {
-                            const price = skill.addonPrice[currentPlan];
-                            const crTx = skill.creditsPerTx?.[currentPlan];
-                            return (
-                              <div key={skill.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-4 hover:border-brand-300 dark:hover:border-brand-700 transition-colors">
-                                <div className="flex items-start gap-3">
-                                  <span className="text-3xl">{skill.icon}</span>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{skill.name}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{skill.detail}</p>
-                                  </div>
-                                </div>
-
-                                {/* Pricing breakdown */}
-                                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 space-y-1.5">
-                                  {price !== undefined && (
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="text-gray-500 dark:text-gray-400">Mensalidade</span>
-                                      <span className="font-bold text-gray-800 dark:text-gray-200">{money(addonPrice(price, currency), currency)}/mês</span>
-                                    </div>
-                                  )}
-                                  {crTx !== undefined ? (
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="text-gray-500 dark:text-gray-400">Consumo por transação</span>
-                                      <span className="font-bold text-purple-600 dark:text-purple-400">{crTx} créditos/tx</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="text-gray-500 dark:text-gray-400">Consumo por uso</span>
-                                      <span className="text-gray-400">Incluído nos créditos do plano</span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <a
-                                  href={`mailto:contact@solutions.shaklabs.tech?subject=Ativar Skill ${encodeURIComponent(skill.name)}&body=Olá, gostaria de ativar a skill ${encodeURIComponent(skill.name)} no meu plano ${PLAN_LABELS[currentPlan as Plan]}.`}
-                                  className="w-full text-center text-sm py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold transition-colors"
-                                >
-                                  Ativar skill →
-                                </a>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div className="mt-4 p-4 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10">
-                    <p className="text-xs text-orange-700 dark:text-orange-300">
-                      ⚠️ A compra de skills em self-service está em breve. Por agora, clica em <strong>"Ativar skill"</strong> para enviar um email e ativarmos manualmente em menos de 2h.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                /* Plano Enterprise ou sem addons — mostrar upgrade */
-                <div className="text-center py-16">
-                  <div className="text-5xl mb-4">🎉</div>
-                  <p className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Tens todas as skills!</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                    O teu plano {PLAN_LABELS[currentPlan as Plan]} já inclui todas as skills disponíveis na plataforma.
-                    {currentPlan !== 'enterprise' && ' Faz upgrade para Enterprise para desbloqueares as restantes.'}
-                  </p>
-                  {currentPlan !== 'enterprise' && (
-                    <button onClick={() => openModal('enterprise', PLAN_PRICING.enterprise[currency].price)}
-                      className="mt-6 btn-primary px-8 py-3">
-                      Upgrade para Enterprise →
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-5 text-xs text-app-faint">
+            Incluído: vem com o plano, sem custo extra. {currency === 'BRL' ? '+R$X/mês' : '+€X/mês'}: addon, compra no marketplace. —: não disponível neste plano.
+          </p>
         </div>
-      </main>
+      )}
+
+      {/* ── Marketplace ── */}
+      {mainTab === 'marketplace' && (
+        <div>
+          {availableAddons.length > 0 ? (
+            <>
+              <p className="mb-5 text-sm text-app-muted">Skills que pode adicionar ao plano {PLAN_LABELS[currentPlan as Plan]}.</p>
+              {categories.map(cat => {
+                const catSkills = availableAddons.filter(s => s.category === cat);
+                if (!catSkills.length) return null;
+                return (
+                  <section key={cat} className="mb-7">
+                    <h3 className="mb-1 text-base font-semibold text-app-ink">{CATEGORY_LABELS[cat]}</h3>
+                    {catSkills.map(skill => {
+                      const price = skill.addonPrice[currentPlan];
+                      const crTx = skill.creditsPerTx?.[currentPlan];
+                      return (
+                        <div key={skill.id} className="grid gap-3 border-t border-app-rule py-4 md:grid-cols-[minmax(0,1fr)_14rem_9rem] md:items-start md:gap-8">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-app-ink">{skill.name}</p>
+                            <p className="mt-1 text-sm text-app-muted">{skill.detail}</p>
+                          </div>
+                          <dl className="space-y-1 text-sm">
+                            {price !== undefined && (
+                              <div className="flex justify-between gap-3"><dt className="text-app-muted">Mensalidade</dt><dd className="num font-medium text-app-ink">{money(addonPrice(price, currency), currency)}/mês</dd></div>
+                            )}
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-app-muted">{crTx !== undefined ? 'Por transação' : 'Por uso'}</dt>
+                              <dd className="num text-right font-medium text-app-ink">{crTx !== undefined ? `${crTx} créditos` : <span className="font-normal text-app-muted">Nos créditos do plano</span>}</dd>
+                            </div>
+                          </dl>
+                          <a
+                            href={`mailto:contact@solutions.shaklabs.tech?subject=Ativar Skill ${encodeURIComponent(skill.name)}&body=Olá, gostaria de ativar a skill ${encodeURIComponent(skill.name)} no meu plano ${PLAN_LABELS[currentPlan as Plan]}.`}
+                            className="btn-secondary w-full md:w-auto md:justify-self-end"
+                          >
+                            Ativar skill
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </section>
+                );
+              })}
+              <p className="border-t border-app-rule pt-4 text-sm text-app-muted">
+                A compra de skills em self-service chega em breve. Por agora, "Ativar skill" abre um email e ativamos manualmente em menos de 2 h.
+              </p>
+            </>
+          ) : (
+            <EmptyState
+              title="O seu plano já inclui todas as skills disponíveis."
+              body={currentPlan !== 'enterprise' ? 'Suba para Enterprise para desbloquear as restantes.' : undefined}
+              action={currentPlan !== 'enterprise' ? <button onClick={() => openModal('enterprise', PLAN_PRICING.enterprise[currency].price)} className="btn-primary">Subir para Enterprise</button> : undefined}
+            />
+          )}
+        </div>
+      )}
 
       {/* ─── Subscribe Modal ─── */}
       {modal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl border border-app-edge bg-app-sheet shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-app-rule p-5">
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                  {step === 'instructions' ? '📋 Instruções de Pagamento' : `Subscrever plano ${PLAN_LABELS[modal.plan as Plan]}`}
+                <h3 className="text-base font-semibold text-app-ink">
+                  {step === 'instructions' ? 'Instruções de pagamento' : `Subscrever plano ${PLAN_LABELS[modal.plan as Plan]}`}
                 </h3>
                 {modal.price > 0 && step !== 'instructions' && (
-                  <p className="text-sm text-gray-500 mt-0.5">{money(modal.price, currency)}/mês · renovação mensal</p>
+                  <p className="num mt-0.5 text-sm text-app-muted">{money(modal.price, currency)} / mês · renovação mensal</p>
                 )}
               </div>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <button onClick={closeModal} aria-label="Fechar" className="text-2xl leading-none text-app-faint hover:text-app-ink">×</button>
             </div>
 
             <div className="p-5">
               {step === 'method' && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Como queres pagar?</p>
+                <div className="space-y-2">
+                  <p className="mb-3 text-sm text-app-muted">Como quer pagar?</p>
                   {(currency === 'BRL' ? [
-                    { id: 'pix' as const,                  icon: '⚡', label: 'PIX',                sub: 'Brasil · ativação após confirmação do pagamento', badge: 'Recomendado' },
-                    { id: 'stripe' as const,               icon: '💳', label: 'Cartão de crédito',  sub: 'Visa, Mastercard', badge: undefined },
+                    { id: 'pix' as const,                  label: 'PIX',                  sub: 'Brasil · ativação após confirmação do pagamento', badge: 'Recomendado' },
+                    { id: 'stripe' as const,               label: 'Cartão de crédito',    sub: 'Visa, Mastercard', badge: undefined },
                   ] : [
-                    { id: 'ifthenpay_mbway' as const,     icon: '📱', label: 'MB Way',             sub: 'Portugal · 0.7% + €0.07', badge: 'Mais barato' },
-                    { id: 'ifthenpay_multibanco' as const, icon: '🏧', label: 'Multibanco / ATM',   sub: 'Portugal · 1.5% + €0.20', badge: undefined },
-                    { id: 'stripe' as const,               icon: '💳', label: 'Cartão Internacional', sub: 'Visa, Mastercard · 1.4% + €0.25', badge: undefined },
+                    { id: 'ifthenpay_mbway' as const,      label: 'MB Way',               sub: 'Portugal · 0,7% + €0,07', badge: 'Mais barato' },
+                    { id: 'ifthenpay_multibanco' as const, label: 'Multibanco / ATM',     sub: 'Portugal · 1,5% + €0,20', badge: undefined },
+                    { id: 'stripe' as const,               label: 'Cartão internacional', sub: 'Visa, Mastercard · 1,4% + €0,25', badge: undefined },
                   ]).map(m => (
                     <button key={m.id} onClick={() => handleMethodChosen(m.id)} disabled={loading}
-                      className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-all text-left">
-                      <span className="text-2xl">{m.icon}</span>
-                      <div className="flex-1">
+                      className="flex w-full items-center gap-3 rounded-xl border border-app-control p-4 text-left transition-colors hover:border-app-accent disabled:opacity-60">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{m.label}</span>
-                          {m.badge && <span className="text-[14px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">{m.badge}</span>}
+                          <span className="text-sm font-semibold text-app-ink">{m.label}</span>
+                          {m.badge && <Pill tone="pos">{m.badge}</Pill>}
                         </div>
-                        <span className="text-xs text-gray-500">{m.sub}</span>
+                        <span className="text-xs text-app-muted">{m.sub}</span>
                       </div>
-                      <span className="text-gray-300">›</span>
+                      <span className="text-app-faint" aria-hidden="true">›</span>
                     </button>
                   ))}
-                  {modalError && <p className="text-sm text-red-500 mt-2">{modalError}</p>}
+                  {modalError && <p className="mt-2 text-sm text-app-neg">{modalError}</p>}
                 </div>
               )}
 
               {step === 'phone' && (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Introduz o teu número MB Way para receber o pedido de pagamento.</p>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                    placeholder="+351 9XXXXXXXX" autoFocus
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
-                  {modalError && <p className="text-sm text-red-500">{modalError}</p>}
+                  <p className="text-sm text-app-muted">Introduza o número MB Way para receber o pedido de pagamento.</p>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+351 9XXXXXXXX" autoFocus className="input w-full" />
+                  {modalError && <p className="text-sm text-app-neg">{modalError}</p>}
                   <div className="flex gap-2">
-                    <button onClick={() => setStep('method')} className="flex-1 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400">← Voltar</button>
-                    <button onClick={handlePhoneSubmit} disabled={loading}
-                      className="flex-1 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50">
-                      {loading ? 'A processar…' : 'Confirmar →'}
+                    <button onClick={() => setStep('method')} className="btn-secondary flex-1">Voltar</button>
+                    <button onClick={handlePhoneSubmit} disabled={loading} className="btn-primary flex-1 disabled:opacity-50">
+                      {loading ? 'A processar…' : 'Confirmar'}
                     </button>
                   </div>
                 </div>
@@ -754,64 +744,60 @@ export default function PlansPage() {
               {step === 'instructions' && instructions && (
                 <div className="space-y-4">
                   {instructions.mock && (
-                    <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                      <span>🧪</span>
-                      <p className="text-xs text-amber-700 dark:text-amber-300"><strong>Modo Teste.</strong> Sem credenciais reais. O admin pode confirmar o pagamento.</p>
-                    </div>
+                    <p className="rounded-lg bg-app-warn-soft p-3 text-xs text-app-warn"><strong>Modo teste.</strong> Sem credenciais reais. O admin pode confirmar o pagamento.</p>
                   )}
                   {instructions.method === 'ifthenpay_multibanco' && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 space-y-3">
-                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">🏧 Referência Multibanco</p>
+                    <div className="space-y-3 rounded-xl bg-app-raised p-4">
+                      <p className="text-sm font-semibold text-app-ink">Referência Multibanco</p>
                       <div className="grid grid-cols-3 gap-3">
                         {[{ label: 'Entidade', value: instructions.multibancoEntity }, { label: 'Referência', value: instructions.multibancoReference }, { label: 'Montante', value: money(instructions.amount, instructions.currency ?? 'EUR', 2) }]
                           .map(({ label, value }) => (
-                            <div key={label} className="text-center">
-                              <p className="text-[14px] text-blue-500 uppercase tracking-wide">{label}</p>
-                              <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mt-0.5">{value}</p>
+                            <div key={label}>
+                              <p className="text-xs text-app-muted">{label}</p>
+                              <p className="num mt-0.5 text-sm font-semibold text-app-ink">{value}</p>
                             </div>
                           ))}
                       </div>
-                      {instructions.multibancoExpiry && <p className="text-xs text-blue-500 text-center">Válido até {instructions.multibancoExpiry}</p>}
+                      {instructions.multibancoExpiry && <p className="text-xs text-app-muted">Válido até <span className="num">{instructions.multibancoExpiry}</span></p>}
                     </div>
                   )}
                   {instructions.method === 'ifthenpay_mbway' && (
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 text-center">
-                      <p className="text-sm font-semibold text-green-800 dark:text-green-200">📱 MB Way</p>
-                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">Pedido enviado para <strong>{instructions.mbwayPhone}</strong></p>
-                      <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-2">{money(instructions.amount, instructions.currency ?? 'EUR', 2)}</p>
-                      <p className="text-xs text-green-500 mt-1">Confirma na app MB Way</p>
+                    <div className="rounded-xl bg-app-raised p-4">
+                      <p className="text-sm font-semibold text-app-ink">MB Way</p>
+                      <p className="mt-1 text-xs text-app-muted">Pedido enviado para <strong className="num text-app-ink">{instructions.mbwayPhone}</strong></p>
+                      <p className="num mt-2 text-2xl font-semibold text-app-ink">{money(instructions.amount, instructions.currency ?? 'EUR', 2)}</p>
+                      <p className="mt-1 text-xs text-app-muted">Confirme na app MB Way.</p>
                     </div>
                   )}
                   {instructions.method === 'pix' && (
-                    <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-4 space-y-2 text-center">
-                      <p className="text-sm font-semibold text-teal-800 dark:text-teal-200">⚡ Pagamento PIX</p>
-                      <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{money(instructions.amount, 'BRL', 2)}</p>
-                      <p className="text-xs text-teal-700 dark:text-teal-300">Chave PIX: <strong className="font-mono">{instructions.pixKey}</strong></p>
-                      <p className="text-xs text-teal-700 dark:text-teal-300">Na descrição do PIX indica a referência <strong className="font-mono">{instructions.pixReference}</strong></p>
-                      <p className="text-[14px] text-teal-600 dark:text-teal-400">O plano é ativado assim que confirmarmos a receção (normalmente em menos de 2h úteis).</p>
+                    <div className="space-y-2 rounded-xl bg-app-raised p-4">
+                      <p className="text-sm font-semibold text-app-ink">Pagamento PIX</p>
+                      <p className="num text-2xl font-semibold text-app-ink">{money(instructions.amount, 'BRL', 2)}</p>
+                      <p className="text-xs text-app-muted">Chave PIX: <strong className="num break-all text-app-ink">{instructions.pixKey}</strong></p>
+                      <p className="text-xs text-app-muted">Na descrição do PIX indique a referência <strong className="num text-app-ink">{instructions.pixReference}</strong></p>
+                      <p className="text-xs text-app-faint">O plano é ativado assim que confirmarmos a receção (normalmente em menos de 2 h úteis).</p>
                     </div>
                   )}
                   {instructions.method === 'stripe' && (
-                    <div className="text-center space-y-3">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Clica abaixo para pagar com cartão:</p>
+                    <div className="space-y-3">
+                      <p className="text-sm text-app-muted">Clique abaixo para pagar com cartão.</p>
                       {instructions.checkoutUrl ? (
-                        <a href={instructions.checkoutUrl} target="_blank" rel="noopener noreferrer"
-                          className="block py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium">
-                          Pagar {money(instructions.amount, instructions.currency ?? 'EUR', 2)} →
+                        <a href={instructions.checkoutUrl} target="_blank" rel="noopener noreferrer" className="btn-primary w-full">
+                          Pagar {money(instructions.amount, instructions.currency ?? 'EUR', 2)}
                         </a>
                       ) : (
-                        <p className="text-xs text-gray-400">Checkout não disponível (modo teste)</p>
+                        <p className="text-xs text-app-faint">Checkout não disponível (modo teste).</p>
                       )}
                     </div>
                   )}
-                  {instructions.notes && <p className="text-xs text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-3 font-mono">{instructions.notes}</p>}
-                  <button onClick={closeModal} className="w-full py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200">Fechar</button>
+                  {instructions.notes && <p className="rounded-lg bg-app-raised p-3 text-xs text-app-muted">{instructions.notes}</p>}
+                  <button onClick={closeModal} className="btn-secondary w-full">Fechar</button>
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }

@@ -25,6 +25,30 @@ module.exports = {
         ink: { DEFAULT: '#13213C', soft: '#3A4660', mute: '#5B6680' },
         field: '#EAEFF8',
         mist: '#F4F6FA',
+        // Tokens da app (out/2026, estilo "framed sheet"): moldura azul-gelo,
+        // folha branca, tinta azul-marinho, cobalto só no que é dado/ação.
+        // Valores em styles/globals.css (:root e .dark), por isso o modo
+        // escuro troca tudo de uma vez e o contraste fica sempre certo.
+        app: {
+          frame: 'rgb(var(--app-frame) / <alpha-value>)',
+          sheet: 'rgb(var(--app-sheet) / <alpha-value>)',
+          raised: 'rgb(var(--app-raised) / <alpha-value>)',
+          edge: 'rgb(var(--app-edge) / <alpha-value>)',
+          rule: 'rgb(var(--app-rule) / <alpha-value>)',
+          control: 'rgb(var(--app-control) / <alpha-value>)',
+          ink: 'rgb(var(--app-ink) / <alpha-value>)',
+          muted: 'rgb(var(--app-muted) / <alpha-value>)',
+          faint: 'rgb(var(--app-faint) / <alpha-value>)',
+          accent: 'rgb(var(--app-accent) / <alpha-value>)',
+          'accent-ink': 'rgb(var(--app-accent-ink) / <alpha-value>)',
+          'accent-soft': 'rgb(var(--app-accent-soft) / <alpha-value>)',
+          pos: 'rgb(var(--app-pos) / <alpha-value>)',
+          'pos-soft': 'rgb(var(--app-pos-soft) / <alpha-value>)',
+          neg: 'rgb(var(--app-neg) / <alpha-value>)',
+          'neg-soft': 'rgb(var(--app-neg-soft) / <alpha-value>)',
+          warn: 'rgb(var(--app-warn) / <alpha-value>)',
+          'warn-soft': 'rgb(var(--app-warn-soft) / <alpha-value>)',
+        },
         line: '#D3DAE8',
         // Só para a demonstração de conversa (imita o WhatsApp).
         wa: { header: '#008069', bubble: '#D9FDD3', wall: '#EFEAE2', tick: '#53BDEB', text: '#111B21', meta: '#667781' },

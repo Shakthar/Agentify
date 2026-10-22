@@ -1,10 +1,13 @@
 /**
- * /dashboard/orders/live — Painel KDS (Kitchen Display System)
- * Responsivo: tabs no mobile, 3 colunas no tablet, 5 colunas no desktop
+ * /dashboard/orders/live — Painel de cozinha (KDS)
+ * Quadro por estado: Nova, Em preparação, Pronta, Entregue (e "A pagar" à parte).
+ * Telemóvel: abas; tablet: 3 colunas; ecrã largo: 5 colunas.
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import AppLayout from '../../../components/app/AppLayout';
+import { EmptyState, PageHeader, Skeleton, Tabs, cx } from '../../../components/app/ui';
 import { useAuth } from '../../../hooks/useAuth';
 import api from '../../../utils/api';
 
@@ -21,11 +24,11 @@ interface Order {
 }
 
 const STATUS_COLUMNS = [
-  { key: 'pending',    label: 'A Pagar',    icon: '⏳', color: 'yellow',  badge: 'bg-yellow-500' },
-  { key: 'paid',       label: 'Novo',       icon: '🔔', color: 'orange',  badge: 'bg-orange-500' },
-  { key: 'processing', label: 'A Preparar', icon: '⚙️',  color: 'blue',    badge: 'bg-blue-500'   },
-  { key: 'done',       label: 'Pronto',     icon: '✅', color: 'green',   badge: 'bg-green-500'  },
-  { key: 'sent',       label: 'Enviado',    icon: '🚗', color: 'purple',  badge: 'bg-purple-500' },
+  { key: 'pending',    label: 'A pagar' },
+  { key: 'paid',       label: 'Nova' },
+  { key: 'processing', label: 'Em preparação' },
+  { key: 'done',       label: 'Pronta' },
+  { key: 'sent',       label: 'Entregue' },
 ] as const;
 
 type ColKey = typeof STATUS_COLUMNS[number]['key'];
@@ -34,16 +37,10 @@ const NEXT_STATUS: Partial<Record<string, string>> = {
   paid: 'processing', processing: 'done', done: 'sent',
 };
 const NEXT_LABEL: Partial<Record<string, string>> = {
-  paid: 'Iniciar preparo', processing: 'Marcar pronto', done: 'Marcar enviado',
+  paid: 'Iniciar preparação', processing: 'Marcar pronta', done: 'Marcar entregue',
 };
 
-const COL_STYLES: Record<string, { card: string; amount: string; btn: string; header: string }> = {
-  pending:    { card: 'border-yellow-600/50 bg-yellow-950/20',  amount: 'text-yellow-400', btn: 'bg-yellow-600 hover:bg-yellow-500', header: 'text-yellow-300'  },
-  paid:       { card: 'border-orange-500/60 bg-orange-950/30',  amount: 'text-orange-400', btn: 'bg-orange-500 hover:bg-orange-400', header: 'text-orange-300'  },
-  processing: { card: 'border-blue-500/50   bg-blue-950/20',    amount: 'text-blue-400',   btn: 'bg-blue-500   hover:bg-blue-400',   header: 'text-blue-300'    },
-  done:       { card: 'border-green-500/50  bg-green-950/20',   amount: 'text-green-400',  btn: 'bg-green-600  hover:bg-green-500',  header: 'text-green-300'   },
-  sent:       { card: 'border-purple-600/40 bg-purple-950/20',  amount: 'text-purple-400', btn: '',                                  header: 'text-purple-300'  },
-};
+const eur = (v: number) => v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
 
 // --- Audio ---------------------------------------------------------------
 function playBeep(freq = 880, duration = 0.3, delay = 0) {
@@ -71,16 +68,12 @@ function playNewOrderSound() {
 
 // --- Time helpers ---------------------------------------------------------
 function elapsedMin(iso: string) { return (Date.now() - new Date(iso).getTime()) / 60000; }
-function formatElapsed(m: number) {
-  if (m < 1)  return '< 1m';
-  if (m < 60) return `${Math.floor(m)}m`;
-  return `${Math.floor(m / 60)}h${String(Math.floor(m % 60)).padStart(2, '0')}m`;
-}
+/** Tempo desde o pedido, por extenso: "agora mesmo", "há 11 min", "há 1 h 05". */
 function timeAgo(iso: string) {
   const m = Math.floor(elapsedMin(iso));
-  if (m < 1)  return 'agora';
-  if (m < 60) return `${m} min`;
-  return `${Math.floor(m / 60)}h`;
+  if (m < 1)  return 'agora mesmo';
+  if (m < 60) return `há ${m} min`;
+  return `há ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
 }
 
 // --- SLA ------------------------------------------------------------------
@@ -95,11 +88,9 @@ function loadSLA(): SLAConfig {
   try { return { ...DEFAULT_SLA, ...JSON.parse(localStorage.getItem('kds_sla') ?? '{}') }; }
   catch { return DEFAULT_SLA; }
 }
-function getSlaColors(mins: number, stage: SlaStage | undefined) {
-  if (!stage) return null;
-  if (mins < stage.yellowMin) return { dot: 'bg-green-400',  text: 'text-green-400',  ring: 'ring-green-500/20',  pulse: false };
-  if (mins < stage.redMin)    return { dot: 'bg-yellow-400', text: 'text-yellow-300', ring: 'ring-yellow-500/30', pulse: false };
-  return                             { dot: 'bg-red-500',    text: 'text-red-400',    ring: 'ring-red-500/40',    pulse: true  };
+/** Uma só cor de alerta: o pedido está atrasado quando passa o limite crítico da etapa. */
+function isLate(mins: number, stage: SlaStage | undefined) {
+  return !!stage && mins >= stage.redMin;
 }
 
 // --- SLA Modal ------------------------------------------------------------
@@ -107,46 +98,38 @@ function SLAModal({ config, onSave, onClose }: { config: SLAConfig; onSave: (c: 
   const [d, setD] = useState<SLAConfig>(config);
   const upStage = (s: keyof SLAConfig['stages'], k: keyof SlaStage, v: number) =>
     setD(p => ({ ...p, stages: { ...p.stages, [s]: { ...p.stages[s], [k]: Math.max(1, v) } } }));
-  const STAGES: { key: keyof SLAConfig['stages']; icon: string; label: string }[] = [
-    { key: 'paid',       icon: '🔔', label: 'Novo — aguarda preparo'    },
-    { key: 'processing', icon: '⚙️',  label: 'A Preparar'                    },
-    { key: 'done',       icon: '✅',        label: 'Pronto — aguarda retirada' },
+  const STAGES: { key: keyof SLAConfig['stages']; label: string }[] = [
+    { key: 'paid',       label: 'Nova, à espera de preparação' },
+    { key: 'processing', label: 'Em preparação' },
+    { key: 'done',       label: 'Pronta, à espera de entrega' },
   ];
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-800 rounded-2xl w-full max-w-sm p-5 space-y-4 border border-gray-700 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Prazos de atraso">
+      <div className="w-full max-w-sm space-y-4 rounded-2xl border border-app-edge bg-app-sheet p-5 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-white text-base">⚙️ Configurar SLA</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-700 text-xl">×</button>
+          <h3 className="text-base font-semibold text-app-ink">Prazos de atraso</h3>
+          <button onClick={onClose} className="btn-ghost -mr-2 h-8 px-2">Fechar</button>
         </div>
-        {STAGES.map(({ key, icon, label }) => (
-          <div key={key} className="rounded-xl p-3 space-y-2 border border-gray-700 bg-gray-700/30">
-            <p className="text-xs font-semibold text-gray-200">{icon} {label}</p>
-            <div className="grid grid-cols-2 gap-2">
-              {([['yellowMin', '🟡 Alerta (min)', 'text-yellow-400'], ['redMin', '🔴 Crítico (min)', 'text-red-400']] as const).map(([field, lbl, cls]) => (
-                <div key={field}>
-                  <label className={`text-[14px] ${cls} block mb-1`}>{lbl}</label>
-                  <input type="number" min="1"
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-2.5 py-2 text-white text-sm focus:outline-none focus:border-brand-500"
-                    value={d.stages[key][field]}
-                    onChange={e => upStage(key, field, parseInt(e.target.value) || 1)}
-                  />
-                </div>
-              ))}
-            </div>
+        <p className="text-sm text-app-muted">Um pedido fica assinalado como atrasado quando passa estes minutos na etapa.</p>
+        {STAGES.map(({ key, label }) => (
+          <div key={key} className="flex items-center justify-between gap-3 border-t border-app-rule pt-3">
+            <label htmlFor={`sla-${key}`} className="text-sm text-app-ink">{label}</label>
+            <input id={`sla-${key}`} type="number" min="1" className="input num w-20 text-right"
+              value={d.stages[key].redMin}
+              onChange={e => upStage(key, 'redMin', parseInt(e.target.value) || 1)}
+            />
           </div>
         ))}
-        <div>
-          <label className="text-xs text-gray-400 block mb-1.5">🔄 Actualizar a cada (seg)</label>
-          <input type="number" min="3"
-            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand-500"
+        <div className="flex items-center justify-between gap-3 border-t border-app-rule pt-3">
+          <label htmlFor="sla-refresh" className="text-sm text-app-ink">Atualizar a cada (s)</label>
+          <input id="sla-refresh" type="number" min="3" className="input num w-20 text-right"
             value={d.refreshSec}
             onChange={e => setD(p => ({ ...p, refreshSec: Math.max(3, parseInt(e.target.value) || 5) }))}
           />
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-gray-700 text-gray-300 text-sm hover:bg-gray-600 transition-colors">Cancelar</button>
-          <button onClick={() => { onSave(d); onClose(); }} className="flex-1 py-3 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-500 transition-colors">Guardar</button>
+          <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+          <button onClick={() => { onSave(d); onClose(); }} className="btn-primary flex-1">Guardar</button>
         </div>
       </div>
     </div>
@@ -168,105 +151,90 @@ function CopyLinkButton({ orderId }: { orderId: string }) {
       });
   }
   return (
-    <button onClick={copy} title="Copiar link de rastreio para o cliente"
-      className={`text-[14px] px-2.5 py-1 rounded-lg transition-all ${copied ? 'bg-green-700 text-green-200' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
-      {copied ? '✓ Copiado!' : '🔗 Link'}
+    <button onClick={copy} title="Copiar link de acompanhamento para o cliente"
+      className="text-xs font-medium text-app-muted underline-offset-2 hover:text-app-ink hover:underline">
+      {copied ? 'Copiado' : 'Copiar link'}
     </button>
   );
 }
 
 // --- Order Card -----------------------------------------------------------
-function OrderCard({ order, colKey, sla, advancing, onAdvance }: {
+function OrderCard({ order, colKey, sla, advancing, onAdvance, fresh }: {
   order: Order; colKey: ColKey; sla: SLAConfig;
-  advancing: string | null; onAdvance: (o: Order, t?: 'delivery' | 'pickup') => void;
+  advancing: string | null; onAdvance: (o: Order, t?: 'delivery' | 'pickup') => void; fresh: boolean;
 }) {
   const nextStatus = NEXT_STATUS[order.status];
   const nextLabel  = NEXT_LABEL[order.status];
   const isAdv      = advancing === order.id;
-  const isFinished = colKey === 'sent';
+  const isFinished = colKey === 'sent' || colKey === 'pending';
   const refTime    = order.paidAt ?? order.createdAt;
-  const mins       = elapsedMin(refTime);
-  const stageSla   = (sla.stages as Record<string, SlaStage | undefined>)[colKey];
-  const slac       = isFinished ? null : getSlaColors(mins, stageSla);
-  const styles     = COL_STYLES[colKey];
+  const late       = !isFinished && isLate(elapsedMin(refTime), (sla.stages as Record<string, SlaStage | undefined>)[colKey]);
+  const lines      = order.description.split('\n').map(l => l.trim()).filter(Boolean);
 
   return (
-    <div className={`rounded-2xl border-2 p-4 space-y-3 transition-all ${styles.card} ${slac?.ring ? `ring-2 ${slac.ring}` : ''} ${slac?.pulse ? 'shadow-lg shadow-red-900/30' : ''}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className={`text-2xl font-extrabold leading-none ${styles.amount}`}>€{order.amount.toFixed(2)}</p>
-          <p className="text-[14px] text-gray-500 mt-0.5 font-mono">#{order.id.slice(-8).toUpperCase()}</p>
-        </div>
-        {!isFinished && slac ? (
-          <div className="flex items-center gap-1.5 bg-gray-900/40 rounded-lg px-2 py-1">
-            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${slac.dot} ${slac.pulse ? 'animate-pulse' : ''}`} />
-            <span className={`text-sm font-mono font-bold ${slac.text}`}>{formatElapsed(mins)}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-gray-500 bg-gray-900/30 rounded-lg px-2 py-1">{timeAgo(refTime)}</span>
-        )}
+    <article
+      className={cx(
+        'rounded-lg border bg-app-sheet p-3.5',
+        late ? 'border-app-neg' : 'border-app-edge',
+        fresh && 'ring-2 ring-app-accent/40',
+      )}
+      aria-label={`Pedido ${order.id.slice(-8).toUpperCase()}`}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="num text-base font-semibold text-app-ink">#{order.id.slice(-8).toUpperCase()}</p>
+        <p className="num text-base font-semibold text-app-ink">{eur(order.amount)}</p>
       </div>
+      <p className={cx('num mt-0.5 text-xs', late ? 'font-semibold text-app-neg' : 'text-app-muted')}>
+        {late && 'Atrasado · '}{timeAgo(refTime)}
+      </p>
 
-      <p className="text-sm font-semibold text-gray-100 leading-snug">{order.description}</p>
+      <ul className="mt-2.5 space-y-0.5 text-sm text-app-ink">
+        {lines.map((l, i) => <li key={i}>{l}</li>)}
+      </ul>
 
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-gray-400">📱 +{order.buyerPhone}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-app-rule pt-2.5">
+        <p className="num text-xs text-app-muted">+{order.buyerPhone}</p>
         <CopyLinkButton orderId={order.id} />
       </div>
 
       {order.status === 'done' ? (
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button onClick={() => onAdvance(order, 'delivery')} disabled={isAdv}
-            className="py-3 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white transition-all active:scale-95 disabled:opacity-40 shadow-sm">
-            {isAdv ? '⏳' : '🚗 Entrega'}
-          </button>
-          <button onClick={() => onAdvance(order, 'pickup')} disabled={isAdv}
-            className="py-3 rounded-xl text-xs font-bold bg-green-700 hover:bg-green-600 active:bg-green-800 text-white transition-all active:scale-95 disabled:opacity-40 shadow-sm">
-            {isAdv ? '⏳' : '🏪 Retirada'}
-          </button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={() => onAdvance(order, 'delivery')} disabled={isAdv} className="btn-secondary h-10 whitespace-nowrap text-xs">Entrega</button>
+          <button onClick={() => onAdvance(order, 'pickup')} disabled={isAdv} className="btn-secondary h-10 text-xs">Retirada</button>
         </div>
       ) : nextStatus && nextLabel ? (
-        <button onClick={() => onAdvance(order)} disabled={isAdv}
-          className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-sm ${styles.btn}`}>
-          {isAdv ? '⏳ A actualizar...' : nextLabel + ' →'}
+        <button onClick={() => onAdvance(order)} disabled={isAdv} className="btn-secondary mt-3 h-10 w-full whitespace-nowrap text-sm">
+          {isAdv ? 'A atualizar…' : nextLabel}
         </button>
       ) : null}
-    </div>
+    </article>
   );
 }
 
-// --- Column (reused by tablet + desktop) ----------------------------------
-function KdsColumn({ col, items, sla, advancing, onAdvance, stickyTop }: {
+// --- Column ---------------------------------------------------------------
+function KdsColumn({ col, items, sla, advancing, onAdvance, freshIds, laneClass }: {
   col: typeof STATUS_COLUMNS[number];
   items: Order[];
   sla: SLAConfig;
   advancing: string | null;
   onAdvance: (o: Order, t?: 'delivery' | 'pickup') => void;
-  stickyTop: string;
+  freshIds: Set<string>;
+  laneClass: string;
 }) {
-  const styles = COL_STYLES[col.key];
   return (
-    <div className="flex flex-col min-h-0">
-      <div className={`flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800 sticky ${stickyTop} z-10`}>
-        <div className="flex items-center gap-2">
-          <span className="text-base">{col.icon}</span>
-          <span className={`text-sm font-bold ${styles.header}`}>{col.label}</span>
-        </div>
-        {items.length > 0 && (
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${col.badge}`}>{items.length}</span>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 pb-6">
+    <section className="flex min-w-0 flex-col rounded-xl bg-app-raised" aria-label={col.label}>
+      <header className="flex items-center justify-between px-3.5 py-3">
+        <h2 className="text-sm font-semibold text-app-ink">{col.label}</h2>
+        <span className="num text-sm text-app-muted">{items.length}</span>
+      </header>
+      <div className={cx('space-y-2.5 overflow-y-auto px-2.5 pb-2.5', laneClass)}>
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-700">
-            <span className="text-3xl opacity-20">{col.icon}</span>
-            <p className="text-xs">Vazio</p>
-          </div>
+          <p className="px-1 py-6 text-center text-xs text-app-faint">Sem pedidos</p>
         ) : items.map(order => (
-          <OrderCard key={order.id} order={order} colKey={col.key as ColKey} sla={sla} advancing={advancing} onAdvance={onAdvance} />
+          <OrderCard key={order.id} order={order} colKey={col.key} sla={sla} advancing={advancing} onAdvance={onAdvance} fresh={freshIds.has(order.id)} />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -284,6 +252,8 @@ export default function OrdersLivePage() {
   const [showSlaConfig, setShowSlaConfig] = useState(false);
   const [activeTab, setActiveTab]         = useState<ColKey>('paid');
   const [, setTick]                       = useState(0);
+  const [freshIds, setFreshIds]           = useState<Set<string>>(new Set());
+  const [loadError, setLoadError]         = useState(false);
 
   const knownPaidIds = useRef(new Set<string>());
   const isFirstLoad  = useRef(true);
@@ -308,17 +278,23 @@ export default function OrdersLivePage() {
       const all: Order[] = [
         ...rPending.data.orders, ...paidOrders,
         ...rProcessing.data.orders, ...rDone.data.orders, ...rSent.data.orders,
-      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
       if (!isFirstLoad.current) {
         const newOnes = paidOrders.filter(o => !knownPaidIds.current.has(o.id));
-        if (newOnes.length > 0) { playNewOrderSound(); setActiveTab('paid'); }
+        if (newOnes.length > 0) {
+          playNewOrderSound(); setActiveTab('paid');
+          const ids = newOnes.map(o => o.id);
+          setFreshIds(prev => new Set([...Array.from(prev), ...ids]));
+          setTimeout(() => setFreshIds(prev => { const n = new Set(prev); ids.forEach(i => n.delete(i)); return n; }), 8000);
+        }
       }
       paidOrders.forEach(o => knownPaidIds.current.add(o.id));
       isFirstLoad.current = false;
       setOrders(all);
       setLastUpdate(new Date());
-    } catch { /* ignore */ }
+      setLoadError(false);
+    } catch { setLoadError(true); }
     finally { setLoading(false); }
   }, []);
 
@@ -352,140 +328,97 @@ export default function OrdersLivePage() {
   const filtered    = agentFilter === 'all' ? orders : orders.filter(o => o.agentId === agentFilter);
   const colOrders   = (key: ColKey) => filtered.filter(o => o.status === key);
   const totalActive = filtered.filter(o => o.status !== 'sent' && o.status !== 'pending').length;
+  const lateCount   = filtered.filter(o => {
+    const st = (sla.stages as Record<string, SlaStage | undefined>)[o.status];
+    return ['paid', 'processing', 'done'].includes(o.status) && isLate(elapsedMin(o.paidAt ?? o.createdAt), st);
+  }).length;
+  const time = lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const laneClass = fullscreen ? 'max-h-[calc(100vh-9rem)]' : 'max-h-[calc(100vh-17rem)] min-h-[16rem]';
+  const colProps = { sla, advancing, onAdvance: advanceStatus, freshIds, laneClass };
 
-  return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <Head><title>Agentfy — Painel de Pedidos</title></Head>
+  const board = (
+    <>
+      <Tabs<ColKey>
+        label="Estados dos pedidos"
+        value={activeTab}
+        onChange={setActiveTab}
+        tabs={STATUS_COLUMNS.map(c => ({ id: c.key, label: c.label, count: colOrders(c.key).length }))}
+      />
+      {/* Telemóvel: uma coluna por aba */}
+      <div className="space-y-2.5 md:hidden">
+        {colOrders(activeTab).length === 0 ? (
+          <EmptyState title="Sem pedidos nesta etapa" body="Os pedidos novos aparecem aqui assim que são pagos." />
+        ) : colOrders(activeTab).map(order => (
+          <OrderCard key={order.id} order={order} colKey={activeTab} sla={sla} advancing={advancing} onAdvance={advanceStatus} fresh={freshIds.has(order.id)} />
+        ))}
+      </div>
+    </>
+  );
 
-      {/* HEADER */}
-      <header className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800 gap-3 sticky top-0 z-20">
-        <div className="flex items-center gap-3 min-w-0">
-          {!fullscreen && (
-            <button onClick={() => router.back()}
-              className="text-gray-500 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 shrink-0 transition-colors">
-              ←
-            </button>
-          )}
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg">🍽️</span>
-            <div className="min-w-0">
-              <h1 className="font-bold text-white text-sm leading-none">Fila de Pedidos</h1>
-              <p className="text-[14px] text-gray-500 mt-0.5 hidden sm:block">
-                ⟳ {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                {totalActive > 0 && <span className="ml-2 text-orange-400 font-semibold">{totalActive} activos</span>}
-              </p>
+  const content = (
+    <>
+      <Head><title>Agentfy · Pedidos em direto</title></Head>
+      <PageHeader
+        title="Pedidos em direto"
+        subtitle={
+          <>
+            <span className="num">{totalActive}</span> {totalActive === 1 ? 'pedido ativo' : 'pedidos ativos'}
+            {lateCount > 0 && <> · <span className="font-medium text-app-neg"><span className="num">{lateCount}</span> {lateCount === 1 ? 'atrasado' : 'atrasados'}</span></>}
+            {colOrders('pending').length > 0 && <span className="2xl:hidden"> · <span className="num">{colOrders('pending').length}</span> a pagar</span>}
+            <span className="hidden sm:inline"> · atualizado às <span className="num">{time}</span></span>
+          </>
+        }
+        actions={
+          <>
+            {agentIds.length > 1 && (
+              <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)} aria-label="Filtrar por agente" className="input h-9 w-auto pr-9">
+                <option value="all">Todos os agentes</option>
+                {agentIds.map(id => <option key={id} value={id}>{orders.find(o => o.agentId === id)?.agentName ?? `…${id.slice(-6)}`}</option>)}
+              </select>
+            )}
+            <button onClick={() => fetchOrders()} className="btn-ghost hidden sm:inline-flex">Atualizar</button>
+            <button onClick={() => setShowSlaConfig(true)} className="btn-secondary">Prazos</button>
+            <button onClick={() => setFullscreen(f => !f)} className="btn-secondary hidden sm:inline-flex">{fullscreen ? 'Sair do ecrã inteiro' : 'Ecrã inteiro'}</button>
+          </>
+        }
+      />
+
+      {loadError && !loading && (
+        <p role="alert" className="mb-4 rounded-lg bg-app-neg-soft px-4 py-2 text-sm text-app-neg">
+          Sem ligação ao servidor. A mostrar os últimos pedidos conhecidos; <button onClick={() => fetchOrders()} className="font-semibold underline underline-offset-2">tentar de novo</button>.
+        </p>
+      )}
+
+      {loading ? (
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className={cx('space-y-2.5 rounded-xl bg-app-raised p-2.5', i > 2 ? 'hidden xl:block' : i > 0 && 'hidden md:block')}>
+              <Skeleton className="h-5 w-24" /><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="md:hidden">{board}</div>
+          <div className="hidden md:block">
+            {/* Tablet: 3 colunas; desktop: 4; ecrã muito largo: 5 (com "A pagar") */}
+            <div className="grid grid-cols-3 gap-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {STATUS_COLUMNS.map(col => (
+                <div key={col.key} className={cx(col.key === 'pending' && 'hidden 2xl:block', col.key === 'sent' && 'hidden xl:block')}>
+                  <KdsColumn col={col} items={colOrders(col.key)} {...colProps} />
+                </div>
+              ))}
             </div>
           </div>
-          {agentIds.length > 1 && (
-            <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)}
-              className="text-xs bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-gray-200 hidden sm:block">
-              <option value="all">Todos os agentes</option>
-              {agentIds.map(id => <option key={id} value={id}>…{id.slice(-6)}</option>)}
-            </select>
-          )}
-        </div>
-
-        <div className="hidden xl:flex items-center gap-3 text-[15px] text-gray-500">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400" /> no prazo</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400" /> atenção</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> crítico</span>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => fetchOrders()}
-            className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors hidden sm:block">
-            🔄
-          </button>
-          <button onClick={() => setShowSlaConfig(true)}
-            className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors">
-            ⚙️ SLA
-          </button>
-          <button onClick={() => setFullscreen(f => !f)}
-            className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors hidden sm:block">
-            {fullscreen ? '⤥' : '⤢'}
-          </button>
-        </div>
-      </header>
-
-      {loading && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
-          <div className="w-8 h-8 border-2 border-gray-700 border-t-brand-500 rounded-full animate-spin" />
-          <p className="text-sm">A carregar pedidos...</p>
-        </div>
+        </>
       )}
 
-      {!loading && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-
-          {/* MOBILE: tab bar (< md) */}
-          <div className="md:hidden flex overflow-x-auto bg-gray-900 border-b border-gray-800 px-2 gap-1">
-            {STATUS_COLUMNS.map(col => {
-              const count    = colOrders(col.key).length;
-              const isActive = activeTab === col.key;
-              return (
-                <button key={col.key} onClick={() => setActiveTab(col.key)}
-                  className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors shrink-0 ${
-                    isActive ? 'border-brand-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-300'
-                  }`}>
-                  <span>{col.icon}</span>
-                  <span>{col.label}</span>
-                  {count > 0 && (
-                    <span className={`text-[14px] font-bold px-1.5 py-0.5 rounded-full text-white ${col.badge}`}>{count}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* MOBILE: single column content */}
-          <div className="md:hidden flex-1 overflow-y-auto p-3 space-y-3 pb-20">
-            {colOrders(activeTab).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-700">
-                <span className="text-5xl opacity-20">{STATUS_COLUMNS.find(c => c.key === activeTab)?.icon}</span>
-                <p className="text-sm">Sem pedidos nesta etapa</p>
-              </div>
-            ) : colOrders(activeTab).map(order => (
-              <OrderCard key={order.id} order={order} colKey={activeTab} sla={sla} advancing={advancing} onAdvance={advanceStatus} />
-            ))}
-          </div>
-
-          {/* TABLET: 3 columns (md, hidden on lg+) */}
-          <div className="hidden md:grid lg:hidden grid-cols-3 flex-1 divide-x divide-gray-800 overflow-hidden">
-            {STATUS_COLUMNS.filter(c => ['paid', 'processing', 'done'].includes(c.key)).map(col => (
-              <KdsColumn key={col.key} col={col} items={colOrders(col.key)} sla={sla}
-                advancing={advancing} onAdvance={advanceStatus} stickyTop="top-[57px]" />
-            ))}
-          </div>
-
-          {/* DESKTOP: 5 columns (lg+) */}
-          <div className="hidden lg:grid lg:grid-cols-5 flex-1 divide-x divide-gray-800 overflow-hidden">
-            {STATUS_COLUMNS.map(col => (
-              <KdsColumn key={col.key} col={col} items={colOrders(col.key)} sla={sla}
-                advancing={advancing} onAdvance={advanceStatus} stickyTop="top-[57px]" />
-            ))}
-          </div>
-
-        </div>
-      )}
-
-      {/* MOBILE: bottom bar */}
-      {!loading && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 px-4 py-2.5 flex items-center justify-between">
-          <span className="text-[15px] text-gray-500">
-            ⟳ {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          {totalActive > 0 ? (
-            <span className="text-xs font-bold text-orange-400">{totalActive} pedido{totalActive !== 1 ? 's' : ''} activo{totalActive !== 1 ? 's' : ''}</span>
-          ) : (
-            <span className="text-xs text-gray-600">Sem pedidos activos</span>
-          )}
-          <button onClick={() => fetchOrders()} className="text-xs text-gray-500 hover:text-white transition-colors">🔄 Actualizar</button>
-        </div>
-      )}
-
-      {showSlaConfig && (
-        <SLAModal config={sla} onSave={saveSla} onClose={() => setShowSlaConfig(false)} />
-      )}
-    </div>
+      {showSlaConfig && <SLAModal config={sla} onSave={saveSla} onClose={() => setShowSlaConfig(false)} />}
+    </>
   );
+
+  if (fullscreen) {
+    return <div className="fixed inset-0 z-40 overflow-y-auto bg-app-sheet px-4 py-5 text-app-ink sm:px-6">{content}</div>;
+  }
+  return <AppLayout wide>{content}</AppLayout>;
 }

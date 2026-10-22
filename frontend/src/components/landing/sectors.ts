@@ -13,7 +13,7 @@ export const SECTORS: SectorPage[] = [
     scenarioId: 'restaurant',
     copy: {
       pt: {
-        title: 'Agente de IA no WhatsApp para restaurantes e delivery | Agentfy',
+        title: 'WhatsApp com IA para restaurantes e delivery | Agentfy',
         description: 'Recebe encomendas pelo WhatsApp a qualquer hora: o agente mostra o menu, calcula o total com entrega, cobra por MB WAY e envia o pedido para a cozinha.',
         h1: 'Encomendas pelo WhatsApp, mesmo com a cozinha a mil',
         intro: 'O agente conhece o teu menu, os pratos do dia, as zonas e o mínimo de entrega. Fecha o pedido, cobra e manda-o para o ecrã da cozinha, enquanto a tua equipa cozinha.',
@@ -25,8 +25,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       es: {
-        title: 'Agente de IA en WhatsApp para restaurantes y delivery | Agentfy',
-        description: 'Recibe pedidos por WhatsApp a cualquier hora: el agente muestra la carta, calcula el total con entrega y manda el pedido a cocina.',
+        title: 'WhatsApp con IA para restaurantes y delivery | Agentfy',
+        description: 'Recibe pedidos por WhatsApp a cualquier hora: el agente muestra la carta, calcula el total con entrega, cobra con MB WAY y manda el pedido directo a cocina.',
         h1: 'Pedidos por WhatsApp, aunque la cocina vaya a tope',
         intro: 'El agente conoce tu carta, los platos del día, las zonas y el mínimo de entrega. Cierra el pedido y lo manda a la pantalla de cocina mientras tu equipo cocina.',
         points: [
@@ -38,7 +38,7 @@ export const SECTORS: SectorPage[] = [
       },
       en: {
         title: 'WhatsApp AI agent for restaurants and delivery | Agentfy',
-        description: 'Take WhatsApp orders at any hour: the agent shows the menu, totals the order with delivery and sends it straight to the kitchen.',
+        description: 'Take WhatsApp orders at any hour: the AI agent shows the menu, totals the order with delivery, collects payment with MB WAY and sends it to the kitchen.',
         h1: 'WhatsApp orders, even when the kitchen is slammed',
         intro: 'The agent knows your menu, daily specials, delivery zones and minimums. It closes the order and sends it to the kitchen screen while your team cooks.',
         points: [
@@ -55,8 +55,8 @@ export const SECTORS: SectorPage[] = [
     scenarioId: 'clinic',
     copy: {
       pt: {
-        title: 'Agente de IA no WhatsApp para clínicas: marcações automáticas | Agentfy',
-        description: 'Marcações pelo WhatsApp ligadas à Google Calendar, lembretes na véspera e passagem para a receção quando o pedido é clínico.',
+        title: 'WhatsApp com IA para clínicas: marcações | Agentfy',
+        description: 'Marcações pelo WhatsApp ligadas à Google Calendar: o agente propõe apenas horários livres, envia lembrete na véspera e passa à receção o que for clínico.',
         h1: 'Marcações pelo WhatsApp sem ocupar a receção',
         intro: 'O agente vê a agenda, propõe horários livres por médico ou serviço, confirma e lembra o paciente na véspera. Perguntas clínicas passam para a equipa.',
         points: [
@@ -67,8 +67,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       es: {
-        title: 'Agente de IA en WhatsApp para clínicas: citas automáticas | Agentfy',
-        description: 'Citas por WhatsApp conectadas a Google Calendar, recordatorios y paso a recepción cuando la consulta es clínica.',
+        title: 'WhatsApp con IA para clínicas: gestión de citas | Agentfy',
+        description: 'Citas por WhatsApp conectadas a Google Calendar: el agente propone únicamente huecos libres, envía recordatorio el día antes y pasa a recepción lo clínico.',
         h1: 'Citas por WhatsApp sin saturar la recepción',
         intro: 'El agente consulta la agenda, propone huecos libres por profesional o servicio, confirma y recuerda la cita el día antes. Las dudas clínicas pasan al equipo.',
         points: [
@@ -79,8 +79,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       en: {
-        title: 'WhatsApp AI agent for clinics: automatic bookings | Agentfy',
-        description: 'WhatsApp bookings linked to Google Calendar, reminders the day before and handover to reception for clinical questions.',
+        title: 'WhatsApp AI agent for clinics: appointment booking | Agentfy',
+        description: 'Book appointments on WhatsApp via Google Calendar: the AI agent offers free slots, reminds patients the day before and hands clinical questions to reception.',
         h1: 'WhatsApp bookings without tying up reception',
         intro: 'The agent checks the calendar, offers free slots by practitioner or service, confirms and reminds the patient the day before. Clinical questions go to your team.',
         points: [
@@ -97,8 +97,8 @@ export const SECTORS: SectorPage[] = [
     scenarioId: 'salon',
     copy: {
       pt: {
-        title: 'Agente de IA no WhatsApp para salões e estética | Agentfy',
-        description: 'Responde a preços e disponibilidade, marca serviços por profissional e envia lembretes, pelo WhatsApp e Instagram.',
+        title: 'WhatsApp com IA para salões, estética e beleza | Agentfy',
+        description: 'O agente responde a preços e disponibilidade no WhatsApp, faz reservas na tua agenda e envia lembretes automáticos, enquanto a equipa trabalha com as clientes.',
         h1: 'O teu salão a marcar clientes enquanto trabalhas',
         intro: 'Preços, duração de cada serviço e a agenda de cada profissional. O agente responde no WhatsApp e no Instagram e marca sem interromper quem está a cortar.',
         points: [
@@ -109,8 +109,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       es: {
-        title: 'Agente de IA en WhatsApp para salones y estética | Agentfy',
-        description: 'Responde precios y disponibilidad, agenda servicios por profesional y envía recordatorios, por WhatsApp e Instagram.',
+        title: 'WhatsApp con IA para salones, estética y belleza | Agentfy',
+        description: 'El agente responde precios y disponibilidad por WhatsApp, hace reservas en tu agenda y envía recordatorios automáticos mientras el equipo atiende a clientas.',
         h1: 'Tu salón agendando clientes mientras trabajas',
         intro: 'Precios, duración de cada servicio y la agenda de cada profesional. El agente responde en WhatsApp e Instagram y agenda sin interrumpir a quien está cortando.',
         points: [
@@ -121,8 +121,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       en: {
-        title: 'WhatsApp AI agent for salons and beauty | Agentfy',
-        description: 'Answers prices and availability, books services by stylist and sends reminders, on WhatsApp and Instagram.',
+        title: 'WhatsApp AI agent for salons and beauty care | Agentfy',
+        description: 'The AI agent answers prices and availability on WhatsApp, books appointments in your calendar and sends automatic reminders while your team looks after clients.',
         h1: 'Your salon booking clients while you work',
         intro: 'Prices, service durations and each stylist’s calendar. The agent answers on WhatsApp and Instagram and books without interrupting whoever is cutting.',
         points: [
@@ -139,8 +139,8 @@ export const SECTORS: SectorPage[] = [
     scenarioId: 'shop',
     copy: {
       pt: {
-        title: 'Agente de IA no WhatsApp para lojas online | Agentfy',
-        description: 'Estado de encomendas, trocas, devoluções e dúvidas de produto respondidas no WhatsApp, com passagem para a equipa quando o cliente se irrita.',
+        title: 'WhatsApp com IA para lojas online e e-commerce | Agentfy',
+        description: 'O agente responde ao estado das encomendas, trocas e devoluções no WhatsApp, de dia e de noite, e passa à tua equipa os clientes insatisfeitos com o resumo.',
         h1: 'Apoio ao cliente da tua loja, 24 horas por dia',
         intro: '“Onde está a minha encomenda?”, trocas, tamanhos e devoluções. O agente responde com as tuas políticas e passa a conversa à equipa quando o cliente precisa de uma pessoa.',
         points: [
@@ -151,8 +151,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       es: {
-        title: 'Agente de IA en WhatsApp para tiendas online | Agentfy',
-        description: 'Estado de pedidos, cambios, devoluciones y dudas de producto en WhatsApp, con paso al equipo cuando el cliente se enfada.',
+        title: 'WhatsApp con IA para tiendas online y e-commerce | Agentfy',
+        description: 'El agente responde sobre estado de pedidos, cambios y devoluciones por WhatsApp las 24 horas y pasa a tu equipo a los clientes molestos con el resumen del caso.',
         h1: 'Atención al cliente de tu tienda, 24 horas al día',
         intro: '“¿Dónde está mi pedido?”, cambios, tallas y devoluciones. El agente responde con tus políticas y pasa la conversación al equipo cuando el cliente necesita una persona.',
         points: [
@@ -163,8 +163,8 @@ export const SECTORS: SectorPage[] = [
         ],
       },
       en: {
-        title: 'WhatsApp AI agent for online shops | Agentfy',
-        description: 'Order status, exchanges, returns and product questions answered on WhatsApp, with handover to your team when a customer gets upset.',
+        title: 'WhatsApp AI agent for online shops and e-commerce | Agentfy',
+        description: 'The AI agent answers order status, exchanges and returns on WhatsApp 24 hours a day and hands unhappy customers to your team with a summary of the issue.',
         h1: 'Customer support for your shop, around the clock',
         intro: '“Where is my order?”, exchanges, sizes and returns. The agent answers from your policies and hands the chat to your team when a customer needs a person.',
         points: [

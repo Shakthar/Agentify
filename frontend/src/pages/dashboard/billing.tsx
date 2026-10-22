@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import Navigation from '../../components/Navigation';
+import Link from 'next/link';
+import AppLayout from '../../components/app/AppLayout';
+import { EmptyState, InlineError, PageHeader, Panel, Pill, Skeleton, Tabs, cx } from '../../components/app/ui';
+import { InvoiceTable, PlatformInvoice, REASON_LABEL, UsageBar, fmt, isoDate } from '../../components/app/billingParts';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../utils/constants';
 import { CreditLog, Plan, PLAN_LABELS } from '../../types';
 import api from '../../utils/api';
-import { PLAN_PRICING, money, num, type Currency, type PlanId } from '../../utils/pricing';
+import { PLAN_PRICING, money, pricePer1k, type Currency, type PlanId } from '../../utils/pricing';
 
 interface BillingData {
   total: number;
@@ -24,230 +27,214 @@ interface AgentUsage {
   creditsUsed: number;
 }
 
-const PLAN_LABEL_LIST: { id: PlanId; label: string }[] = [
-  { id: 'free', label: 'Free' }, { id: 'starter', label: 'Starter' },
-  { id: 'business', label: 'Business' }, { id: 'enterprise', label: 'Enterprise' },
-];
-const plansFor = (cur: Currency) => PLAN_LABEL_LIST.map(({ id, label }) => ({
-  id, label,
-  price: money(PLAN_PRICING[id][cur].price, cur),
-  agents: PLAN_PRICING[id].agents,
-  credits: num(PLAN_PRICING[id][cur].credits),
-}));
-
-// SVG pie chart (no external lib)
-function PieChart({ used, total }: { used: number; total: number }) {
-  if (total === 0) return <div className="w-40 h-40 rounded-full bg-gray-200 dark:bg-gray-600 mx-auto" />;
-  const pct = Math.min(used / total, 1);
-  const r = 60;
-  const cx = 80;
-  const cy = 80;
-  const circumference = 2 * Math.PI * r;
-  const usedArc = circumference * pct;
-  const freeArc = circumference * (1 - pct);
-  const color = pct >= 0.9 ? '#ef4444' : pct >= 0.7 ? '#f59e0b' : '#3b57f0';
-  return (
-    <div className="flex flex-col items-center">
-      <svg width="160" height="160" viewBox="0 0 160 160">
-        {/* Background circle (available) */}
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="20" />
-        {/* Used arc */}
-        <circle
-          cx={cx} cy={cy} r={r} fill="none"
-          stroke={color} strokeWidth="20"
-          strokeDasharray={`${usedArc} ${freeArc}`}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${cx} ${cy})`}
-          style={{ transition: 'stroke-dasharray 0.5s ease' }}
-        />
-        {/* Center text */}
-        <text x={cx} y={cy - 6} textAnchor="middle" className="text-2xl font-bold" fill={color} fontSize="22" fontWeight="700">
-          {Math.round(pct * 100)}%
-        </text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fill="#9ca3af" fontSize="10">usado</text>
-      </svg>
-      <div className="flex gap-4 text-xs mt-1">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />Usado: {used.toLocaleString()}</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-200 dark:bg-gray-600" />Livre: {(total - used).toLocaleString()}</span>
-      </div>
-    </div>
-  );
-}
+const PLAN_IDS: PlanId[] = ['free', 'starter', 'business', 'enterprise'];
+type Tab = 'overview' | 'agents' | 'history';
 
 export default function BillingPage() {
   const router = useRouter();
   const { tenant } = useAuth();
   const [data, setData] = useState<BillingData | null>(null);
   const [agentUsage, setAgentUsage] = useState<AgentUsage[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'agents' | 'history'>('overview');
+  const [invoices, setInvoices] = useState<PlatformInvoice[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [currency, setCurrency] = useState<Currency>('EUR');
-  const PLANS = plansFor(currency);
 
-  useEffect(() => {
-    if (!tenant) { router.replace(ROUTES.home); return; }
+  const load = () => {
+    setLoading(true); setFailed(false);
     api.get('/api/billing/pricing').then(r => { if (r.data?.tenantCurrency === 'BRL') setCurrency('BRL'); }).catch(() => {});
+    api.get('/api/billing/platform-invoices').then(r => setInvoices(r.data?.invoices ?? [])).catch(() => {});
     Promise.all([
       api.get('/api/billing/credits'),
       api.get('/api/billing/usage-by-agent'),
     ]).then(([credRes, agentRes]) => {
       setData(credRes.data);
       setAgentUsage(agentRes.data.usage ?? []);
-    }).finally(() => setLoading(false));
+    }).catch(() => setFailed(true)).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!tenant) { router.replace(ROUTES.home); return; }
+    load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
 
   if (!tenant) return null;
 
+  const cur = tenant.plan as PlanId;
+  const curIdx = PLAN_IDS.indexOf(cur);
+  const curData = PLAN_PRICING[cur][currency];
+  const status = tenant.subscriptionStatus;
+  const days = tenant.subscriptionExpiresAt ? Math.ceil((new Date(tenant.subscriptionExpiresAt).getTime() - Date.now()) / 86400000) : null;
+
   return (
-    <div className="flex min-h-screen">
+    <AppLayout>
       <Head><title>Agentfy — Faturação</title></Head>
-      <Navigation />
-      <main className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Créditos & Plano</h1>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">Plano atual: <span className="font-medium">{PLAN_LABELS[tenant.plan as Plan]}</span></p>
-            </div>
-          </div>
+      <PageHeader
+        title="Faturação"
+        subtitle="Plano, créditos e faturas da conta."
+        actions={<Link href={ROUTES.plans} className="btn-primary">Alterar plano</Link>}
+      />
 
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1">
-            {([
-              { key: 'overview', label: '📊 Visão geral' },
-              { key: 'agents',   label: '🤖 Por agente' },
-              { key: 'history',  label: '🕒 Histórico' },
-            ] as { key: typeof activeTab; label: string }[]).map((t) => (
-              <button key={t.key} onClick={() => setActiveTab(t.key)}
-                className={`px-3 pb-2 text-sm font-medium transition-colors ${
-                  activeTab === t.key ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                }`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+      <Tabs<Tab>
+        label="Faturação"
+        value={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'overview', label: 'Plano e faturas' },
+          { id: 'agents', label: 'Por agente', count: agentUsage.length },
+          { id: 'history', label: 'Histórico', count: data?.history.length },
+        ]}
+      />
 
-          {loading ? <p className="text-gray-400 text-sm">A carregar...</p> : data && (
-            <>
-              {/* ─── Visão geral ─── */}
-              {activeTab === 'overview' && (
-                <>
-                  {/* Pie chart + stats */}
-                  <div className="card mb-6 flex flex-col sm:flex-row items-center gap-8">
-                    <PieChart used={data.used} total={data.total} />
-                    <div className="flex-1 space-y-3">
-                      <div className="flex justify-between text-sm border-b border-gray-100 dark:border-gray-700 pb-2">
-                        <span className="text-gray-500 dark:text-gray-400">Total alocado</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{data.total.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm border-b border-gray-100 dark:border-gray-700 pb-2">
-                        <span className="text-gray-500 dark:text-gray-400">Consumidos</span>
-                        <span className="font-semibold text-red-500">{data.used.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Disponíveis</span>
-                        <span className={`font-semibold ${data.usedPercent >= 90 ? 'text-red-600' : data.usedPercent >= 70 ? 'text-yellow-600' : 'text-green-600'}`}>
-                          {data.available.toLocaleString()}
-                        </span>
-                      </div>
-                      {data.usedPercent >= 70 && (
-                        <p className={`text-xs px-3 py-2 rounded-lg ${data.usedPercent >= 90 ? 'bg-red-50 text-red-600' : 'bg-yellow-50 text-yellow-700'}`}>
-                          {data.usedPercent >= 90 ? '⚠️ Créditos quase esgotados!' : '⚡ Tens menos de 30% dos créditos restantes'}
-                        </p>
-                      )}
+      {loading && (
+        <div className="space-y-4">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-56 w-full" />
+        </div>
+      )}
+      {!loading && failed && <InlineError message="Não foi possível carregar a faturação." onRetry={load} />}
+
+      {!loading && data && (
+        <>
+          {activeTab === 'overview' && (
+            <div className="space-y-5">
+              {/* Plano atual e utilização primeiro */}
+              <Panel>
+                <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:gap-10">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-semibold text-app-ink">Plano {PLAN_LABELS[cur as Plan]}</h2>
+                      {status === 'active' && <Pill tone="pos" dot>Ativo</Pill>}
+                      {status === 'trial' && <Pill tone="accent">Período de teste</Pill>}
+                      {status === 'pending_payment' && <Pill tone="warn">Aguarda pagamento</Pill>}
+                      {status === 'suspended' && <Pill tone="neg">Suspenso</Pill>}
                     </div>
+                    <p className="num mt-2 text-2xl font-semibold text-app-ink">
+                      {curData.price === 0 ? 'Grátis' : money(curData.price, currency)}
+                      {curData.price > 0 && <span className="text-sm font-normal text-app-muted"> / mês</span>}
+                    </p>
+                    <dl className="mt-3 space-y-1 text-sm">
+                      <div className="flex justify-between gap-3"><dt className="text-app-muted">Renovação</dt><dd className="num text-app-ink">{tenant.subscriptionExpiresAt ? isoDate(tenant.subscriptionExpiresAt) : '—'}{days !== null && days > 0 ? <span className="text-app-faint"> · {days} dias</span> : null}</dd></div>
+                      <div className="flex justify-between gap-3"><dt className="text-app-muted">Agentes</dt><dd className="num text-app-ink">{PLAN_PRICING[cur].agents}</dd></div>
+                      <div className="flex justify-between gap-3"><dt className="text-app-muted">Créditos</dt><dd className="num text-app-ink">{fmt(curData.credits)}{cur === 'free' ? ' (únicos)' : ' / mês'}</dd></div>
+                    </dl>
                   </div>
+                  <div className="md:border-l md:border-app-rule md:pl-10">
+                    <UsageBar
+                      used={data.used}
+                      total={data.total}
+                      caption={data.usedPercent >= 90 ? 'Créditos quase esgotados.' : data.usedPercent >= 70 ? 'Restam menos de 30% dos créditos.' : data.refreshDate ? <>Restam {fmt(data.available)} até <span className="num">{isoDate(data.refreshDate)}</span>.</> : undefined}
+                    />
+                  </div>
+                </div>
+              </Panel>
 
-                  {/* Plans */}
-                  <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Planos disponíveis</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {PLANS.map((plan) => (
-                      <div key={plan.id} className={`card relative ${tenant.plan === plan.id ? 'border-brand-500 ring-1 ring-brand-500' : ''}`}>
-                        {tenant.plan === plan.id && (
-                          <span className="absolute -top-2.5 left-4 bg-brand-600 text-white text-xs px-2 py-0.5 rounded-full">Atual</span>
-                        )}
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{plan.label}</p>
-                        <p className="text-2xl font-bold text-brand-700 mb-3">
-                          {plan.price}{plan.id !== 'free' && <span className="text-sm text-gray-400 font-normal">/mês</span>}
-                        </p>
-                        <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                          <li>✓ {plan.agents === 999 ? '30+ agentes' : `${plan.agents} agentes`}</li>
-                          <li>✓ {plan.credits} créditos{plan.id === 'free' ? ' (único, sem reset)' : '/mês'}</li>
-                        </ul>
-                        {tenant.plan !== plan.id && (
-                          <button className="btn-primary w-full mt-4 text-sm" disabled>{plan.id === 'free' ? 'Downgrade' : 'Upgrade'}</button>
-                        )}
+              {/* Comparação de planos */}
+              <Panel title="Planos" action={<Link href={ROUTES.plans} className="font-medium text-app-accent hover:underline">Comparar em detalhe</Link>} bodyClassName="p-0 md:p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-app-muted">
+                        <th className="px-5 py-2 font-medium" />
+                        {PLAN_IDS.map((id) => (
+                          <th key={id} className={cx('px-3 py-2 text-right font-medium', id === cur && 'text-app-ink')}>
+                            {PLAN_LABELS[id as Plan]}{id === cur && <span className="ml-1.5 text-app-faint">atual</span>}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: `Preço (${currency}, por mês)`, f: (id: PlanId) => (PLAN_PRICING[id][currency].price === 0 ? 'Grátis' : money(PLAN_PRICING[id][currency].price, currency)) },
+                        { label: 'Créditos', f: (id: PlanId) => `${fmt(PLAN_PRICING[id][currency].credits)}${id === 'free' ? ' únicos' : ' / mês'}` },
+                        { label: 'Agentes', f: (id: PlanId) => (PLAN_PRICING[id].agents === 999 ? '30+' : String(PLAN_PRICING[id].agents)) },
+                        { label: 'Preço por 1.000 créditos', f: (id: PlanId) => (PLAN_PRICING[id][currency].price === 0 ? '—' : pricePer1k(id, currency)) },
+                      ].map((row) => (
+                        <tr key={row.label} className="border-t border-app-rule">
+                          <td className="px-5 py-2.5 text-app-muted">{row.label}</td>
+                          {PLAN_IDS.map((id) => (
+                            <td key={id} className={cx('num px-3 py-2.5 text-right', id === cur ? 'font-semibold text-app-ink' : 'text-app-muted')}>{row.f(id)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="border-t border-app-rule px-5 py-3 text-sm text-app-muted">
+                  {curIdx < PLAN_IDS.length - 1 ? 'Ao subir de plano ganha mais créditos mensais e agentes; ' : ''}
+                  {curIdx > 0 ? 'ao descer, os limites passam a ser os do novo plano. ' : ''}
+                  O pagamento é pedido em <Link href={ROUTES.plans} className="font-medium text-app-accent hover:underline">Planos</Link>, no momento da mudança.
+                </p>
+              </Panel>
+
+              {/* Faturas */}
+              <Panel title="Faturas">
+                {invoices.length === 0 ? (
+                  <EmptyState title="Ainda não há faturas" body="Aparecem aqui assim que subscrever um plano pago." action={<Link href={ROUTES.plans} className="btn-secondary">Ver planos</Link>} />
+                ) : (
+                  <InvoiceTable invoices={invoices.slice(0, 12)} />
+                )}
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === 'agents' && (
+            <Panel bodyClassName="p-0">
+              {agentUsage.length === 0 ? (
+                <div className="p-5"><EmptyState title="Sem consumo por agente" body="Os agentes ainda não gastaram créditos." /></div>
+              ) : (
+                <>
+                  <div className="flex justify-between px-5 py-3 text-xs text-app-muted"><span>Agente</span><span>Créditos consumidos</span></div>
+                  {agentUsage.slice().sort((a, b) => b.creditsUsed - a.creditsUsed).map((au) => {
+                    const pct = data.used > 0 ? (au.creditsUsed / data.used) * 100 : 0;
+                    return (
+                      <div key={au.agentId} className="border-t border-app-rule px-5 py-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="truncate text-sm font-medium text-app-ink">{au.agentName}</p>
+                          <p className="num text-sm font-medium text-app-ink">{fmt(au.creditsUsed)}</p>
+                        </div>
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-app-raised"><div className="h-full rounded-full bg-app-accent" style={{ width: `${pct}%` }} /></div>
+                          <span className="num w-20 shrink-0 text-right text-xs text-app-faint">{Math.round(pct)}% do total</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </>
               )}
-
-              {/* ─── Por agente ─── */}
-              {activeTab === 'agents' && (
-                <div className="card p-0 overflow-hidden">
-                  {agentUsage.length === 0 ? (
-                    <p className="text-center py-10 text-sm text-gray-400">Sem dados de consumo por agente ainda.</p>
-                  ) : (
-                    <>
-                      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex justify-between text-xs font-semibold text-gray-500 dark:text-gray-400">
-                        <span>Agente</span><span>Créditos consumidos</span>
-                      </div>
-                      {agentUsage
-                        .slice()
-                        .sort((a, b) => b.creditsUsed - a.creditsUsed)
-                        .map((au) => {
-                          const pct = data.used > 0 ? Math.round((au.creditsUsed / data.used) * 100) : 0;
-                          return (
-                            <div key={au.agentId} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                              <div className="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold text-sm shrink-0">
-                                {au.agentName[0]}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{au.agentName}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                    <div className="h-full bg-brand-600 rounded-full" style={{ width: `${pct}%` }} />
-                                  </div>
-                                  <span className="text-[14px] text-gray-400 shrink-0">{pct}% do total</span>
-                                </div>
-                              </div>
-                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 shrink-0">
-                                {au.creditsUsed.toLocaleString()}
-                              </span>
-                            </div>
-                          );
-                        })}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* ─── Histórico ─── */}
-              {activeTab === 'history' && (
-                <div className="card p-0 overflow-hidden">
-                  {data.history.length === 0 ? (
-                    <p className="text-center py-10 text-sm text-gray-400">Sem histórico ainda.</p>
-                  ) : (
-                    data.history.map((log) => (
-                      <div key={log.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                        <div>
-                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 capitalize">{log.reason}</span>
-                          <span className="text-gray-400 text-xs ml-2">{new Date(log.createdAt).toLocaleDateString('pt-PT')}</span>
-                        </div>
-                        <span className={`text-sm font-semibold ${log.amount > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                          {log.amount > 0 ? '+' : ''}{log.amount.toLocaleString()}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </>
+            </Panel>
           )}
-        </div>
-      </main>
-    </div>
+
+          {activeTab === 'history' && (
+            <Panel bodyClassName="p-0">
+              {data.history.length === 0 ? (
+                <div className="p-5"><EmptyState title="Sem histórico" body="Os movimentos de créditos ficam registados aqui." /></div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-app-muted">
+                      <th className="px-5 py-3 font-medium">Movimento</th>
+                      <th className="px-3 py-3 text-right font-medium">Data</th>
+                      <th className="px-5 py-3 text-right font-medium">Créditos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.history.map((log) => (
+                      <tr key={log.id} className="border-t border-app-rule">
+                        <td className="px-5 py-3 text-app-ink">{REASON_LABEL[log.reason] ?? log.reason}</td>
+                        <td className="num px-3 py-3 text-right text-app-muted">{isoDate(log.createdAt)}</td>
+                        <td className={`num px-5 py-3 text-right font-medium ${log.amount > 0 ? 'text-app-pos' : 'text-app-ink'}`}>{log.amount > 0 ? '+' : '−'}{fmt(Math.abs(log.amount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Panel>
+          )}
+        </>
+      )}
+    </AppLayout>
   );
 }

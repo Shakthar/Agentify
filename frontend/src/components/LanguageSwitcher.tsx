@@ -1,9 +1,9 @@
 import { useRouter } from 'next/router';
 
 const LANGUAGES = [
-  { code: 'pt', label: 'PT', flag: '🇵🇹' },
-  { code: 'en', label: 'EN', flag: '🇬🇧' },
-  { code: 'es', label: 'ES', flag: '🇪🇸' },
+  { code: 'pt', label: 'PT' },
+  { code: 'es', label: 'ES' },
+  { code: 'en', label: 'EN' },
 ];
 
 export default function LanguageSwitcher() {
@@ -15,21 +15,23 @@ export default function LanguageSwitcher() {
   };
 
   return (
-    <div className="flex items-center gap-1">
-      {LANGUAGES.map((lang) => (
-        <button
-          key={lang.code}
-          onClick={() => switchLocale(lang.code)}
-          title={lang.label}
-          className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
-            locale === lang.code
-              ? 'bg-brand-100 text-brand-700 font-semibold'
-              : 'text-gray-400 hover:text-gray-700'
-          }`}
-        >
-          {lang.flag} {lang.label}
-        </button>
-      ))}
+    <div role="group" aria-label="Idioma" className="flex items-center rounded-full bg-app-sheet p-0.5">
+      {LANGUAGES.map((lang) => {
+        const active = locale === lang.code;
+        return (
+          <button
+            key={lang.code}
+            type="button"
+            aria-pressed={active}
+            onClick={() => switchLocale(lang.code)}
+            className={`h-7 rounded-full px-2.5 text-xs font-semibold transition-colors ${
+              active ? 'bg-app-ink text-app-sheet' : 'text-app-muted hover:text-app-ink'
+            }`}
+          >
+            {lang.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
