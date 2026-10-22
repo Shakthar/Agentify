@@ -1,7 +1,10 @@
 import { useEffect, useState, Fragment } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import Navigation from '../../components/Navigation';
+import AppLayout from '../../components/app/AppLayout';
+import { EmptyState, KpiStrip, PageHeader, Panel, Pill, Skeleton, Tabs } from '../../components/app/ui';
+import type { PillTone } from '../../components/app/ui';
+import SeoPanel from '../../components/admin/SeoPanel';
 import { useAuth } from '../../hooks/useAuth';
 import { useAdmin } from '../../hooks/useAdmin';
 import { ROUTES } from '../../utils/constants';
@@ -113,19 +116,36 @@ interface Expense {
   amount: number; recurring: boolean; period: string; createdAt: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'geral', label: 'Visão geral' },
+  { id: 'clientes', label: 'Clientes' },
+  { id: 'seo', label: 'SEO e visitas' },
+  { id: 'financas', label: 'Receitas e despesas' },
+  { id: 'precos', label: 'Preços' },
+  { id: 'whatsapp', label: 'WhatsApp' },
+  { id: 'auditoria', label: 'Auditoria' },
+] as const;
+type TabId = (typeof TABS)[number]['id'];
+// Aceita também as chaves antigas (?tab=dashboard, etc.).
+const TAB_ALIASES: Record<string, TabId> = { dashboard: 'geral', tenants: 'clientes', balance: 'financas', pricing: 'precos', logs: 'auditoria' };
+function parseTab(q: unknown): TabId {
+  const v = Array.isArray(q) ? q[0] : q;
+  if (typeof v !== 'string') return 'geral';
+  if (TAB_ALIASES[v]) return TAB_ALIASES[v];
+  return (TABS.find((t) => t.id === v)?.id ?? 'geral') as TabId;
+}
+
+const eur = (v: number) => v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+const int = (v: number) => v.toLocaleString('pt-PT');
+const tok = (v: number) => `${(v / 1000).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mil`;
+
 const PLAN_LABELS_LOCAL: Record<string, string> = {
   free: 'Free', starter: 'Starter', business: 'Business', enterprise: 'Enterprise',
 };
-const PLAN_COLORS: Record<string, string> = {
-  free: 'bg-gray-100 text-gray-600',
-  starter: 'bg-blue-100 text-blue-700',
-  business: 'bg-brand-100 text-brand-700',
-  enterprise: 'bg-amber-100 text-amber-700',
-};
+const PLAN_TONES: Record<string, PillTone> = { free: 'neutral', starter: 'neutral', business: 'accent', enterprise: 'accent' };
 const CATEGORY_LABELS: Record<string, string> = {
-  hosting: '🖥️ Hosting', api: '🔌 APIs', support: '🛟 Suporte',
-  marketing: '📣 Marketing', misc: '📦 Outros',
+  hosting: 'Hosting', api: 'APIs', support: 'Suporte', marketing: 'Marketing', misc: 'Outros',
 };
 const ACTION_LABELS: Record<string, string> = {
   tenant_signup: 'Conta criada', agent_created: 'Agente criado',
@@ -133,61 +153,55 @@ const ACTION_LABELS: Record<string, string> = {
   agent_deactivated: 'Agente desativado', conversation_created: 'Conversa iniciada',
   conversation_closed: 'Conversa fechada',
 };
-const ACTION_COLORS: Record<string, string> = {
-  tenant_signup: 'bg-blue-100 text-blue-700', agent_created: 'bg-green-100 text-green-700',
-  agent_deleted: 'bg-red-100 text-red-700', agent_activated: 'bg-green-100 text-green-700',
-  agent_deactivated: 'bg-yellow-100 text-yellow-700', conversation_created: 'bg-purple-100 text-purple-700',
-  conversation_closed: 'bg-gray-100 text-gray-700',
+const ACTION_TONES: Record<string, PillTone> = {
+  tenant_signup: 'accent', agent_created: 'pos', agent_deleted: 'neg', agent_activated: 'pos',
+  agent_deactivated: 'warn', conversation_created: 'neutral', conversation_closed: 'neutral',
 };
 
 // ─── Small components ─────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
-  return (
-    <div className="card">
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${accent ?? 'text-gray-900 dark:text-gray-100'}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
-    </div>
-  );
+function PlanPill({ plan }: { plan: string }) {
+  return <Pill tone={PLAN_TONES[plan] ?? 'neutral'}>{PLAN_LABELS_LOCAL[plan] ?? plan}</Pill>;
 }
 
 function SkillBadge({ label, active, highlight }: { label: string; active: boolean; highlight?: boolean }) {
   return (
-    <span className={`text-[14px] px-1.5 py-0.5 rounded-full font-medium ${
-      !active ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 line-through' :
-      highlight ? 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300' :
-      'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+      !active ? 'bg-app-raised text-app-faint line-through' : highlight ? 'bg-app-accent-soft text-app-accent' : 'bg-app-raised text-app-ink'
     }`}>{label}</span>
   );
 }
 
-function PlanBar({ byPlan }: { byPlan: Record<string, number> }) {
-  const plans = ['free', 'starter', 'business', 'enterprise'];
-  const total = plans.reduce((s, p) => s + (byPlan[p] ?? 0), 0) || 1;
-  const barColors: Record<string, string> = {
-    free: 'bg-gray-400', starter: 'bg-blue-500',
-    business: 'bg-brand-600', enterprise: 'bg-amber-500',
-  };
+/** Barra fina de percentagem; só muda de tom quando o estado pede atenção. */
+function UsageBar({ pct, className = 'w-16' }: { pct: number; className?: string }) {
+  const tone = pct >= 90 ? 'bg-app-neg' : pct >= 70 ? 'bg-app-warn' : 'bg-app-accent';
   return (
-    <div className="card col-span-full">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">Distribuição por plano</p>
-      <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
-        {plans.map((p) => {
-          const count = byPlan[p] ?? 0;
-          const pct = Math.round((count / total) * 100);
-          if (!count) return null;
-          return <div key={p} className={`${barColors[p]}`} style={{ width: `${pct}%` }} title={`${PLAN_LABELS_LOCAL[p]}: ${count} (${pct}%)`} />;
-        })}
-      </div>
-      <div className="flex flex-wrap gap-3 mt-3">
-        {plans.map((p) => (
-          <div key={p} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
-            <span className={`w-2.5 h-2.5 rounded-sm ${barColors[p]}`} />
-            {PLAN_LABELS_LOCAL[p]}: <strong>{byPlan[p] ?? 0}</strong>
-          </div>
-        ))}
-      </div>
+    <span className={`block h-1 rounded-full bg-app-raised ${className}`}>
+      <span className={`block h-1 rounded-full ${tone}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+    </span>
+  );
+}
+
+function Stat({ label, value, note, tone }: { label: string; value: string; note?: string; tone?: 'neg' }) {
+  return (
+    <div>
+      <p className="text-sm text-app-muted">{label}</p>
+      <p className={`num mt-0.5 text-xl font-semibold ${tone === 'neg' ? 'text-app-neg' : 'text-app-ink'}`}>{value}</p>
+      {note && <p className="text-xs text-app-faint">{note}</p>}
     </div>
+  );
+}
+
+function Th({ children, right, className }: { children?: React.ReactNode; right?: boolean; className?: string }) {
+  return <th className={`pb-2 text-xs font-normal text-app-muted ${right ? 'text-right' : 'text-left'} ${className ?? ''}`}>{children}</th>;
+}
+
+function BarRow({ label, value, max, trailing }: { label: string; value: number; max: number; trailing: React.ReactNode }) {
+  return (
+    <li className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
+      <span className="truncate text-app-ink">{label}</span>
+      <span className="h-1 rounded-full bg-app-raised"><span className="block h-1 rounded-full bg-app-accent" style={{ width: `${Math.min(100, max ? (value / max) * 100 : 0)}%` }} /></span>
+      <span className="num text-right text-app-muted">{trailing}</span>
+    </li>
   );
 }
 
@@ -197,7 +211,8 @@ export default function AdminPage() {
   const { tenant, loadMe } = useAuth();
   const { auditLogs, auditTotal, loading: auditLoading, fetchAuditLogs } = useAdmin();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'balance' | 'pricing' | 'logs' | 'whatsapp'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabId>('geral');
+  const [tabInit, setTabInit] = useState(false);
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -396,325 +411,245 @@ export default function AdminPage() {
     }
   }
 
-  const tabList = [
-    { key: 'dashboard', label: '📊 Dashboard' },
-    { key: 'tenants',   label: '🏢 Contas' },
-    { key: 'balance',   label: '💰 Balanço' },
-    { key: 'pricing',   label: '🏷️ Preços' },
-    { key: 'logs',      label: '📋 Auditoria' },
-    { key: 'whatsapp',  label: '💬 WhatsApp' },
-  ] as { key: typeof activeTab; label: string }[];
+
+  function selectTab(id: TabId, push = true) {
+    setActiveTab(id);
+    if (push) router.replace({ pathname: router.pathname, query: id === 'geral' ? {} : { tab: id } }, undefined, { shallow: true });
+    if (id === 'auditoria') fetchAuditLogs(0, PAGE_SIZE);
+    if (id === 'precos' && !pricing) loadPricing();
+    if (id === 'whatsapp') loadWhatsApp();
+  }
+
+  // Aplica ?tab= (também em navegação para trás/frente).
+  useEffect(() => {
+    if (!router.isReady || !isAdmin) return;
+    const t = parseTab(router.query.tab);
+    if (t !== activeTab || !tabInit) {
+      setTabInit(true);
+      selectTab(t, false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.tab, isAdmin]);
 
   if (!tenant || !isAdmin) return null;
 
-  return (
-    <div className="flex min-h-screen">
-      <Head><title>Agentfy — Administração</title></Head>
-      <Navigation />
-      <main className="flex-1 p-8 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-6xl mx-auto">
-
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Painel Superadmin</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Visão completa da plataforma Agentfy</p>
+  function renderTenantDetail(t: TenantDetail) {
+    return (
+      <div className="space-y-5 px-1 py-4">
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+          <div className="min-w-[200px] flex-1">
+            <p className="text-sm font-semibold text-app-ink">{t.companyName || t.name}</p>
+            <p className="text-xs text-app-muted">{t.email}</p>
+            {t.phone && <p className="text-xs text-app-muted">Telefone: <span className="num">{t.phone}</span></p>}
+            {t.vatNumber && <p className="text-xs text-app-muted">NIF: <span className="num">{t.vatNumber}</span></p>}
+            {t.domain && <p className="text-xs text-app-muted">Domínio: {t.domain}</p>}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {t.twoFactorEnabled && <Pill tone="pos">2FA ativo</Pill>}
+              <Pill tone={t.paymentStatus === 'active' ? 'pos' : 'neutral'}>Faturação: {t.paymentStatus}</Pill>
             </div>
-            <span className="text-xs bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-3 py-1.5 rounded-full font-medium">
-              🔑 {tenant.email}
-            </span>
           </div>
-
-          <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1">
-            {tabList.map((t) => (
-              <button key={t.key} onClick={() => {
-                setActiveTab(t.key);
-                if (t.key === 'logs') fetchAuditLogs(0, PAGE_SIZE);
-                if (t.key === 'pricing' && !pricing) loadPricing();
-                if (t.key === 'whatsapp') loadWhatsApp();
-              }}
-                className={`px-4 pb-2 text-sm font-medium transition-colors ${
-                  activeTab === t.key ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                }`}>
-                {t.label}
+          <div className="min-w-[180px]">
+            <p className="mb-1 text-xs text-app-muted">Créditos</p>
+            <UsageBar pct={t.creditsUsedPercent} className="mb-1.5 w-full" />
+            <p className="num text-xs text-app-ink">{int(t.creditsUsed)} / {int(t.creditsTotal)} ({t.creditsUsedPercent}%)</p>
+            <p className="num text-xs text-app-faint">Disponível: {int(t.creditsAvailable)}</p>
+          </div>
+          <div className="min-w-[200px]">
+            <p className="mb-1 text-xs text-app-muted">Alterar plano</p>
+            <div className="flex gap-2">
+              <select defaultValue={t.plan} id={`plan-select-${t.id}`} className="input flex-1">
+                {['free', 'starter', 'business', 'enterprise'].map((p) => (
+                  <option key={p} value={p}>{PLAN_LABELS_LOCAL[p]}</option>
+                ))}
+              </select>
+              <button
+                disabled={planChanging}
+                onClick={() => {
+                  const sel = document.getElementById(`plan-select-${t.id}`) as HTMLSelectElement;
+                  changePlan(t.id, sel.value);
+                }}
+                className="btn-secondary"
+              >
+                {planChanging ? 'A aplicar…' : 'Aplicar'}
               </button>
-            ))}
+            </div>
           </div>
-
-          {loadingData && !metrics && (
-            <div className="text-center py-16 text-gray-400 text-sm">A carregar dados da plataforma...</div>
-          )}
-
-          {/* ─── Dashboard ─── */}
-          {activeTab === 'dashboard' && metrics && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard label="Contas" value={metrics.tenants.total} />
-                <KpiCard label="Agentes" value={metrics.agents.total} sub={`${metrics.agents.active} ativos`} />
-                <KpiCard label="Conversas totais" value={metrics.conversations.total.toLocaleString()} sub={`${metrics.messages.total.toLocaleString()} mensagens`} />
-                <KpiCard label="Conversas este ano" value={metrics.conversations.thisYear.toLocaleString()} sub={`${metrics.conversations.thisMonth} este mês · ${metrics.conversations.today} hoje`} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <KpiCard label="Receita Mensal Recorrente" value={`€${metrics.revenue.mrr.toFixed(2)}`} accent="text-green-600" />
-                <KpiCard label="Receita Anual Recorrente" value={`€${metrics.revenue.arr.toFixed(2)}`} accent="text-green-600" />
-                <KpiCard
-                  label="Balanço mensal"
-                  value={`€${metrics.balance.toFixed(2)}`}
-                  accent={metrics.balance >= 0 ? 'text-green-600' : 'text-red-600'}
-                  sub={`Despesas fixas: €${metrics.expenses.monthly.toFixed(2)}/mês`}
-                />
-              </div>
-              {/* Créditos vs custo real LLM */}
-              <div className="card">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">
-                  🤖 Consumo LLM — créditos internos vs custo real API
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Créditos consumidos</p>
-                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                      {(metrics.usage?.creditsConsumed ?? 0).toLocaleString()}
-                    </p>
-                    <p className="text-[14px] text-gray-400">unidade virtual</p>
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Tokens enviados</p>
-                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                      {((metrics.usage?.inputTokens ?? 0) / 1000).toFixed(1)}K
-                    </p>
-                    <p className="text-[14px] text-gray-400">input tokens</p>
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Tokens recebidos</p>
-                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                      {((metrics.usage?.outputTokens ?? 0) / 1000).toFixed(1)}K
-                    </p>
-                    <p className="text-[14px] text-gray-400">output tokens</p>
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Custo real API</p>
-                    <p className="text-xl font-bold text-red-500">
-                      €{(metrics.usage?.realApiCostEur ?? 0).toFixed(4)}
-                    </p>
-                    <p className="text-[14px] text-gray-400">EUR pago à Anthropic/OpenAI</p>
-                  </div>
-                </div>
-                {(metrics.usage?.creditsConsumed ?? 0) > 0 && (
-                  <p className="text-[14px] text-gray-400 mt-3 border-t border-gray-100 dark:border-gray-700 pt-2">
-                    💡 Eficiência: €{((metrics.usage?.realApiCostEur ?? 0) / (metrics.usage?.creditsConsumed ?? 1) * 1000).toFixed(4)} por 1 000 créditos consumidos
-                    {' · '}Receita mensal por 1 000 créditos: €{(metrics.revenue.mrr / ((metrics.usage?.creditsConsumed ?? 1) / 1000)).toFixed(2)}
-                  </p>
-                )}
-              </div>
-              {/* Conversas por período */}
-              <div className="card">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-4">
-                  💬 Conversas por período
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                  {[
-                    { label: 'Hoje',      value: metrics.conversations.today,     accent: 'text-brand-600' },
-                    { label: 'Este mês',  value: metrics.conversations.thisMonth, accent: 'text-brand-600' },
-                    { label: 'Este ano',  value: metrics.conversations.thisYear,  accent: 'text-gray-800 dark:text-gray-100' },
-                    { label: 'Total',     value: metrics.conversations.total,     accent: 'text-gray-800 dark:text-gray-100' },
-                  ].map(({ label, value, accent }) => (
-                    <div key={label}>
-                      <p className="text-[15px] text-gray-400 mb-0.5">{label}</p>
-                      <p className={`text-2xl font-bold ${accent}`}>{value.toLocaleString('pt-PT')}</p>
-                      {metrics.conversations.total > 0 && (
-                        <p className="text-[14px] text-gray-400 mt-0.5">
-                          {Math.round((value / metrics.conversations.total) * 100)}% do total
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Addons / Skills ativos */}
-              {metrics.addons && metrics.addons.length > 0 && (
-                <div className="card">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-4">
-                    🔌 Addons e Skills ativos — adopção por agentes ({metrics.agents.total} total)
-                  </p>
-                  <div className="space-y-2.5">
-                    {metrics.addons.map((addon) => (
-                      <div key={addon.key} className="flex items-center gap-3">
-                        <p className="text-xs text-gray-700 dark:text-gray-300 w-44 shrink-0">{addon.label}</p>
-                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-brand-500 rounded-full transition-all"
-                            style={{ width: `${Math.min(addon.pct, 100)}%` }}
-                          />
-                        </div>
-                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-20 text-right shrink-0">
-                          {addon.count} agente{addon.count !== 1 ? 's' : ''} <span className="text-gray-400 font-normal">({addon.pct}%)</span>
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-4">
-                <PlanBar byPlan={metrics.tenants.byPlan} />
-              </div>
+          {!t.isAdmin && (
+            <div className="min-w-[140px]">
+              <p className="mb-1 text-xs text-app-muted">Acesso direto</p>
+              <button disabled={impersonating === t.id} onClick={() => impersonateTenant(t.id, t.name)} className="btn-secondary w-full">
+                {impersonating === t.id ? 'A entrar…' : 'Entrar como'}
+              </button>
             </div>
           )}
+        </div>
 
-          {/* ─── Contas ─── */}
-          {activeTab === 'tenants' && (
-            <div className="space-y-2">
-              <div className="card overflow-x-auto p-0">
-                <table className="w-full text-sm min-w-[700px]">
+        <div>
+          <p className="mb-2 text-xs text-app-muted">
+            Agentes <span className="num">({t.agents.length})</span> · Conversas: <span className="num">{int(t._count.conversations)}</span> · Pedidos: <span className="num">{int(t._count.orders)}</span>
+          </p>
+          {t.agents.length === 0 && <p className="text-sm text-app-muted">Sem agentes criados.</p>}
+          <ul className="rounded-lg border border-app-edge bg-app-sheet">
+            {t.agents.map((agent, i) => (
+              <li key={agent.id} className={`p-3 ${i > 0 ? 'border-t border-app-rule' : ''}`}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Pill tone={agent.isActive ? 'pos' : 'neutral'} dot>{agent.isActive ? 'Ativo' : 'Pausado'}</Pill>
+                    <span className="text-sm font-semibold text-app-ink">{agent.name}</span>
+                    <span className="text-xs text-app-faint">{agent.model.split('-').slice(0, 2).join('-')}</span>
+                  </div>
+                  <span className="num text-xs text-app-muted">
+                    {agent._count.conversations} conversas{agent._count.orders > 0 && ` · ${agent._count.orders} pedidos`}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {agent.webChatEnabled && <SkillBadge label="Web" active />}
+                  {agent.whatsappEnabled && <SkillBadge label="WhatsApp" active />}
+                  <SkillBadge label="Handoff" active={agent.skillHandoff} />
+                  <SkillBadge label="Dados" active={agent.skillDataCollection} />
+                  <SkillBadge label="Agenda" active={agent.skillScheduling} />
+                  <SkillBadge label="Upload" active={agent.skillFileUpload} />
+                  <SkillBadge label="Humor" active={agent.skillHumorDetection} />
+                  <SkillBadge label="Vendas+KDS" active={agent.skillVendas} highlight />
+                  <SkillBadge label="Whitelabel" active={agent.whitelabelEnabled} highlight />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  const planMax = metrics ? Math.max(1, ...['free', 'starter', 'business', 'enterprise'].map((p) => metrics.tenants.byPlan[p] ?? 0)) : 1;
+  const paidPlans = ['starter', 'business', 'enterprise'];
+  const usage = metrics?.usage;
+
+  return (
+    <AppLayout wide>
+      <Head><title>Administração · Agentfy</title></Head>
+
+      <PageHeader
+        title="Administração"
+        subtitle="Contas, receitas, visitas ao site e diagnósticos da plataforma."
+        actions={<Pill tone="neutral">{tenant.email}</Pill>}
+      />
+
+      <Tabs tabs={TABS.map((t) => ({ id: t.id, label: t.label }))} value={activeTab} onChange={(id) => selectTab(id)} label="Áreas da administração" />
+
+      {loadingData && !metrics && activeTab !== 'seo' && activeTab !== 'auditoria' && activeTab !== 'whatsapp' && (
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      )}
+
+      {/* ─── Visão geral ─── */}
+      {activeTab === 'geral' && metrics && (
+        <div className="space-y-4">
+          <KpiStrip
+            items={[
+              { label: 'Contas', value: int(metrics.tenants.total), caption: `${int(metrics.tenants.total - (metrics.tenants.byPlan.free ?? 0))} com plano pago` },
+              { label: 'Agentes', value: int(metrics.agents.total), caption: `${int(metrics.agents.active)} ativos` },
+              { label: 'Conversas totais', value: int(metrics.conversations.total), caption: `${int(metrics.messages.total)} mensagens` },
+              { label: 'Conversas este ano', value: int(metrics.conversations.thisYear), caption: `${int(metrics.conversations.thisMonth)} este mês · ${int(metrics.conversations.today)} hoje` },
+            ]}
+          />
+          <KpiStrip
+            items={[
+              { label: 'Receita mensal recorrente', value: eur(metrics.revenue.mrr), caption: 'Soma das mensalidades ativas' },
+              { label: 'Receita anual recorrente', value: eur(metrics.revenue.arr), caption: 'MRR × 12' },
+              { label: 'Balanço mensal', value: eur(metrics.balance), tone: metrics.balance < 0 ? 'neg' : 'default', caption: `Receita menos ${eur(metrics.expenses.monthly)}/mês de despesas fixas` },
+            ]}
+          />
+
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <Panel title="Consumo de LLM" action="Créditos internos vs. custo real">
+              <div className="grid grid-cols-2 gap-5">
+                <Stat label="Créditos consumidos" value={int(usage?.creditsConsumed ?? 0)} note="unidade virtual" />
+                <Stat label="Custo real da API" value={`€${(usage?.realApiCostEur ?? 0).toLocaleString('pt-PT', { minimumFractionDigits: 4 })}`} note="pago à Anthropic/OpenAI" />
+                <Stat label="Tokens enviados" value={tok(usage?.inputTokens ?? 0)} note="input" />
+                <Stat label="Tokens recebidos" value={tok(usage?.outputTokens ?? 0)} note="output" />
+              </div>
+              {(usage?.creditsConsumed ?? 0) > 0 && (
+                <p className="mt-4 border-t border-app-rule pt-3 text-xs text-app-muted">
+                  Custo real: <span className="num font-semibold text-app-ink">{eur(((usage?.realApiCostEur ?? 0) / (usage?.creditsConsumed ?? 1)) * 1000)}</span> por 1 000 créditos consumidos.
+                  {' '}Receita mensal: <span className="num font-semibold text-app-ink">{eur(metrics.revenue.mrr / ((usage?.creditsConsumed ?? 1) / 1000))}</span> por 1 000 créditos.
+                </p>
+              )}
+            </Panel>
+
+            <Panel title="Conversas por período" action="% do total desde o início">
+              <div className="grid grid-cols-2 gap-5">
+                {[
+                  { label: 'Hoje', value: metrics.conversations.today },
+                  { label: 'Este mês', value: metrics.conversations.thisMonth },
+                  { label: 'Este ano', value: metrics.conversations.thisYear },
+                  { label: 'Total', value: metrics.conversations.total },
+                ].map(({ label, value }) => (
+                  <Stat key={label} label={label} value={int(value)} note={metrics.conversations.total > 0 ? `${Math.round((value / metrics.conversations.total) * 100)}% do total` : undefined} />
+                ))}
+              </div>
+            </Panel>
+          </div>
+
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <Panel title="Contas por plano" action={`${int(metrics.tenants.total)} contas`}>
+              <ul className="space-y-3">
+                {['free', 'starter', 'business', 'enterprise'].map((p) => (
+                  <BarRow key={p} label={PLAN_LABELS_LOCAL[p]} value={metrics.tenants.byPlan[p] ?? 0} max={planMax} trailing={int(metrics.tenants.byPlan[p] ?? 0)} />
+                ))}
+              </ul>
+            </Panel>
+            {metrics.addons && metrics.addons.length > 0 && (
+              <Panel title="Addons e skills ativos" action={`Adoção em ${int(metrics.agents.total)} agentes`}>
+                <ul className="space-y-3">
+                  {metrics.addons.map((a) => (
+                    <BarRow key={a.key} label={a.label} value={a.pct} max={100} trailing={<>{a.count} agente{a.count !== 1 ? 's' : ''} <span className="text-app-faint">({a.pct}%)</span></>} />
+                  ))}
+                </ul>
+              </Panel>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Clientes ─── */}
+      {activeTab === 'clientes' && (
+        <Panel title="Contas" action={`${int(tenants.length)} contas`} bodyClassName="!pt-1">
+          {tenants.length === 0 && !loadingData ? (
+            <EmptyState title="Nenhuma conta encontrada." body="Quando alguém criar conta, aparece aqui." />
+          ) : (
+            <>
+              <div className="hidden md:block">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                      {['Conta', 'Plano', 'Agentes', 'Conversas', 'Créditos', 'Mensalidade', 'Criada', ''].map((h) => (
-                        <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
-                      ))}
+                    <tr>
+                      <Th>Conta</Th><Th>Plano</Th><Th right className="pl-4">Agentes</Th><Th right className="pl-4">Conversas</Th><Th className="pl-6">Créditos usados</Th><Th right className="pl-4">Mensalidade</Th><Th right className="pl-4">Criada</Th><Th />
                     </tr>
                   </thead>
                   <tbody>
                     {tenants.map((t) => (
                       <Fragment key={t.id}>
-                        <tr key={t.id} className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors ${selectedTenant?.id === t.id ? 'bg-brand-50 dark:bg-brand-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                          onClick={() => openTenantDetail(t.id)}>
-                          <td className="py-2 px-3">
-                            <p className="font-medium text-gray-900 dark:text-gray-100 text-xs">{t.name}</p>
-                            <p className="text-[14px] text-gray-400">{t.email}{t.isAdmin && ' 🔑'}</p>
+                        <tr className={`cursor-pointer border-t border-app-rule transition-colors hover:bg-app-raised ${selectedTenant?.id === t.id ? 'bg-app-raised' : ''}`} onClick={() => openTenantDetail(t.id)}>
+                          <td className="py-3 pr-3">
+                            <p className="font-semibold text-app-ink">{t.name}</p>
+                            <p className="text-xs text-app-muted">{t.email}{t.isAdmin && ' · administrador'}</p>
                           </td>
-                          <td className="py-2 px-3">
-                            <span className={`text-[14px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan] ?? PLAN_COLORS.free}`}>
-                              {PLAN_LABELS_LOCAL[t.plan] ?? t.plan}
-                            </span>
+                          <td className="py-3 pr-3"><PlanPill plan={t.plan} /></td>
+                          <td className="num py-3 pl-4 text-right text-app-ink">{t._count.agents}</td>
+                          <td className="num py-3 pl-4 text-right text-app-ink">{int(t._count.conversations)}</td>
+                          <td className="py-3 pl-6">
+                            <span className="flex items-center gap-2"><UsageBar pct={t.creditsUsedPercent} className="w-20" /><span className="num text-xs text-app-muted">{t.creditsUsedPercent}%</span></span>
                           </td>
-                          <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300">{t._count.agents}</td>
-                          <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300">{t._count.conversations}</td>
-                          <td className="py-2 px-3">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${t.creditsUsedPercent >= 90 ? 'bg-red-500' : t.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                                  style={{ width: `${t.creditsUsedPercent}%` }} />
-                              </div>
-                              <span className="text-[14px] text-gray-400">{t.creditsUsedPercent}%</span>
-                            </div>
-                          </td>
-                          <td className="py-2 px-3 text-xs font-medium text-green-600">€{t.planPrice}/mês</td>
-                          <td className="py-2 px-3 text-[14px] text-gray-400">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
-                          <td className="py-2 px-3 text-xs text-brand-500">{selectedTenant?.id === t.id ? '▲' : '▼'}</td>
+                          <td className="num whitespace-nowrap py-3 pl-4 text-right text-app-ink">{eur(t.planPrice)}/mês</td>
+                          <td className="num py-3 pl-4 text-right text-app-muted">{new Date(t.createdAt).toLocaleDateString('pt-PT')}</td>
+                          <td className="py-3 pl-3 text-right text-xs font-semibold text-app-accent">{selectedTenant?.id === t.id ? 'Fechar' : 'Abrir'}</td>
                         </tr>
-
-                        {/* Inline detail row */}
                         {selectedTenant?.id === t.id && (
-                          <tr key={`detail-${t.id}`}>
-                            <td colSpan={8} className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700 p-0">
-                              {tenantDetailLoading ? (
-                                <div className="py-6 text-center text-xs text-gray-400">A carregar...</div>
-                              ) : (
-                                <div className="p-4 space-y-4">
-                                  {/* Header info */}
-                                  <div className="flex flex-wrap gap-4 items-start">
-                                    <div className="flex-1 min-w-[200px]">
-                                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{selectedTenant.companyName || selectedTenant.name}</p>
-                                      <p className="text-[14px] text-gray-400">{selectedTenant.email}</p>
-                                      {selectedTenant.phone && <p className="text-[14px] text-gray-400">📱 {selectedTenant.phone}</p>}
-                                      {selectedTenant.vatNumber && <p className="text-[14px] text-gray-400">NIF: {selectedTenant.vatNumber}</p>}
-                                      {selectedTenant.domain && <p className="text-[14px] text-gray-400">🌐 {selectedTenant.domain}</p>}
-                                      <div className="flex gap-2 mt-1">
-                                        {selectedTenant.twoFactorEnabled && <span className="text-[14px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">2FA ✓</span>}
-                                        <span className={`text-[14px] px-1.5 py-0.5 rounded-full ${selectedTenant.paymentStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                          Billing: {selectedTenant.paymentStatus}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    {/* Credits */}
-                                    <div className="min-w-[160px]">
-                                      <p className="text-[14px] text-gray-500 mb-1">Créditos</p>
-                                      <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden mb-1">
-                                        <div className={`h-full rounded-full ${selectedTenant.creditsUsedPercent >= 90 ? 'bg-red-500' : selectedTenant.creditsUsedPercent >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                                          style={{ width: `${selectedTenant.creditsUsedPercent}%` }} />
-                                      </div>
-                                      <p className="text-[14px] text-gray-500">{selectedTenant.creditsUsed.toLocaleString()} / {selectedTenant.creditsTotal.toLocaleString()} ({selectedTenant.creditsUsedPercent}%)</p>
-                                      <p className="text-[14px] text-gray-400">Disponível: {selectedTenant.creditsAvailable.toLocaleString()}</p>
-                                    </div>
-                                    {/* Plan change */}
-                                    <div className="min-w-[160px]">
-                                      <p className="text-[14px] text-gray-500 mb-1">Alterar plano</p>
-                                      <div className="flex gap-1">
-                                        <select
-                                          defaultValue={selectedTenant.plan}
-                                          id={`plan-select-${selectedTenant.id}`}
-                                          className="input text-xs flex-1"
-                                        >
-                                          {['free','starter','business','enterprise'].map(p => (
-                                            <option key={p} value={p}>{PLAN_LABELS_LOCAL[p]}</option>
-                                          ))}
-                                        </select>
-                                        <button
-                                          disabled={planChanging}
-                                          onClick={() => {
-                                            const sel = document.getElementById(`plan-select-${selectedTenant.id}`) as HTMLSelectElement;
-                                            changePlan(selectedTenant.id, sel.value);
-                                          }}
-                                          className="btn-primary text-xs px-2 py-1"
-                                        >
-                                          {planChanging ? '...' : '✓'}
-                                        </button>
-                                      </div>
-                                    </div>
-                                    {/* Impersonate */}
-                                    {!selectedTenant.isAdmin && (
-                                      <div className="min-w-[120px]">
-                                        <p className="text-[14px] text-gray-500 mb-1">Acesso direto</p>
-                                        <button
-                                          disabled={impersonating === selectedTenant.id}
-                                          onClick={() => impersonateTenant(selectedTenant.id, selectedTenant.name)}
-                                          className="btn-secondary text-xs px-3 py-1 w-full"
-                                        >
-                                          {impersonating === selectedTenant.id ? '...' : '🔑 Entrar como'}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Agents + skills */}
-                                  <div>
-                                    <p className="text-[14px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                                      Agentes ({selectedTenant.agents.length}) · Conversas: {selectedTenant._count.conversations} · Pedidos: {selectedTenant._count.orders}
-                                    </p>
-                                    {selectedTenant.agents.length === 0 && (
-                                      <p className="text-xs text-gray-400">Sem agentes criados.</p>
-                                    )}
-                                    <div className="space-y-2">
-                                      {selectedTenant.agents.map((agent) => (
-                                        <div key={agent.id} className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-3">
-                                          <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                              <span className={`w-1.5 h-1.5 rounded-full ${agent.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
-                                              <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
-                                              <span className="text-[14px] text-gray-400">{agent.model.split('-').slice(0,2).join('-')}</span>
-                                            </div>
-                                            <div className="flex gap-1 text-[14px]">
-                                              <span className="text-gray-400">{agent._count.conversations} conv.</span>
-                                              {agent._count.orders > 0 && <span className="text-green-600">{agent._count.orders} pedidos</span>}
-                                            </div>
-                                          </div>
-                                          <div className="flex flex-wrap gap-1">
-                                            {agent.webChatEnabled   && <SkillBadge label="Web"       active />}
-                                            {agent.whatsappEnabled  && <SkillBadge label="WA"        active />}
-                                            <SkillBadge label="Handoff"    active={agent.skillHandoff} />
-                                            <SkillBadge label="Dados"      active={agent.skillDataCollection} />
-                                            <SkillBadge label="Agenda"     active={agent.skillScheduling} />
-                                            <SkillBadge label="Upload"     active={agent.skillFileUpload} />
-                                            <SkillBadge label="Humor"      active={agent.skillHumorDetection} />
-                                            <SkillBadge label="Vendas+KDS" active={agent.skillVendas} highlight />
-                                            <SkillBadge label="Whitelabel" active={agent.whitelabelEnabled} highlight />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
+                          <tr>
+                            <td colSpan={8} className="bg-app-raised/60 px-4">
+                              {tenantDetailLoading ? <div className="py-6"><Skeleton className="h-16 w-full" /></div> : renderTenantDetail(selectedTenant)}
                             </td>
                           </tr>
                         )}
@@ -722,554 +657,422 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                {tenants.length === 0 && !loadingData && (
-                  <p className="text-center py-10 text-sm text-gray-400">Nenhuma conta encontrada</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ─── Balanço ─── */}
-          {activeTab === 'balance' && metrics && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">💚 Receita Mensal Recorrente</p>
-                  <p className="text-3xl font-bold text-green-600">€{metrics.revenue.mrr.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400 mt-1">Receita Anual Recorrente: €{metrics.revenue.arr.toFixed(2)}</p>
-                </div>
-                <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">❤️ Despesas fixas/mês</p>
-                  <p className="text-3xl font-bold text-red-500">€{metrics.expenses.monthly.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400 mt-1">{metrics.expenses.items.length} itens registados</p>
-                </div>
-                <div className="card">
-                  <p className="text-xs text-gray-500 mb-1">⚖️ Balanço líquido</p>
-                  <p className={`text-3xl font-bold ${metrics.balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {metrics.balance >= 0 ? '+' : ''}€{metrics.balance.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">{metrics.balance >= 0 ? 'Positivo ✓' : '⚠️ Negativo'}</p>
-                </div>
               </div>
 
-              {/* Custo real LLM (variável) */}
-              <div className="card border border-orange-100 dark:border-orange-900/30">
-                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3">
-                  🔌 Custo variável LLM — rastreado automaticamente
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Créditos consumidos</p>
-                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
-                      {(metrics.usage?.creditsConsumed ?? 0).toLocaleString()}
-                    </p>
-                    <p className="text-[14px] text-gray-400">unidades internas</p>
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Input tokens</p>
-                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
-                      {((metrics.usage?.inputTokens ?? 0) / 1000).toFixed(1)}K
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Output tokens</p>
-                    <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
-                      {((metrics.usage?.outputTokens ?? 0) / 1000).toFixed(1)}K
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[14px] text-gray-400 mb-0.5">Custo real pago (EUR)</p>
-                    <p className="text-lg font-bold text-orange-600">
-                      €{(metrics.usage?.realApiCostEur ?? 0).toFixed(4)}
-                    </p>
-                    <p className="text-[14px] text-gray-400">à Anthropic / OpenAI</p>
-                  </div>
-                </div>
-                <p className="text-[14px] text-gray-400 bg-orange-50 dark:bg-orange-900/10 rounded p-2">
-                  ℹ️ Os créditos são a moeda interna da plataforma. O custo real EUR é calculado pelos tokens efetivamente processados × preço do modelo.
-                  Os planos de Anthropic/OpenAI nas despesas abaixo são estimativas manuais — compare com este valor rastreado.
-                </p>
-              </div>
-
-              <div className="card">
-                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3">Receita por plano</h3>
-                {['starter', 'business', 'enterprise'].map((plan) => {
-                  const count = metrics.tenants.byPlan[plan] ?? 0;
-                  const rev = metrics.revenue.byPlan?.[plan] ?? 0;
-                  if (!count) return null;
-                  return (
-                    <div key={plan} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
-                        <span className="text-xs text-gray-500">{count} conta{count !== 1 ? 's' : ''}</span>
-                      </div>
-                      <span className="text-sm font-semibold text-green-600">€{rev.toFixed(2)}/mês</span>
-                    </div>
-                  );
-                })}
-                {['starter', 'business', 'enterprise'].every((p) => !(metrics.tenants.byPlan[p] ?? 0)) && (
-                  <p className="text-xs text-gray-400 py-2">Sem contas pagas ainda.</p>
-                )}
-              </div>
-
-              <div className="card">
-                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3">Despesas registadas</h3>
-                {metrics.expenses.items.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-2">Nenhuma despesa registada ainda.</p>
-                ) : (
-                  <div className="space-y-1 mb-4">
-                    {metrics.expenses.items.map((exp) => (
-                      <div key={exp.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                        <div>
-                          <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                            {CATEGORY_LABELS[exp.category] ?? exp.category} — {exp.description}
-                          </p>
-                          <p className="text-[14px] text-gray-400">
-                            {exp.recurring ? `Recorrente (${exp.period === 'monthly' ? 'mensal' : 'anual'})` : 'Pontual'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-red-500">
-                            €{exp.period === 'yearly' ? (exp.amount / 12).toFixed(2) : exp.amount.toFixed(2)}/mês
-                            {exp.period === 'yearly' && <span className="text-[14px] text-gray-400 ml-1">(€{exp.amount}/ano)</span>}
-                          </span>
-                          <button onClick={() => removeExpense(exp.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <form onSubmit={addExpense} className="border-t border-gray-100 dark:border-gray-700 pt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block text-[14px] text-gray-500 mb-1">Categoria</label>
-                    <select className="input text-xs" value={expForm.category} onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))}>
-                      {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[14px] text-gray-500 mb-1">Descrição</label>
-                    <input className="input text-xs" placeholder="ex: Railway hosting" value={expForm.description} onChange={(e) => setExpForm((f) => ({ ...f, description: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-[14px] text-gray-500 mb-1">Valor (€)</label>
-                    <input className="input text-xs" type="number" step="0.01" min="0" placeholder="0.00" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="block text-[14px] text-gray-500">Período</label>
-                    <div className="flex gap-1.5">
-                      <select className="input text-xs flex-1" value={expForm.period} onChange={(e) => setExpForm((f) => ({ ...f, period: e.target.value }))}>
-                        <option value="monthly">Mensal</option>
-                        <option value="yearly">Anual</option>
-                      </select>
-                      <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                        <input type="checkbox" checked={expForm.recurring} onChange={(e) => setExpForm((f) => ({ ...f, recurring: e.target.checked }))} />
-                        Rec.
-                      </label>
-                    </div>
-                    <button type="submit" disabled={expSaving} className="btn-primary text-xs mt-0.5">
-                      {expSaving ? '...' : '+ Adicionar'}
+              <ul className="md:hidden">
+                {tenants.map((t, i) => (
+                  <li key={t.id} className={i > 0 ? 'border-t border-app-rule' : ''}>
+                    <button type="button" onClick={() => openTenantDetail(t.id)} className="flex w-full items-start gap-3 py-3 text-left">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-app-ink">{t.name}</span>
+                        <span className="block truncate text-xs text-app-muted">{t.email}</span>
+                        <span className="num mt-1 block text-xs text-app-muted">{t._count.agents} agentes · {int(t._count.conversations)} conversas · {eur(t.planPrice)}/mês · {t.creditsUsedPercent}% créditos</span>
+                      </span>
+                      <PlanPill plan={t.plan} />
                     </button>
-                  </div>
-                </form>
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-[14px] font-semibold text-blue-700 dark:text-blue-400 mb-1">💡 Despesas típicas a registar</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[14px] text-blue-600 dark:text-blue-400">
-                    <span>🖥️ Railway ~€20/mês</span><span>🗄️ Supabase Pro €25/mês</span>
-                    <span>🤖 Anthropic API: variável</span><span>🤖 OpenAI API: variável</span>
-                    <span>🌐 Vercel Pro €20/mês</span><span>📱 Meta WA: grátis até 1000/mês</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                    {selectedTenant?.id === t.id && (tenantDetailLoading ? <Skeleton className="mb-3 h-16 w-full" /> : <div className="mb-3 rounded-lg bg-app-raised px-3">{renderTenantDetail(selectedTenant)}</div>)}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
+        </Panel>
+      )}
 
-          {/* ─── Preços ─── */}
-          {activeTab === 'pricing' && (
-            <div className="space-y-6">
-              {!pricing && <div className="text-center py-10 text-gray-400 text-sm">A carregar configuração...</div>}
-              {pricing && (
-                <>
-                  {pricingMsg && (
-                    <div className={`text-sm px-4 py-2 rounded-lg ${pricingMsg.includes('Erro') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                      {pricingMsg}
-                    </div>
-                  )}
+      {/* ─── SEO e visitas ─── */}
+      {activeTab === 'seo' && <SeoPanel />}
 
-                  {/* Planos base */}
-                  <div className="card">
-                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">📦 Planos — preço, créditos e agentes</h3>
-                    <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
-                      <span>Câmbio € → R$ (o € é a base; R$ arredonda para cima até final 9):</span>
-                      <input type="number" min="0.1" step="0.01" className="input text-xs w-24"
-                        value={getDraftVal(['fx', 'BRLperEUR'], pricing.fx?.BRLperEUR ?? 5.61)}
-                        onChange={(e) => pNum(['fx', 'BRLperEUR'], e.target.value)}
-                        onBlur={(e) => handleNumBlur(['fx', 'BRLperEUR'], e.target.value)} />
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm min-w-[500px]">
-                        <thead>
-                          <tr className="border-b border-gray-100 dark:border-gray-700">
-                            <th className="text-left py-2 text-xs text-gray-500 w-24">Plano</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Preço (€/mês)</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Créditos/mês</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Preço R$ (€ × {pricing.fx?.BRLperEUR ?? 5.61})</th>
-                            <th className="text-left py-2 text-xs text-gray-500">Agentes máx.</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(['free','starter','business','enterprise'] as const).map((plan) => (
-                            <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
-                              <td className="py-2 pr-3">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
-                              </td>
-                              <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input text-xs w-24"
-                                value={getDraftVal(['plans', plan, 'price'], pricing.plans[plan]?.price)}
-                                onChange={(e) => pNum(['plans', plan, 'price'], e.target.value)}
-                                onBlur={(e) => handleNumBlur(['plans', plan, 'price'], e.target.value)} /></td>
-                              <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input text-xs w-28"
-                                value={getDraftVal(['plans', plan, 'credits'], pricing.plans[plan]?.credits)}
-                                onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)}
-                                onBlur={(e) => handleNumBlur(['plans', plan, 'credits'], e.target.value)} /></td>
-                              <td className="py-2 pr-3 text-xs text-gray-600 dark:text-gray-300">
-                                {(() => { const eur = pricing.plans[plan]?.price ?? 0; const r = pricing.fx?.BRLperEUR ?? 5.61;
-                                  return eur > 0 ? `R$${Math.ceil((eur * r + 1) / 10) * 10 - 1}` : 'R$0'; })()}
-                              </td>
-                              <td className="py-2"><input type="number" min="1" step="1" className="input text-xs w-20"
-                                value={getDraftVal(['plans', plan, 'agents'], pricing.plans[plan]?.agents)}
-                                onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)}
-                                onBlur={(e) => handleNumBlur(['plans', plan, 'agents'], e.target.value)} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+      {/* ─── Receitas e despesas ─── */}
+      {activeTab === 'financas' && metrics && (
+        <div className="space-y-4">
+          <KpiStrip
+            items={[
+              { label: 'Receita mensal recorrente', value: eur(metrics.revenue.mrr), caption: `Anual: ${eur(metrics.revenue.arr)}` },
+              { label: 'Despesas fixas por mês', value: eur(metrics.expenses.monthly), caption: `${metrics.expenses.items.length} itens registados` },
+              { label: 'Balanço líquido', value: `${metrics.balance >= 0 ? '+' : ''}${eur(metrics.balance)}`, tone: metrics.balance < 0 ? 'neg' : 'default', caption: metrics.balance >= 0 ? 'Positivo' : 'Negativo: as despesas superam a receita' },
+            ]}
+          />
 
-                  {/* Features per plan */}
-                  {([
-                    ['scheduling',     '📅 Agendamento',           false],
-                    ['fileUpload',     '📁 Upload ficheiros',       false],
-                    ['humorDetection', '😊 Deteção de humor',      false],
-                    ['payments',       '💳 Pagamentos',             true ],
-                    ['whitelabel',     '🎨 White-label',            false],
-                    ['vendas',         '🏷️ Vendas + Pedidos/KDS',  false],
-                    ['feedback',       '⭐ Recolha de Feedback',    false],
-                    ['analytics',      '📊 Análises Avançadas',     false],
-                    ['leadGen',        '🎯 Lead Generation',        false],
-                    ['customSkills',   '⚙️ Custom Skills',          false],
-                    ['extraAgents',    '➕ Agentes extra',           false],
-                  ] as [string, string, boolean][]).map(([featureKey, featureLabel, hasCredits]) => (
-                    <div key={featureKey} className="card">
-                      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">{featureLabel}</h3>
-                      <p className="text-[14px] text-gray-400 mb-4">
-                        {featureKey === 'whitelabel' || featureKey === 'extraAgents' ? 'Preço = €/agente/mês' :
-                         featureKey === 'payments'   ? 'Preço = mensalidade €/mês · Créditos = por transação' :
-                         featureKey === 'vendas'     ? 'Sempre addon — inclui Pedidos/KDS. Preço = €/mês (mesmo para business/enterprise)' :
-                         'Preço = addon €/mês (só relevante se mode=addon)'}
-                      </p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm min-w-[500px]">
-                          <thead>
-                            <tr className="border-b border-gray-100 dark:border-gray-700">
-                              <th className="text-left py-1.5 text-xs text-gray-500 w-24">Plano</th>
-                              <th className="text-left py-1.5 text-xs text-gray-500 w-40">Modo</th>
-                              <th className="text-left py-1.5 text-xs text-gray-500">Preço (€)</th>
-                              {hasCredits && <th className="text-left py-1.5 text-xs text-gray-500">Crd/tx</th>}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(['free','starter','business','enterprise'] as const).map((plan) => {
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              const feat = (pricing.features as any)[featureKey]?.[plan] as FeaturePlanConfig | undefined;
-                              const mode = feat?.mode ?? 'disabled';
-                              return (
-                                <tr key={plan} className="border-b border-gray-50 dark:border-gray-700/50">
-                                  <td className="py-1.5 pr-3">
-                                    <span className={`text-[14px] px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[plan]}`}>{PLAN_LABELS_LOCAL[plan]}</span>
-                                  </td>
-                                  <td className="py-1.5 pr-3">
-                                    <select
-                                      value={mode}
-                                      onChange={(e) => pMode(featureKey, plan, e.target.value)}
-                                      className={`input text-xs w-36 ${
-                                        mode === 'disabled' ? 'text-gray-400' :
-                                        mode === 'included' ? 'text-green-600' : 'text-orange-600'
-                                      }`}
-                                    >
-                                      <option value="disabled">🚫 Desativado</option>
-                                      <option value="addon">➕ Addon (cobra)</option>
-                                      <option value="included">✅ Incluído</option>
-                                    </select>
-                                  </td>
-                                  <td className="py-1.5 pr-3">
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-xs text-gray-400">€</span>
-                                      <input type="number" min="0" step="1" className="input text-xs w-20"
-                                        disabled={mode !== 'addon'}
-                                        value={getDraftVal(['features', featureKey, plan, 'price'], feat?.price)}
-                                        onChange={(e) => pNum(['features', featureKey, plan, 'price'], e.target.value)}
-                                        onBlur={(e) => handleNumBlur(['features', featureKey, plan, 'price'], e.target.value)} />
-                                    </div>
-                                  </td>
-                                  {hasCredits && (
-                                    <td className="py-1.5">
-                                      <input type="number" min="0" step="1" className="input text-xs w-20"
-                                        disabled={mode === 'disabled'}
-                                        value={getDraftVal(['features', featureKey, plan, 'creditsPerTx'], feat?.creditsPerTx)}
-                                        onChange={(e) => pNum(['features', featureKey, plan, 'creditsPerTx'], e.target.value)}
-                                        onBlur={(e) => handleNumBlur(['features', featureKey, plan, 'creditsPerTx'], e.target.value)} />
-                                    </td>
-                                  )}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="flex justify-end">
-                    <button onClick={savePricing} disabled={pricingSaving} className="btn-primary">
-                      {pricingSaving ? 'A guardar...' : '💾 Guardar alterações'}
-                    </button>
-                  </div>
-                              </>
-              )}
-            </div>
-          )}
-
-          {/* ─── Auditoria ─── */}
-          {/* ─── WhatsApp ─── */}
-          {activeTab === 'whatsapp' && (
-            <div className="space-y-5">
-              {/* Reload button */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Diagnóstico WhatsApp</h2>
-                <button onClick={loadWhatsApp} disabled={wpLoading}
-                  className="text-xs btn-secondary px-3 py-1.5">
-                  {wpLoading ? '⏳ A carregar...' : '🔄 Atualizar'}
-                </button>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <Panel title="Custo variável de LLM" action="Rastreado automaticamente">
+              <div className="grid grid-cols-2 gap-5">
+                <Stat label="Créditos consumidos" value={int(usage?.creditsConsumed ?? 0)} note="unidades internas" />
+                <Stat label="Custo real pago" value={`€${(usage?.realApiCostEur ?? 0).toLocaleString('pt-PT', { minimumFractionDigits: 4 })}`} note="à Anthropic / OpenAI" />
+                <Stat label="Tokens enviados" value={tok(usage?.inputTokens ?? 0)} />
+                <Stat label="Tokens recebidos" value={tok(usage?.outputTokens ?? 0)} />
               </div>
+              <p className="mt-4 text-xs text-app-muted">
+                Os créditos são a moeda interna. O custo real em euros vem dos tokens efetivamente processados × preço do modelo. As despesas de Anthropic/OpenAI abaixo são estimativas manuais: compare-as com este valor.
+              </p>
+            </Panel>
 
-              {wpLoading && !wpData && (
-                <p className="text-gray-400 text-sm text-center py-10">A carregar diagnóstico...</p>
-              )}
-
-              {wpData && (
-                <>
-                  {/* Summary pills */}
-                  <div className="flex flex-wrap gap-3">
-                    {[
-                      { label: 'Total', val: wpData.summary.total, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
-                      { label: '✅ OK', val: wpData.summary.ok, color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-                      { label: '⚠️ Aviso', val: wpData.summary.warning, color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-                      { label: '❌ Erro', val: wpData.summary.error, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-                    ].map(p => (
-                      <div key={p.label} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${p.color}`}>
-                        {p.label}: {p.val}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* ENV Config card */}
-                  <div className="card space-y-2">
-                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Configuração global (ENV)</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {Object.entries(wpData.env).map(([k, v]) => (
-                        <div key={k} className="flex items-start gap-2 text-xs">
-                          <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${v && !v.startsWith('✗') ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <div>
-                            <span className="font-mono text-gray-500 dark:text-gray-400">{k}</span>
-                            <span className="ml-1 text-gray-700 dark:text-gray-300">{v ?? '—'}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Agents table */}
-                  {wpData.agents.length === 0 ? (
-                    <div className="card text-center py-10 text-gray-400 text-sm">
-                      Nenhum agente com WhatsApp ativado.
-                    </div>
-                  ) : (() => {
-                    // Group agents by tenant
-                    const groups = wpData.agents.reduce<Record<string, { tenant: string; email: string; plan: string; agents: WpAgentDiag[] }>>((acc, a) => {
-                      if (!acc[a.tenantEmail]) acc[a.tenantEmail] = { tenant: a.tenant, email: a.tenantEmail, plan: a.plan, agents: [] };
-                      acc[a.tenantEmail].agents.push(a);
-                      return acc;
-                    }, {});
-
+            <Panel title="Receita por plano">
+              {paidPlans.every((p) => !(metrics.tenants.byPlan[p] ?? 0)) ? (
+                <p className="text-sm text-app-muted">Sem contas pagas ainda.</p>
+              ) : (
+                <ul>
+                  {paidPlans.map((plan) => {
+                    const count = metrics.tenants.byPlan[plan] ?? 0;
+                    const rev = metrics.revenue.byPlan?.[plan] ?? 0;
+                    if (!count) return null;
                     return (
-                      <div className="space-y-6">
-                        {Object.entries(groups).map(([email, group]) => {
-                          const worstStatus = group.agents.some(a => a.status === 'error') ? 'error'
-                            : group.agents.some(a => a.status === 'warning') ? 'warning' : 'ok';
-                          const tenantBadge = worstStatus === 'ok'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : worstStatus === 'warning'
-                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+                      <li key={plan} className="flex items-center justify-between border-t border-app-rule py-2.5 first:border-t-0">
+                        <span className="flex items-center gap-2"><PlanPill plan={plan} /><span className="num text-sm text-app-muted">{count} conta{count !== 1 ? 's' : ''}</span></span>
+                        <span className="num text-sm font-semibold text-app-ink">{eur(rev)}/mês</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+          </div>
+
+          <Panel title="Despesas registadas">
+            {metrics.expenses.items.length === 0 ? (
+              <p className="mb-4 text-sm text-app-muted">Nenhuma despesa registada ainda. Use o formulário abaixo.</p>
+            ) : (
+              <ul className="mb-5">
+                {metrics.expenses.items.map((exp) => (
+                  <li key={exp.id} className="flex items-center justify-between gap-3 border-t border-app-rule py-2.5 first:border-t-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-app-ink">{CATEGORY_LABELS[exp.category] ?? exp.category} · {exp.description}</p>
+                      <p className="text-xs text-app-muted">{exp.recurring ? `Recorrente (${exp.period === 'monthly' ? 'mensal' : 'anual'})` : 'Pontual'}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="num text-sm font-semibold text-app-ink">
+                        {eur(exp.period === 'yearly' ? exp.amount / 12 : exp.amount)}/mês
+                        {exp.period === 'yearly' && <span className="ml-1 text-xs font-normal text-app-faint">({eur(exp.amount)}/ano)</span>}
+                      </span>
+                      <button onClick={() => removeExpense(exp.id)} className="text-sm text-app-muted hover:text-app-neg" aria-label={`Remover ${exp.description}`}>Remover</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form onSubmit={addExpense} className="grid grid-cols-2 gap-3 border-t border-app-rule pt-4 sm:grid-cols-6">
+              <div className="sm:col-span-1">
+                <label className="mb-1 block text-xs text-app-muted">Categoria</label>
+                <select className="input" value={expForm.category} onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))}>
+                  {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs text-app-muted">Descrição</label>
+                <input className="input" placeholder="ex.: Railway hosting" value={expForm.description} onChange={(e) => setExpForm((f) => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-app-muted">Valor (€)</label>
+                <input className="input" type="number" step="0.01" min="0" placeholder="0,00" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-app-muted">Período</label>
+                <select className="input" value={expForm.period} onChange={(e) => setExpForm((f) => ({ ...f, period: e.target.value }))}>
+                  <option value="monthly">Mensal</option>
+                  <option value="yearly">Anual</option>
+                </select>
+              </div>
+              <div className="col-span-full flex items-center justify-end gap-4">
+                <label className="flex h-10 items-center gap-1.5 text-sm text-app-muted">
+                  <input type="checkbox" checked={expForm.recurring} onChange={(e) => setExpForm((f) => ({ ...f, recurring: e.target.checked }))} />
+                  Recorrente
+                </label>
+                <button type="submit" disabled={expSaving} className="btn-primary">{expSaving ? 'A guardar…' : 'Adicionar'}</button>
+              </div>
+            </form>
+            <p className="mt-4 text-xs text-app-faint">
+              Despesas típicas a registar: Railway ~€20/mês · Supabase Pro €25/mês · Vercel Pro €20/mês · Anthropic e OpenAI (variável) · Meta WhatsApp (grátis até 1000 conversas/mês).
+            </p>
+          </Panel>
+        </div>
+      )}
+
+      {/* ─── Preços ─── */}
+      {activeTab === 'precos' && (
+        <div className="space-y-4">
+          {!pricing && <Skeleton className="h-48 w-full" />}
+          {pricing && (
+            <>
+              {pricingMsg && (
+                <div className={`rounded-lg px-4 py-2 text-sm ${pricingMsg.includes('Erro') ? 'bg-app-neg-soft text-app-neg' : 'bg-app-pos-soft text-app-pos'}`}>{pricingMsg}</div>
+              )}
+
+              <Panel title="Planos" action="Preço, créditos e agentes">
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-app-muted">
+                  <span>Câmbio € → R$ (o € é a base; R$ arredonda para cima até final 9):</span>
+                  <input type="number" min="0.1" step="0.01" className="input w-24"
+                    value={getDraftVal(['fx', 'BRLperEUR'], pricing.fx?.BRLperEUR ?? 5.61)}
+                    onChange={(e) => pNum(['fx', 'BRLperEUR'], e.target.value)}
+                    onBlur={(e) => handleNumBlur(['fx', 'BRLperEUR'], e.target.value)} />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[540px] text-sm">
+                    <thead>
+                      <tr>
+                        <Th className="w-28">Plano</Th><Th>Preço (€/mês)</Th><Th>Créditos/mês</Th><Th>Preço R$ (€ × {pricing.fx?.BRLperEUR ?? 5.61})</Th><Th>Agentes máx.</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(['free', 'starter', 'business', 'enterprise'] as const).map((plan) => (
+                        <tr key={plan} className="border-t border-app-rule">
+                          <td className="py-2 pr-3"><PlanPill plan={plan} /></td>
+                          <td className="py-2 pr-3"><input type="number" min="0" step="1" className="input w-24"
+                            value={getDraftVal(['plans', plan, 'price'], pricing.plans[plan]?.price)}
+                            onChange={(e) => pNum(['plans', plan, 'price'], e.target.value)}
+                            onBlur={(e) => handleNumBlur(['plans', plan, 'price'], e.target.value)} /></td>
+                          <td className="py-2 pr-3"><input type="number" min="0" step="100" className="input w-28"
+                            value={getDraftVal(['plans', plan, 'credits'], pricing.plans[plan]?.credits)}
+                            onChange={(e) => pNum(['plans', plan, 'credits'], e.target.value)}
+                            onBlur={(e) => handleNumBlur(['plans', plan, 'credits'], e.target.value)} /></td>
+                          <td className="num py-2 pr-3 text-app-muted">
+                            {(() => { const e = pricing.plans[plan]?.price ?? 0; const r = pricing.fx?.BRLperEUR ?? 5.61;
+                              return e > 0 ? `R$${Math.ceil((e * r + 1) / 10) * 10 - 1}` : 'R$0'; })()}
+                          </td>
+                          <td className="py-2"><input type="number" min="1" step="1" className="input w-20"
+                            value={getDraftVal(['plans', plan, 'agents'], pricing.plans[plan]?.agents)}
+                            onChange={(e) => pNum(['plans', plan, 'agents'], e.target.value)}
+                            onBlur={(e) => handleNumBlur(['plans', plan, 'agents'], e.target.value)} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+
+              {([
+                ['scheduling',     'Agendamento',            false],
+                ['fileUpload',     'Upload de ficheiros',    false],
+                ['humorDetection', 'Deteção de humor',       false],
+                ['payments',       'Pagamentos',             true ],
+                ['whitelabel',     'White-label',            false],
+                ['vendas',         'Vendas + Pedidos/KDS',   false],
+                ['feedback',       'Recolha de feedback',    false],
+                ['analytics',      'Análises avançadas',     false],
+                ['leadGen',        'Lead generation',        false],
+                ['customSkills',   'Custom skills',          false],
+                ['extraAgents',    'Agentes extra',          false],
+              ] as [string, string, boolean][]).map(([featureKey, featureLabel, hasCredits]) => (
+                <Panel key={featureKey} title={featureLabel}
+                  action={
+                    featureKey === 'whitelabel' || featureKey === 'extraAgents' ? 'Preço = €/agente/mês' :
+                    featureKey === 'payments'   ? 'Preço = mensalidade €/mês · Créditos = por transação' :
+                    featureKey === 'vendas'     ? 'Sempre addon, inclui Pedidos/KDS. Preço = €/mês' :
+                    'Preço = addon €/mês (só se o modo for addon)'
+                  }>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[480px] text-sm">
+                      <thead>
+                        <tr>
+                          <Th className="w-28">Plano</Th><Th className="w-44">Modo</Th><Th>Preço (€)</Th>{hasCredits && <Th>Créditos/tx</Th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(['free', 'starter', 'business', 'enterprise'] as const).map((plan) => {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          const feat = (pricing.features as any)[featureKey]?.[plan] as FeaturePlanConfig | undefined;
+                          const mode = feat?.mode ?? 'disabled';
                           return (
-                            <div key={email}>
-                              {/* Tenant header */}
-                              <div className="flex items-center gap-3 mb-2 px-1">
-                                <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold text-sm shrink-0">
-                                  {group.tenant[0]?.toUpperCase()}
+                            <tr key={plan} className="border-t border-app-rule">
+                              <td className="py-1.5 pr-3"><PlanPill plan={plan} /></td>
+                              <td className="py-1.5 pr-3">
+                                <select value={mode} onChange={(e) => pMode(featureKey, plan, e.target.value)}
+                                  className={`input w-40 ${mode === 'disabled' ? '!text-app-faint' : ''}`}>
+                                  <option value="disabled">Desativado</option>
+                                  <option value="addon">Addon (cobra)</option>
+                                  <option value="included">Incluído</option>
+                                </select>
+                              </td>
+                              <td className="py-1.5 pr-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm text-app-faint">€</span>
+                                  <input type="number" min="0" step="1" className="input w-24 disabled:opacity-50"
+                                    disabled={mode !== 'addon'}
+                                    value={getDraftVal(['features', featureKey, plan, 'price'], feat?.price)}
+                                    onChange={(e) => pNum(['features', featureKey, plan, 'price'], e.target.value)}
+                                    onBlur={(e) => handleNumBlur(['features', featureKey, plan, 'price'], e.target.value)} />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{group.tenant}</span>
-                                  <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">{email}</span>
-                                </div>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${tenantBadge}`}>
-                                  {group.agents.length} agente{group.agents.length !== 1 ? 's' : ''} · plano {group.plan}
-                                </span>
-                              </div>
-
-                              {/* Agents in this tenant */}
-                              <div className="space-y-2 pl-0 sm:pl-10">
-                                {group.agents.map((a) => {
-                                  const testRes = wpTestResult[a.id];
-                                  const isTesting = wpTestId === a.id;
-                                  const statusColor =
-                                    a.status === 'ok'      ? 'border-green-500 dark:border-green-600' :
-                                    a.status === 'warning' ? 'border-yellow-500 dark:border-yellow-600' :
-                                                             'border-red-500 dark:border-red-600';
-                                  const statusBadge =
-                                    a.status === 'ok'      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                    a.status === 'warning' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                                             'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-                                  return (
-                                    <div key={a.id} className={`card border-l-4 ${statusColor} space-y-3`}>
-                                      {/* Header */}
-                                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{a.name}</span>
-                                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge}`}>
-                                            {a.status === 'ok' ? '✅ OK' : a.status === 'warning' ? '⚠️ Aviso' : '❌ Erro'}
-                                          </span>
-                                          {!a.isActive && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700">Inativo</span>}
-                                        </div>
-                                        <button
-                                          onClick={() => testAgent(a.id, a.phoneNumberId)}
-                                          disabled={isTesting || !a.phoneNumberId}
-                                          className="text-xs btn-secondary px-3 py-1.5 shrink-0 disabled:opacity-40"
-                                          title={!a.phoneNumberId ? 'Phone Number ID não configurado' : 'Testa o routing real pelo phone_number_id (como o Meta faz)'}
-                                        >
-                                          {isTesting ? '⏳ A testar...' : '🧪 Testar routing'}
-                                        </button>
-                                      </div>
-
-                                      {/* Details grid */}
-                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                                          <p className="text-gray-400 mb-0.5">Phone Number ID</p>
-                                          <p className="font-mono text-gray-800 dark:text-gray-200 truncate">{a.phoneNumberId ?? <span className="text-red-400">—</span>}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                                          <p className="text-gray-400 mb-0.5">Token</p>
-                                          <p className={a.hasAgentToken ? 'text-green-600 dark:text-green-400' : a.hasGlobalToken ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500'}>
-                                            {a.hasAgentToken ? '🔑 por agente' : a.hasGlobalToken ? '🌐 global (env)' : '✗ em falta'}
-                                          </p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                                          <p className="text-gray-400 mb-0.5">WhatsApp</p>
-                                          <p className={a.whatsappEnabled ? 'text-green-600 dark:text-green-400' : 'text-red-500'}>
-                                            {a.whatsappEnabled ? '✓ ativado' : '✗ desativado'}
-                                          </p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                                          <p className="text-gray-400 mb-0.5">Conversas</p>
-                                          <p className="text-gray-800 dark:text-gray-200">{a.conversations}</p>
-                                        </div>
-                                      </div>
-
-                                      {/* Issues */}
-                                      {a.issues.length > 0 && (
-                                        <div className="space-y-1">
-                                          {a.issues.map((issue, i) => (
-                                            <div key={i} className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
-                                              <span className="shrink-0 mt-0.5">❌</span><span>{issue}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {a.warnings.length > 0 && (
-                                        <div className="space-y-1">
-                                          {a.warnings.map((w, i) => (
-                                            <div key={i} className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3 py-2">
-                                              <span className="shrink-0 mt-0.5">⚠️</span><span>{w}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-
-                                      {/* Test result */}
-                                      {testRes && (
-                                        <div className={`text-xs rounded-lg px-3 py-2 ${testRes.ok ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'}`}>
-                                          <span className="font-semibold">{testRes.ok ? '✅ Resposta do agente:' : '❌ Erro:'}</span>{' '}
-                                          <span className="italic">{testRes.msg}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                              </td>
+                              {hasCredits && (
+                                <td className="py-1.5">
+                                  <input type="number" min="0" step="1" className="input w-24 disabled:opacity-50"
+                                    disabled={mode === 'disabled'}
+                                    value={getDraftVal(['features', featureKey, plan, 'creditsPerTx'], feat?.creditsPerTx)}
+                                    onChange={(e) => pNum(['features', featureKey, plan, 'creditsPerTx'], e.target.value)}
+                                    onBlur={(e) => handleNumBlur(['features', featureKey, plan, 'creditsPerTx'], e.target.value)} />
+                                </td>
+                              )}
+                            </tr>
                           );
                         })}
-                      </div>
-                    );
-                  })()}
-                </>
-              )}
-            </div>
-          )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Panel>
+              ))}
 
-          {activeTab === 'logs' && (
-            <>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Registos de Auditoria</h2>
-                <span className="text-xs text-gray-400">{auditTotal} entradas</span>
-              </div>
-              <div className="card overflow-hidden p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                      {['Data', 'Ação', 'Tipo', 'ID'].map((h) => (
-                        <th key={h} className="text-left py-2 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditLogs.map((log: AuditLogEntry) => {
-                      const label = ACTION_LABELS[log.action] ?? log.action;
-                      const color = ACTION_COLORS[log.action] ?? 'bg-gray-100 text-gray-700';
-                      const d = new Date(log.createdAt);
-                      return (
-                        <tr key={log.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="py-2 px-4 text-xs text-gray-400 whitespace-nowrap">
-                            {d.toLocaleDateString('pt-PT')} {d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="py-2 px-4"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{label}</span></td>
-                          <td className="py-2 px-4 text-xs text-gray-500">{log.resourceType ?? '—'}</td>
-                          <td className="py-2 px-4 text-xs text-gray-400 font-mono">{log.resourceId?.slice(-8) ?? '—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
-                  <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">← Anterior</button>                  <span className="text-xs text-gray-400">{skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
-                  <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="text-xs text-brand-600 disabled:text-gray-300 hover:underline">Próximo →</button>
-                </div>
+              <div className="flex justify-end">
+                <button onClick={savePricing} disabled={pricingSaving} className="btn-primary">{pricingSaving ? 'A guardar…' : 'Guardar alterações'}</button>
               </div>
             </>
           )}
-
         </div>
-      </main>
-    </div>
+      )}
+
+      {/* ─── WhatsApp ─── */}
+      {activeTab === 'whatsapp' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-app-muted">Estado do routing e das credenciais por agente.</p>
+            <button onClick={loadWhatsApp} disabled={wpLoading} className="btn-secondary">{wpLoading ? 'A carregar…' : 'Atualizar'}</button>
+          </div>
+
+          {wpLoading && !wpData && <Skeleton className="h-40 w-full" />}
+
+          {wpData && (
+            <>
+              <KpiStrip
+                items={[
+                  { label: 'Agentes com WhatsApp', value: int(wpData.summary.total) },
+                  { label: 'Tudo certo', value: int(wpData.summary.ok), caption: wpData.summary.ok === wpData.summary.total ? 'Todos' : undefined, tone: 'default' },
+                  { label: 'Com avisos', value: int(wpData.summary.warning), tone: wpData.summary.warning ? 'warn' : 'default' },
+                  { label: 'Com erros', value: int(wpData.summary.error), tone: wpData.summary.error ? 'neg' : 'default' },
+                ]}
+              />
+
+              <Panel title="Configuração global (ENV)">
+                <ul className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                  {Object.entries(wpData.env).map(([k, v]) => {
+                    const ok = !!v && !v.startsWith('✗');
+                    return (
+                      <li key={k} className="flex items-start gap-2 text-sm">
+                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${ok ? 'bg-app-pos' : 'bg-app-neg'}`} aria-hidden="true" />
+                        <span className="min-w-0 break-words">
+                          <span className="font-mono text-xs text-app-muted">{k}</span>{' '}
+                          <span className="text-app-ink">{v ? v.replace(/^✗\s*/, '') : '—'}</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Panel>
+
+              {wpData.agents.length === 0 ? (
+                <EmptyState title="Nenhum agente com WhatsApp ativado." body="Quando um cliente ligar o WhatsApp a um agente, aparece aqui." />
+              ) : (() => {
+                const groups = wpData.agents.reduce<Record<string, { tenant: string; email: string; plan: string; agents: WpAgentDiag[] }>>((acc, a) => {
+                  if (!acc[a.tenantEmail]) acc[a.tenantEmail] = { tenant: a.tenant, email: a.tenantEmail, plan: a.plan, agents: [] };
+                  acc[a.tenantEmail].agents.push(a);
+                  return acc;
+                }, {});
+                const statusTone = (s: WpAgentDiag['status']): PillTone => (s === 'ok' ? 'pos' : s === 'warning' ? 'warn' : 'neg');
+                const statusLabel = (s: WpAgentDiag['status']) => (s === 'ok' ? 'OK' : s === 'warning' ? 'Aviso' : 'Erro');
+                return (
+                  <div className="space-y-4">
+                    {Object.entries(groups).map(([email, group]) => (
+                      <Panel key={email} title={group.tenant} action={<>{email} · {group.agents.length} agente{group.agents.length !== 1 ? 's' : ''} · plano {group.plan}</>} bodyClassName="!pt-1">
+                        <ul>
+                          {group.agents.map((a, i) => {
+                            const testRes = wpTestResult[a.id];
+                            const isTesting = wpTestId === a.id;
+                            return (
+                              <li key={a.id} className={`space-y-3 py-4 ${i > 0 ? 'border-t border-app-rule' : ''}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-semibold text-app-ink">{a.name}</span>
+                                    <Pill tone={statusTone(a.status)} dot>{statusLabel(a.status)}</Pill>
+                                    {!a.isActive && <Pill>Inativo</Pill>}
+                                  </div>
+                                  <button
+                                    onClick={() => testAgent(a.id, a.phoneNumberId)}
+                                    disabled={isTesting || !a.phoneNumberId}
+                                    className="btn-secondary disabled:opacity-40"
+                                    title={!a.phoneNumberId ? 'Phone Number ID não configurado' : 'Testa o routing real pelo phone_number_id (como o Meta faz)'}
+                                  >
+                                    {isTesting ? 'A testar…' : 'Testar routing'}
+                                  </button>
+                                </div>
+
+                                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+                                  <div className="min-w-0">
+                                    <dt className="text-xs text-app-muted">Phone Number ID</dt>
+                                    <dd className="truncate font-mono text-xs text-app-ink">{a.phoneNumberId ?? <span className="text-app-neg">—</span>}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="text-xs text-app-muted">Token</dt>
+                                    <dd className={a.hasAgentToken ? 'text-app-pos' : a.hasGlobalToken ? 'text-app-warn' : 'text-app-neg'}>
+                                      {a.hasAgentToken ? 'Por agente' : a.hasGlobalToken ? 'Global (env)' : 'Em falta'}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt className="text-xs text-app-muted">WhatsApp</dt>
+                                    <dd className={a.whatsappEnabled ? 'text-app-pos' : 'text-app-neg'}>{a.whatsappEnabled ? 'Ativado' : 'Desativado'}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="text-xs text-app-muted">Conversas</dt>
+                                    <dd className="num text-app-ink">{int(a.conversations)}</dd>
+                                  </div>
+                                </dl>
+
+                                {a.issues.map((issue, k) => (
+                                  <p key={`i${k}`} className="rounded-lg bg-app-neg-soft px-3 py-2 text-sm text-app-neg">Erro: {issue}</p>
+                                ))}
+                                {a.warnings.map((w, k) => (
+                                  <p key={`w${k}`} className="rounded-lg bg-app-warn-soft px-3 py-2 text-sm text-app-warn">Aviso: {w}</p>
+                                ))}
+                                {testRes && (
+                                  <p className={`rounded-lg px-3 py-2 text-sm ${testRes.ok ? 'bg-app-pos-soft text-app-pos' : 'bg-app-neg-soft text-app-neg'}`}>
+                                    <span className="font-semibold">{testRes.ok ? 'Resposta do agente:' : 'Erro:'}</span> {testRes.msg}
+                                  </p>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </Panel>
+                    ))}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ─── Auditoria ─── */}
+      {activeTab === 'auditoria' && (
+        <Panel title="Registos de auditoria" action={`${int(auditTotal)} entradas`} bodyClassName="!pt-1">
+          {auditLogs.length === 0 && !auditLoading ? (
+            <EmptyState title="Sem registos de auditoria." body="As ações da plataforma aparecem aqui à medida que acontecem." />
+          ) : (
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr><Th>Data</Th><Th>Ação</Th><Th className="hidden sm:table-cell">Tipo</Th><Th right>ID</Th></tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log: AuditLogEntry) => {
+                    const d = new Date(log.createdAt);
+                    return (
+                      <tr key={log.id} className="border-t border-app-rule">
+                        <td className="num whitespace-nowrap py-2.5 pr-3 text-app-muted">
+                          {d.toLocaleDateString('pt-PT')} {d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 pr-3"><Pill tone={ACTION_TONES[log.action] ?? 'neutral'}>{ACTION_LABELS[log.action] ?? log.action}</Pill></td>
+                        <td className="hidden py-2.5 pr-3 text-app-muted sm:table-cell">{log.resourceType ?? '—'}</td>
+                        <td className="py-2.5 text-right font-mono text-xs text-app-faint">{log.resourceId?.slice(-8) ?? '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between border-t border-app-rule pt-3 text-sm">
+                <button onClick={handleAuditPrev} disabled={skip === 0 || auditLoading} className="font-semibold text-app-accent hover:underline disabled:text-app-faint disabled:no-underline">← Anterior</button>
+                <span className="num text-xs text-app-muted">{skip + 1}–{Math.min(skip + PAGE_SIZE, auditTotal)} de {auditTotal}</span>
+                <button onClick={handleAuditNext} disabled={skip + PAGE_SIZE >= auditTotal || auditLoading} className="font-semibold text-app-accent hover:underline disabled:text-app-faint disabled:no-underline">Seguinte →</button>
+              </div>
+            </>
+          )}
+        </Panel>
+      )}
+    </AppLayout>
   );
 }

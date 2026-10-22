@@ -11,32 +11,28 @@ interface ConversationWithMessages extends Conversation {
 }
 
 function sentimentColor(s?: number) {
-  if (s === undefined || s === null) return '';
-  if (s >= 0.3) return 'text-green-500';
-  if (s <= -0.3) return 'text-red-500';
-  return 'text-yellow-500';
+  if (s === undefined || s === null) return 'text-app-faint';
+  if (s >= 0.3) return 'text-app-pos';
+  if (s <= -0.3) return 'text-app-neg';
+  return 'text-app-muted';
 }
 
 function sentimentLabel(s?: number) {
-  if (s === undefined || s === null) return '-';
-  if (s >= 0.3) return 'ok';
-  if (s <= -0.3) return 'mau';
-  return 'neutro';
+  if (s === undefined || s === null) return '';
+  if (s >= 0.3) return 'Satisfeito';
+  if (s <= -0.3) return 'Insatisfeito';
+  return 'Neutro';
 }
 
+const URGENCY: Record<string, { label: string; cls: string }> = {
+  critical: { label: 'Crítica', cls: 'bg-app-neg-soft text-app-neg' },
+  high: { label: 'Urgente', cls: 'bg-app-warn-soft text-app-warn' },
+};
+
+/** Só marca urgência quando importa (alta ou crítica); o resto é ruído. */
 function urgencyBadge(u?: string) {
-  const map: Record<string, string> = {
-    critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-    medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    low: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-  };
-  if (!u) return null;
-  return (
-    <span className={`text-[14px] font-medium px-1.5 py-0.5 rounded ${map[u] ?? map.low}`}>
-      {u}
-    </span>
-  );
+  if (!u || !URGENCY[u]) return null;
+  return <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${URGENCY[u].cls}`}>{URGENCY[u].label}</span>;
 }
 
 function formatDate(d: string) {
@@ -57,10 +53,14 @@ function formatTime(d: string) {
 }
 
 function channelTag(channelType: string): string {
-  if (channelType === 'whatsapp') return '[WA] ';
-  if (channelType === 'instagram') return '[IG] ';
-  if (channelType === 'telegram') return '[TG] ';
-  return '[Web] ';
+  if (channelType === 'whatsapp') return 'WhatsApp';
+  if (channelType === 'instagram') return 'Instagram';
+  if (channelType === 'telegram') return 'Telegram';
+  return 'Site';
+}
+
+function Stars({ n, title }: { n: number; title?: string }) {
+  return <span className="num whitespace-nowrap text-xs text-app-muted" title={title} aria-label={`${n} de 5`}>{n}/5</span>;
 }
 
 export default function ConversationHistory({ agentId }: Props) {
@@ -161,218 +161,203 @@ export default function ConversationHistory({ agentId }: Props) {
     }
   }
 
+  const FILTERS = [
+    { id: 'all', label: 'Todas' },
+    { id: 'handoff', label: 'Com a equipa' },
+    { id: 'whatsapp', label: 'WhatsApp' },
+    { id: 'instagram', label: 'Instagram' },
+    { id: 'telegram', label: 'Telegram' },
+    { id: 'web', label: 'Site' },
+  ] as const;
+
   return (
-    <div className="flex h-[600px] rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-72 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        {/* Header */}
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-2">
-            Conversas {total > 0 && <span className="text-gray-400 font-normal">({total})</span>}
-          </h3>
+    <div className="flex flex-col overflow-hidden rounded-xl border border-app-edge bg-app-sheet md:h-[640px] md:flex-row">
+      {/* Lista */}
+      <div className="flex max-h-[420px] shrink-0 flex-col border-b border-app-rule md:max-h-none md:w-96 md:border-b-0 md:border-r">
+        <div className="space-y-2 border-b border-app-rule p-3">
           <input
             type="text"
-            placeholder="Filtrar por numero..."
+            aria-label="Filtrar por número"
+            placeholder="Procurar por número ou nome"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-2.5 py-1.5 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            className="input"
           />
-          <div className="flex gap-1 mt-2 flex-wrap">
-            {(['whatsapp', 'instagram', 'telegram', 'web', 'handoff', 'all'] as const).map((f) => (
+          <div role="group" aria-label="Filtrar por canal" className="flex flex-wrap gap-1">
+            {FILTERS.map((f) => (
               <button
-                key={f}
-                onClick={() => { setFilter(f); loadConversations(0, true); }}
-                className={`flex-1 min-w-[2.5rem] text-[14px] py-1 rounded font-medium transition-colors ${
-                  filter === f
-                    ? f === 'handoff' ? 'bg-orange-500 text-white' : 'bg-brand-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                key={f.id}
+                type="button"
+                aria-pressed={filter === f.id}
+                onClick={() => { setFilter(f.id); loadConversations(0, true); }}
+                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                  filter === f.id ? 'bg-app-ink text-app-sheet' : 'text-app-muted hover:bg-app-raised hover:text-app-ink'
                 }`}
               >
-                {f === 'whatsapp' ? 'WA' : f === 'instagram' ? 'IG' : f === 'telegram' ? 'TG' : f === 'web' ? 'Web' : f === 'handoff' ? '🤝' : 'Todas'}
+                {f.label}
               </button>
             ))}
           </div>
+          <p className="num text-xs text-app-faint">{total} conversa{total === 1 ? '' : 's'}</p>
         </div>
 
-        {/* List */}
         <div className="flex-1 overflow-y-auto">
           {error ? (
-            <div className="p-4 text-center text-xs text-red-500 space-y-2">
+            <div className="m-3 space-y-1 rounded-lg bg-app-neg-soft px-3 py-2 text-sm text-app-neg">
               <p>{error}</p>
-              {error.includes('expirada') && (
-                <a href="/dashboard/profile" className="text-brand-600 underline block">Ir para perfil</a>
+              {error.includes('expirada') ? (
+                <a href="/dashboard/profile" className="block font-semibold underline underline-offset-2">Ir para o perfil</a>
+              ) : (
+                <button type="button" onClick={() => loadConversations(0, true)} className="font-semibold underline underline-offset-2">Tentar de novo</button>
               )}
             </div>
           ) : loading && conversations.length === 0 ? (
-            <div className="p-4 text-center text-xs text-gray-400">A carregar...</div>
-          ) : displayed.length === 0 ? (
-            <div className="p-4 text-center text-xs text-gray-400">
-              {filter === 'whatsapp' ? 'Sem conversas WhatsApp.' : filter === 'instagram' ? 'Sem conversas Instagram.' : filter === 'telegram' ? 'Sem conversas Telegram.' : filter === 'web' ? 'Sem conversas Web.' : 'Sem conversas ainda.'}
+            <div className="space-y-4 p-4" aria-label="A carregar conversas">
+              {[0, 1, 2, 3].map((k) => (
+                <div key={k} className="space-y-1.5">
+                  <span className="block h-4 w-2/3 rounded bg-app-raised" />
+                  <span className="block h-3 w-1/2 rounded bg-app-raised" />
+                </div>
+              ))}
             </div>
+          ) : displayed.length === 0 ? (
+            <p className="p-4 text-sm text-app-muted">
+              {filter === 'whatsapp' ? 'Sem conversas no WhatsApp.' : filter === 'instagram' ? 'Sem conversas no Instagram.' : filter === 'telegram' ? 'Sem conversas no Telegram.' : filter === 'web' ? 'Sem conversas no site.' : filter === 'handoff' ? 'Nenhuma conversa à espera da equipa.' : 'Ainda não há conversas. Quando um cliente escrever, aparece aqui.'}
+            </p>
           ) : (
-            displayed.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => openConversation(conv)}
-                className={`w-full text-left px-3 py-2.5 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                  selected?.id === conv.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-brand-600' : ''
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1 mb-0.5">
-                  <span className="font-medium text-xs text-gray-900 dark:text-gray-100 truncate">
-                    {channelTag(conv.channelType)}
-                    {conv.visitorId ?? 'Anonimo'}
-                  </span>
-                  <span className="text-[14px] text-gray-400 shrink-0">{formatDate(conv.createdAt)}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs ${sentimentColor(conv.sentiment)}`}>{sentimentLabel(conv.sentiment)}</span>
-                  {urgencyBadge(conv.urgency)}
-                  {conv.resolved && (
-                    <span className="text-[14px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">ok</span>
-                  )}
-                  {conv.handedOffToHuman && (
-                    <span className="text-[14px] bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">🤝 handoff</span>
-                  )}
-                  {conv.needsReview && (
-                    <span className="text-[14px] bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1.5 py-0.5 rounded" title={conv.reviewReason}>🔎 revisão</span>
-                  )}
-                  {conv.rating != null && (
-                    <span className="text-[14px] text-yellow-500">{'★'.repeat(conv.rating)}{'☆'.repeat(5 - conv.rating)}</span>
-                  )}
-                  <span className="ml-auto text-[14px] text-gray-400">
-                    {(conv._count?.messages ?? 0)} msg
-                  </span>
-                </div>
-              </button>
-            ))
+            displayed.map((conv) => {
+              const on = selected?.id === conv.id;
+              return (
+                <button
+                  key={conv.id}
+                  type="button"
+                  onClick={() => openConversation(conv)}
+                  aria-current={on ? 'true' : undefined}
+                  className={`relative block w-full border-b border-app-rule px-4 py-3 text-left transition-colors ${on ? 'bg-app-raised' : 'hover:bg-app-raised'}`}
+                >
+                  {on && <span className="absolute inset-y-0 left-0 w-0.5 bg-app-accent" aria-hidden="true" />}
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-app-ink">{conv.visitorId ?? 'Anónimo'}</span>
+                    <span className="num shrink-0 text-xs text-app-faint">{formatDate(conv.createdAt)}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-muted">
+                    <span>{channelTag(conv.channelType)}</span>
+                    <span className="num text-app-faint">· {(conv._count?.messages ?? 0)} msg</span>
+                    {conv.rating != null && <Stars n={conv.rating} />}
+                    {conv.handedOffToHuman ? (
+                      <span className="rounded-full bg-app-warn-soft px-2 py-0.5 font-medium text-app-warn">Com a equipa</span>
+                    ) : conv.needsReview ? (
+                      <span className="rounded-full bg-app-warn-soft px-2 py-0.5 font-medium text-app-warn" title={conv.reviewReason}>A rever</span>
+                    ) : conv.resolved ? (
+                      <span className="rounded-full bg-app-pos-soft px-2 py-0.5 font-medium text-app-pos">Resolvida</span>
+                    ) : null}
+                    {urgencyBadge(conv.urgency)}
+                  </div>
+                </button>
+              );
+            })
           )}
           {displayed.length < total && !loading && (
-            <button
-              onClick={() => loadConversations(skip, false)}
-              className="w-full py-2 text-xs text-brand-600 hover:underline"
-            >
-              Carregar mais...
+            <button type="button" onClick={() => loadConversations(skip, false)} className="w-full py-3 text-sm font-semibold text-app-accent hover:underline">
+              Carregar mais
             </button>
           )}
         </div>
       </div>
 
-      {/* Main — mensagens */}
-      <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+      {/* Conversa */}
+      <div className="flex min-h-[420px] min-w-0 flex-1 flex-col bg-app-raised/40">
         {!selected ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-2">
-            <span className="text-4xl">chat</span>
-            <p className="text-sm">Seleciona uma conversa para ver as mensagens</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
+            <p className="text-sm font-semibold text-app-ink">Escolha uma conversa</p>
+            <p className="text-sm text-app-muted">As mensagens aparecem aqui, com o resumo e o estado.</p>
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className="px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                  {channelTag(selected.channelType)}
-                  {selected.visitorId ?? 'Anonimo'}
-                </p>
-                <p className="text-[14px] text-gray-400">
-                  Iniciada em {new Date(selected.createdAt).toLocaleString('pt-PT')}
-                  {selected.closedAt && ` - Encerrada ${new Date(selected.closedAt).toLocaleString('pt-PT')}`}
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-app-rule bg-app-sheet px-5 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-app-ink">{selected.visitorId ?? 'Anónimo'}</p>
+                <p className="num text-xs text-app-muted">
+                  {channelTag(selected.channelType)} · {new Date(selected.createdAt).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
+                  {selected.closedAt && ` – fechada ${new Date(selected.closedAt).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}`}
+                  {' · '}{selected.tokensUsed} tokens
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {urgencyBadge(selected.urgency)}
-                <span className={`text-xs ${sentimentColor(selected.sentiment)}`}>{sentimentLabel(selected.sentiment)}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {selected.tokensUsed} tokens
-                </span>
-                {selected.rating != null && (
-                  <span className="text-xs text-yellow-500" title={selected.ratingText}>
-                    {'★'.repeat(selected.rating)}{'☆'.repeat(5 - selected.rating)}
-                  </span>
-                )}
+                {sentimentLabel(selected.sentiment) && <span className={`text-xs font-medium ${sentimentColor(selected.sentiment)}`}>{sentimentLabel(selected.sentiment)}</span>}
+                {selected.rating != null && <Stars n={selected.rating} title={selected.ratingText} />}
                 {selected.needsReview && (
-                  <span className="text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded-full" title={selected.reviewReason}>
-                    🔎 A rever
-                  </span>
+                  <span className="rounded-full bg-app-warn-soft px-2 py-0.5 text-xs font-medium text-app-warn" title={selected.reviewReason}>A rever</span>
                 )}
                 {selected.resolved && (
-                  <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Resolvida</span>
+                  <span className="rounded-full bg-app-pos-soft px-2 py-0.5 text-xs font-medium text-app-pos">Resolvida</span>
                 )}
                 {selected.handedOffToHuman && (
-                  <button
-                    onClick={() => returnToAgent(selected)}
-                    disabled={returningHandoff}
-                    className="text-xs bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white px-3 py-1 rounded-full font-medium transition-colors"
-                  >
-                    {returningHandoff ? 'A devolver...' : '🤖 Devolver ao Agente'}
+                  <button type="button" onClick={() => returnToAgent(selected)} disabled={returningHandoff} className="btn-secondary h-8 px-3 text-xs">
+                    {returningHandoff ? 'A devolver…' : 'Devolver ao agente'}
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Copiloto de IA — resumo + respostas sugeridas para quem está a atender */}
+            {selected.needsReview && selected.reviewReason && (
+              <p className="border-b border-app-rule bg-app-warn-soft px-5 py-2 text-sm text-app-warn">Motivo da revisão: {selected.reviewReason}</p>
+            )}
+            {selected.handoffSummary && (
+              <p className="border-b border-app-rule bg-app-sheet px-5 py-2 text-sm text-app-muted"><span className="font-semibold text-app-ink">Resumo para a equipa:</span> {selected.handoffSummary}</p>
+            )}
+
+            {/* Copiloto de IA: resumo + respostas sugeridas para quem está a atender */}
             {(selected.handedOffToHuman || copilot) && (
-              <div className="px-4 py-2.5 bg-brand-50 dark:bg-brand-900/10 border-b border-brand-100 dark:border-brand-900/30">
+              <div className="border-b border-app-rule bg-app-sheet px-5 py-3">
                 {!copilot && !loadingCopilot && (
-                  <button
-                    onClick={() => fetchCopilot(selected)}
-                    className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:underline"
-                  >
-                    🤖 Pedir sugestões ao copiloto de IA
+                  <button type="button" onClick={() => fetchCopilot(selected)} className="text-sm font-semibold text-app-accent hover:underline">
+                    Sugerir respostas com IA
                   </button>
                 )}
-                {loadingCopilot && (
-                  <p className="text-xs text-brand-600 dark:text-brand-400 animate-pulse">A gerar sugestões...</p>
-                )}
-                {copilotError && (
-                  <p className="text-xs text-red-600">{copilotError}</p>
-                )}
+                {loadingCopilot && <p className="text-sm text-app-muted">A preparar sugestões…</p>}
+                {copilotError && <p className="text-sm text-app-neg">{copilotError}</p>}
                 {copilot && (
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-gray-700 dark:text-gray-300"><span className="font-medium">Resumo:</span> {copilot.summary}</p>
+                  <div className="space-y-2">
+                    <p className="text-sm text-app-ink"><span className="font-semibold">Resumo:</span> {copilot.summary}</p>
                     {copilot.suggestedReplies.length > 0 && (
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1.5">
                         {copilot.suggestedReplies.map((r, i) => (
-                          <p key={i} className="text-xs bg-white dark:bg-gray-800 border border-brand-100 dark:border-brand-900/40 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-200">
-                            {r}
-                          </p>
+                          <p key={i} className="rounded-lg border border-app-edge px-3 py-2 text-sm text-app-ink">{r}</p>
                         ))}
                       </div>
                     )}
-                    <button
-                      onClick={() => fetchCopilot(selected)}
-                      className="text-[14px] text-brand-600 dark:text-brand-400 hover:underline"
-                    >
-                      ↻ Gerar novas sugestões
+                    <button type="button" onClick={() => fetchCopilot(selected)} className="text-sm font-semibold text-app-accent hover:underline">
+                      Gerar outras sugestões
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 space-y-3 overflow-y-auto p-5">
               {loadingMessages ? (
-                <div className="text-center text-xs text-gray-400 pt-8">A carregar mensagens...</div>
+                <div className="space-y-3" aria-label="A carregar mensagens">
+                  <span className="block h-10 w-2/3 rounded-2xl bg-app-raised" />
+                  <span className="ml-auto block h-10 w-1/2 rounded-2xl bg-app-raised" />
+                </div>
               ) : selected.messages.length === 0 ? (
-                <div className="text-center text-xs text-gray-400 pt-8">Sem mensagens</div>
+                <p className="pt-8 text-center text-sm text-app-muted">Esta conversa não tem mensagens.</p>
               ) : (
                 selected.messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
                     <div
-                      className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm ${
+                      className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                         msg.role === 'user'
-                          ? 'bg-brand-600 text-white rounded-br-sm'
-                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm rounded-bl-sm'
+                          ? 'rounded-bl-sm border border-app-edge bg-app-sheet text-app-ink'
+                          : 'rounded-br-sm bg-app-accent text-app-accent-ink'
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                      <p className={`text-[14px] mt-1 text-right ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'}`}>
-                        {formatTime(msg.timestamp)}
-                        {msg.tokens > 0 && ` - ${msg.tokens}t`}
+                      <p className={`num mt-1 text-right text-xs ${msg.role === 'user' ? 'text-app-faint' : 'text-app-accent-ink/75'}`}>
+                        {msg.role === 'user' ? 'Cliente' : 'Agente'} · {formatTime(msg.timestamp)}
+                        {msg.tokens > 0 && ` · ${msg.tokens}t`}
                       </p>
                     </div>
                   </div>

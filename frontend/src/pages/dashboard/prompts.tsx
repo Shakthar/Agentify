@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import Navigation from '../../components/Navigation';
+import AppLayout from '../../components/app/AppLayout';
+import { EmptyState, PageHeader, cx } from '../../components/app/ui';
 
 interface Prompt {
   id: string;
@@ -183,106 +184,87 @@ export default function PromptsPage() {
     });
   };
 
+  const current = filtered.find(p => p.id === expanded) ?? filtered[0] ?? null;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <Navigation />
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">📚 Biblioteca de Templates</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              Escolhe um template base e o assistente IA adapta-o ao teu negócio específico.
-            </p>
-          </div>
-          <button onClick={() => router.back()} className="btn-secondary text-sm">← Voltar</button>
-        </div>
+    <AppLayout wide>
+      <PageHeader
+        title="Modelos de agente"
+        subtitle="Escolha um ponto de partida; o assistente IA adapta-o ao seu negócio."
+        actions={current && <button onClick={() => usePrompt(current)} className="btn-primary">Usar este modelo</button>}
+      />
 
-        {/* Tip banner */}
-        <div className="mb-6 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-lg flex items-start gap-2 text-sm text-brand-700 dark:text-brand-300">
-          <span className="shrink-0 text-base">💡</span>
-          <span>Clica em <strong>Usar template →</strong> para abrir o criador de agentes com este prompt pré-preenchido. O assistente IA vai ajudar a personalizá-lo para o teu negócio.</span>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-5">
-          <input
-            className="input flex-1"
-            placeholder="Pesquisar templates…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <div className="flex gap-1 flex-wrap">
-            {SECTORS.map(s => (
-              <button
-                key={s}
-                onClick={() => setFilterSector(s)}
-                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                  filterSector === s
-                    ? 'bg-brand-600 text-white border-brand-600'
-                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-brand-400'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map(p => (
-            <div key={p.id} className="card space-y-3">
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{p.name}</h3>
-                  <span className="text-[14px] px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full shrink-0">{p.sector}</span>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{p.description}</p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {p.tags.map(t => (
-                    <span key={t} className="text-[14px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded">{t}</span>
-                  ))}
-                </div>
-              </div>
-
-              {expanded === p.id && (
-                <pre className="text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-3 whitespace-pre-wrap font-mono leading-relaxed max-h-48 overflow-y-auto">
-                  {p.prompt}
-                </pre>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center" role="search">
+        <input
+          className="input sm:max-w-xs"
+          placeholder="Pesquisar modelos"
+          aria-label="Pesquisar modelos"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Setor">
+          {SECTORS.map(s => (
+            <button
+              key={s}
+              onClick={() => setFilterSector(s)}
+              aria-pressed={filterSector === s}
+              className={cx(
+                'h-8 rounded-full border px-3 text-xs font-medium transition-colors',
+                filterSector === s ? 'border-app-ink bg-app-ink text-app-sheet' : 'border-app-control text-app-muted hover:text-app-ink',
               )}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-                  className="btn-secondary text-xs flex-1"
-                >
-                  {expanded === p.id ? '▲ Ocultar' : '▼ Ver prompt'}
-                </button>
-                <button
-                  onClick={() => copyPrompt(p.prompt, p.id)}
-                  className="btn-secondary text-xs px-3"
-                  title="Copiar prompt"
-                >
-                  {copied === p.id ? '✓' : '📋'}
-                </button>
-                <button
-                  onClick={() => usePrompt(p)}
-                  className="btn-primary text-xs px-3 whitespace-nowrap"
-                >
-                  Usar template →
-                </button>
-              </div>
-            </div>
+            >
+              {s}
+            </button>
           ))}
         </div>
+      </div>
 
-        {filtered.length === 0 && (
-          <div className="card text-center py-12">
-            <p className="text-gray-400 text-sm">Nenhum template encontrado.</p>
-          </div>
-        )}
-      </main>
-    </div>
+      {filtered.length === 0 ? (
+        <EmptyState title="Nenhum modelo corresponde à pesquisa" body="Experimente outro termo ou escolha Todos os setores." />
+      ) : (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+          <ul className="overflow-hidden rounded-xl border border-app-edge bg-app-sheet" aria-label="Modelos">
+            {filtered.map((p, i) => {
+              const active = current?.id === p.id;
+              return (
+                <li key={p.id} className={i > 0 ? 'border-t border-app-rule' : ''}>
+                  <button
+                    onClick={() => setExpanded(p.id)}
+                    aria-current={active}
+                    className={cx('block w-full px-5 py-3.5 text-left transition-colors hover:bg-app-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-app-accent/40', active && 'bg-app-raised')}
+                  >
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className={cx('font-medium', active ? 'text-app-accent' : 'text-app-ink')}>{p.name}</span>
+                      <span className="shrink-0 text-xs text-app-faint">{p.sector}</span>
+                    </span>
+                    <span className="mt-0.5 block text-sm text-app-muted">{p.description}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {current && (
+            <section className="min-w-0 rounded-xl border border-app-edge bg-app-sheet lg:sticky lg:top-6" aria-label={`Prompt de ${current.name}`}>
+              <div className="flex items-start justify-between gap-3 border-b border-app-rule px-5 py-4">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-app-ink">{current.name}</h2>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {current.tags.map(t => <span key={t} className="rounded bg-app-raised px-1.5 py-0.5 text-xs text-app-muted">{t}</span>)}
+                  </div>
+                </div>
+                <button onClick={() => copyPrompt(current.prompt, current.id)} className="btn-secondary h-9 shrink-0 px-3 text-xs" title="Copiar prompt">
+                  {copied === current.id ? 'Copiado' : 'Copiar prompt'}
+                </button>
+              </div>
+              <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words px-5 py-4 font-mono text-xs leading-relaxed text-app-ink">{current.prompt}</pre>
+              <p className="border-t border-app-rule px-5 py-3 text-xs text-app-faint">
+                Os campos entre chavetas, como <span className="font-mono">{'{nome_negocio}'}</span>, são preenchidos no criador de agentes.
+              </p>
+            </section>
+          )}
+        </div>
+      )}
+    </AppLayout>
   );
 }

@@ -65,13 +65,13 @@ const pt: LandingCopy = {
   meta: {
     title: 'Agentfy — Agente de IA para WhatsApp, Instagram e Telegram',
     description:
-      'Um agente de IA no teu número de WhatsApp que atende, recebe encomendas com MB WAY, faz marcações e passa a conversa à tua equipa. Instagram, Telegram e chat do site no mesmo agente. Pronto em 10 minutos.',
+      'Agente de IA no teu WhatsApp: atende, recebe encomendas com MB WAY, faz marcações e passa a conversa à equipa. Também no Instagram e Telegram. Pronto em 10 min.',
     ogLocale: 'pt_PT',
   },
   nav: { how: 'Como funciona', compare: 'Porquê Agentfy', sectors: 'Setores', pricing: 'Preços', faq: 'Perguntas', login: 'Entrar', cta: 'Criar o meu agente', menu: 'Menu' },
   hero: {
-    title: 'O teu WhatsApp atende, vende e marca. Mesmo fechado.',
-    sub: 'Um agente de IA no teu número de sempre, treinado com o teu menu, preços e regras. Recebe encomendas, faz marcações e passa a conversa à tua equipa quando é preciso. No Instagram, no Telegram e no teu site também.',
+    title: 'O teu WhatsApp vende. Mesmo fechado.',
+    sub: 'Atende, vende e marca por ti. Um agente de IA no teu número de sempre, treinado com o teu menu, preços e regras. Recebe encomendas, faz marcações e passa a conversa à tua equipa quando é preciso. No Instagram, no Telegram e no teu site também.',
     cta: 'Criar grátis em 10 minutos',
     secondary: 'Ver porque não chega a IA da Meta',
     checks: ['API oficial da Meta, sem risco de ban', 'Dados na UE · RGPD', 'Sem cartão no plano Free'],
@@ -254,13 +254,13 @@ const es: LandingCopy = {
   meta: {
     title: 'Agentfy — Agente de IA para WhatsApp, Instagram y Telegram',
     description:
-      'Un agente de IA en tu número de WhatsApp que atiende, toma pedidos, agenda citas y pasa la conversación a tu equipo. Instagram, Telegram y el chat de tu web en el mismo agente. Listo en 10 minutos.',
+      'Agente de IA en tu WhatsApp: atiende, toma pedidos con pago, agenda citas y pasa la conversación al equipo. También en Instagram y Telegram. Listo en 10 min.',
     ogLocale: 'es_ES',
   },
   nav: { how: 'Cómo funciona', compare: 'Por qué Agentfy', sectors: 'Sectores', pricing: 'Precios', faq: 'Preguntas', login: 'Entrar', cta: 'Crear mi agente', menu: 'Menú' },
   hero: {
-    title: 'Tu WhatsApp atiende, vende y agenda. Incluso cerrado.',
-    sub: 'Un agente de IA en tu número de siempre, entrenado con tu carta, precios y reglas. Toma pedidos, agenda citas y pasa la conversación a tu equipo cuando hace falta. También en Instagram, Telegram y tu web.',
+    title: 'Tu WhatsApp vende. Incluso cerrado.',
+    sub: 'Atiende, vende y agenda por ti. Un agente de IA en tu número de siempre, entrenado con tu carta, precios y reglas. Toma pedidos, agenda citas y pasa la conversación a tu equipo cuando hace falta. También en Instagram, Telegram y tu web.',
     cta: 'Crear gratis en 10 minutos',
     secondary: 'Por qué no basta la IA de Meta',
     checks: ['API oficial de Meta, sin riesgo de bloqueo', 'Datos en la UE · RGPD', 'Sin tarjeta en el plan Free'],
@@ -443,13 +443,13 @@ const en: LandingCopy = {
   meta: {
     title: 'Agentfy — AI agent for WhatsApp, Instagram and Telegram',
     description:
-      'An AI agent on your own WhatsApp number that answers customers, takes orders and payments, books appointments and hands over to your team. Instagram, Telegram and website chat in the same agent. Live in 10 minutes.',
+      'AI agent on your WhatsApp: answers, takes orders with payment, books appointments and hands over to your team. Also on Instagram and Telegram. Ready in 10 min.',
     ogLocale: 'en_GB',
   },
   nav: { how: 'How it works', compare: 'Why Agentfy', sectors: 'Industries', pricing: 'Pricing', faq: 'FAQ', login: 'Log in', cta: 'Create my agent', menu: 'Menu' },
   hero: {
-    title: 'Your WhatsApp answers, sells and books. Even after closing.',
-    sub: 'An AI agent on the number you already use, trained on your menu, prices and rules. It takes orders, books appointments and hands the chat to your team when needed. On Instagram, Telegram and your website too.',
+    title: 'Your WhatsApp sells. Even when closed.',
+    sub: 'It answers, sells and books for you. An AI agent on the number you already use, trained on your menu, prices and rules. It takes orders, books appointments and hands the chat to your team when needed. On Instagram, Telegram and your website too.',
     cta: 'Start free in 10 minutes',
     secondary: "Why Meta's AI isn't enough",
     checks: ['Official Meta API, no ban risk', 'EU data · GDPR', 'No card on the Free plan'],

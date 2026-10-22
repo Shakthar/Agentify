@@ -1,8 +1,21 @@
+# Agentfy: páginas públicas indexáveis; app, API e rotas privadas fora.
 User-agent: *
 Allow: /
 Disallow: /dashboard
-Disallow: /chat/
-Disallow: /w/
-Disallow: /orders/
-Disallow: /order-status/
-Sitemap: https://agentfy.tech/sitemap.xml
+Disallow: /api
+Disallow: /chat
+Disallow: /w
+Disallow: /orders
+Disallow: /order-status
+Disallow: /es/dashboard
+Disallow: /es/chat
+Disallow: /es/w
+Disallow: /es/orders
+Disallow: /es/order-status
+Disallow: /en/dashboard
+Disallow: /en/chat
+Disallow: /en/w
+Disallow: /en/orders
+Disallow: /en/order-status
+
+Sitemap: https://agentfy.shaklabs.tech/sitemap.xml

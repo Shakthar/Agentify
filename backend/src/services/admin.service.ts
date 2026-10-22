@@ -3,7 +3,11 @@ import prisma from '../lib/prisma.js';
 
 export interface AdminMetrics {
   agents: { total: number; active: number };
-  conversations: { total: number; today: number; open: number };
+  conversations: {
+    total: number; today: number; open: number;
+    byHour: number[];
+    openHours: { from: string; to: string } | null;
+  };
   messages: { total: number };
   credits: { total: number; used: number; available: number; usedPercent: number };
   orders: {
@@ -92,6 +96,32 @@ export async function getMetrics(tenantId: string): Promise<AdminMetrics> {
     }),
   ]);
 
+  const [hourRows, scheduleAgents] = await Promise.all([
+    prisma.$queryRaw<{ h: number; c: bigint }[]>`
+      SELECT EXTRACT(HOUR FROM ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Lisbon')::int AS h, COUNT(*) AS c
+      FROM "Conversation"
+      WHERE "tenantId" = ${tenantId} AND "createdAt" >= ${new Date(Date.now() - 7 * 86400000)}
+      GROUP BY 1`,
+    prisma.agent.findMany({
+      where: { tenantId, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { whatsappSchedule: true, instagramSchedule: true, telegramSchedule: true },
+    }),
+  ]);
+  const byHour: number[] = new Array(24).fill(0);
+  for (const r of hourRows) if (r.h >= 0 && r.h < 24) byHour[r.h] = Number(r.c);
+
+  let openHours: { from: string; to: string } | null = null;
+  outer: for (const a of scheduleAgents) {
+    for (const sch of [a.whatsappSchedule, a.instagramSchedule, a.telegramSchedule]) {
+      const s = sch as { enabled?: boolean; weekdays?: { start?: string; end?: string } | null } | null;
+      if (s?.enabled && s.weekdays?.start && s.weekdays?.end) {
+        openHours = { from: s.weekdays.start, to: s.weekdays.end };
+        break outer;
+      }
+    }
+  }
+
   const creditsTotal = tenant?.creditsTotal ?? 0;
   const creditsUsed = tenant?.creditsUsed ?? 0;
   const available = creditsTotal - creditsUsed;
@@ -99,7 +129,7 @@ export async function getMetrics(tenantId: string): Promise<AdminMetrics> {
 
   return {
     agents: { total: totalAgents, active: activeAgents },
-    conversations: { total: totalConversations, today: todayConversations, open: openConversations },
+    conversations: { total: totalConversations, today: todayConversations, open: openConversations, byHour, openHours },
     messages: { total: totalMessages },
     credits: { total: creditsTotal, used: creditsUsed, available, usedPercent },
     orders: {

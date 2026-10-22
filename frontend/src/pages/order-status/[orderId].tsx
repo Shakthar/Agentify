@@ -19,17 +19,25 @@ interface OrderStatus {
 }
 
 const STEPS = [
-  { key: 'pending',    label: 'A aguardar pagamento', icon: '⏳', active: 'bg-yellow-500',  ring: 'ring-yellow-400/30', text: 'text-yellow-400'  },
-  { key: 'paid',       label: 'Pagamento confirmado', icon: '✅', active: 'bg-orange-500', ring: 'ring-orange-400/30', text: 'text-orange-400' },
-  { key: 'processing', label: 'Em preparação',        icon: '⚙️', active: 'bg-blue-500',   ring: 'ring-blue-400/30',   text: 'text-blue-400'   },
-  { key: 'done',       label: 'Pronto',               icon: '🎉', active: 'bg-green-500',  ring: 'ring-green-400/30',  text: 'text-green-400'  },
-  { key: 'sent',       label: 'A caminho!',           icon: '🚗', active: 'bg-purple-500', ring: 'ring-purple-400/30', text: 'text-purple-400' },
+  { key: 'pending',    label: 'A aguardar pagamento' },
+  { key: 'paid',       label: 'Pagamento confirmado' },
+  { key: 'processing', label: 'Em preparação' },
+  { key: 'done',       label: 'Pronto' },
+  { key: 'sent',       label: 'A caminho' },
 ];
 
-const TERMINAL: Record<string, { label: string; icon: string; desc: string }> = {
-  failed:  { label: 'Pagamento falhado', icon: '❌', desc: 'Contacta o estabelecimento.' },
-  expired: { label: 'Pedido expirado',   icon: '⌛', desc: 'Contacta o estabelecimento.' },
+const TERMINAL: Record<string, { label: string; desc: string }> = {
+  failed:  { label: 'Pagamento falhado', desc: 'Contacte o estabelecimento.' },
+  expired: { label: 'Pedido expirado',   desc: 'Contacte o estabelecimento.' },
 };
+
+const eur = (v: number) => v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+function timeAgo(iso: string) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'agora mesmo';
+  if (m < 60) return `há ${m} min`;
+  return `há ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
+}
 
 function getStepIndex(status: string) {
   return STEPS.findIndex(s => s.key === status);
@@ -78,104 +86,87 @@ export default function OrderStatusPage() {
   const terminal = order ? TERMINAL[order.status] : null;
   const currentStep = stepIdx >= 0 ? STEPS[stepIdx] : null;
 
+  const lines = order ? order.description.split('\n').map(l => l.trim()).filter(Boolean) : [];
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-start py-10 px-4">
+    <div className="flex min-h-screen flex-col items-center bg-mist px-4 py-8 text-ink sm:py-12" style={{ colorScheme: 'light' }}>
       <Head>
-        <title>Estado do Pedido{order?.agentName ? ` — ${order.agentName}` : ''}</title>
+        <title>Estado do pedido{order?.agentName ? ` · ${order.agentName}` : ''}</title>
         <meta name="robots" content="noindex,nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="light" />
       </Head>
 
-      <div className="w-full max-w-sm space-y-5">
+      <div className="w-full max-w-sm space-y-4">
         {loading && (
-          <div className="flex flex-col items-center gap-3 mt-20 text-gray-400">
-            <div className="w-8 h-8 border-2 border-gray-600 border-t-white rounded-full animate-spin" />
-            <p className="text-sm">A carregar...</p>
+          <div className="mt-20 flex flex-col items-center gap-3 text-ink-mute" role="status">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-line border-t-brand-600" />
+            <p className="text-sm">A carregar…</p>
           </div>
         )}
 
         {!loading && error && (
-          <div className="mt-20 text-center space-y-3">
-            <p className="text-4xl">😕</p>
-            <p className="text-red-400 font-medium">{error}</p>
-            <p className="text-xs text-gray-500">Verifica o link ou contacta o estabelecimento.</p>
+          <div className="mt-20 space-y-2 text-center" role="alert">
+            <p className="text-base font-semibold">{error}</p>
+            <p className="text-sm text-ink-mute">Verifique o link ou contacte o estabelecimento.</p>
           </div>
         )}
 
         {!loading && order && (
           <>
-            {/* Header */}
-            <div className="text-center space-y-0.5">
-              {order.agentName && <p className="text-sm text-gray-400">{order.agentName}</p>}
-              <h1 className="text-xl font-bold">O teu pedido</h1>
-              <p className="text-[15px] text-gray-600 font-mono">#{order.id.slice(-10).toUpperCase()}</p>
-            </div>
+            <header>
+              {order.agentName && <p className="text-sm text-ink-mute">{order.agentName}</p>}
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {terminal ? terminal.label : currentStep ? currentStep.label : 'O seu pedido'}
+              </h1>
+              <p className="num mt-1 text-xs text-ink-mute">Pedido #{order.id.slice(-10).toUpperCase()} · {timeAgo(order.createdAt)}</p>
+            </header>
 
-            {/* Summary */}
-            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 space-y-1">
-              <p className="text-sm text-gray-300 leading-snug">{order.description}</p>
-              <p className="text-3xl font-extrabold text-white">€{order.amount.toFixed(2)}</p>
-            </div>
-
-            {/* Terminal states */}
-            {terminal && (
-              <div className="bg-gray-800 rounded-2xl p-7 border border-gray-700 text-center space-y-2">
-                <p className="text-5xl">{terminal.icon}</p>
-                <p className="text-lg font-bold text-red-400">{terminal.label}</p>
-                <p className="text-xs text-gray-500">{terminal.desc}</p>
-              </div>
-            )}
-
-            {/* Progress tracker */}
-            {!terminal && (
-              <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 space-y-4">
-                {/* Current status */}
-                {currentStep && (
-                  <div className="flex items-center gap-3 pb-3 border-b border-gray-700">
-                    <span className="text-3xl">{currentStep.icon}</span>
-                    <div>
-                      <p className="text-[14px] uppercase tracking-wider text-gray-500">Estado atual</p>
-                      <p className={`text-base font-bold ${currentStep.text}`}>{currentStep.label}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Steps list */}
-                <div className="space-y-3">
+            {terminal ? (
+              <section className="rounded-2xl border border-line bg-white p-5">
+                <p className="text-sm text-ink-soft">{terminal.desc}</p>
+              </section>
+            ) : (
+              <section className="rounded-2xl border border-line bg-white p-5" aria-label="Progresso do pedido">
+                <ol>
                   {STEPS.map((step, i) => {
-                    const done   = i < stepIdx;
+                    const done = i < stepIdx;
                     const active = i === stepIdx;
-                    const future = i > stepIdx;
                     return (
-                      <div key={step.key} className="flex items-center gap-3">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 ${
-                          done   ? 'bg-green-600 text-white' :
-                          active ? `${step.active} text-white ring-2 ring-offset-2 ring-offset-gray-800 ${step.ring}` :
-                                   'bg-gray-700 text-gray-500'
-                        }`}>
-                          {done ? '✓' : <span className={future ? 'opacity-40' : ''}>{step.icon}</span>}
-                        </div>
-                        <span className={`text-sm ${
-                          active ? 'font-semibold text-white' :
-                          done   ? 'text-gray-500 line-through' :
-                                   'text-gray-600'
-                        }`}>{step.label}</span>
-                        {active && (
-                          <span className="ml-auto">
-                            <span className="w-2 h-2 rounded-full bg-white inline-block animate-pulse" />
-                          </span>
+                      <li key={step.key} className="relative flex items-start gap-3 pb-5 last:pb-0" aria-current={active ? 'step' : undefined}>
+                        {i < STEPS.length - 1 && (
+                          <span className={`absolute left-[9px] top-5 h-[calc(100%-1.25rem)] w-px ${done ? 'bg-ink' : 'bg-line'}`} aria-hidden="true" />
                         )}
-                      </div>
+                        <span
+                          className={`relative mt-0.5 flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full border-2 ${
+                            done ? 'border-ink bg-ink text-white' : active ? 'border-brand-600 bg-white' : 'border-line bg-white'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.5l2.2 2.2 4.8-5" /></svg>}
+                          {active && <span className="h-2 w-2 rounded-full bg-brand-600" />}
+                        </span>
+                        <span className={`text-sm ${active ? 'font-semibold text-ink' : done ? 'text-ink-soft' : 'text-ink-mute'}`}>{step.label}</span>
+                      </li>
                     );
                   })}
-                </div>
-              </div>
+                </ol>
+              </section>
             )}
 
-            {/* Footer */}
-            <p className="text-center text-[14px] text-gray-700">
+            <section className="rounded-2xl border border-line bg-white p-5" aria-label="Resumo do pedido">
+              <ul className="space-y-1 text-sm">
+                {lines.map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
+              <div className="mt-4 flex items-baseline justify-between border-t border-line pt-3">
+                <span className="text-sm text-ink-mute">Total</span>
+                <span className="num text-xl font-semibold">{eur(order.amount)}</span>
+              </div>
+            </section>
+
+            <p className="num text-center text-xs text-ink-mute">
               Atualizado às {lastUpdate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              {!TERMINAL_STATUSES.has(order.status) && ` · auto-refresh ${REFRESH_SEC}s`}
+              {!TERMINAL_STATUSES.has(order.status) && ` · atualiza sozinho a cada ${REFRESH_SEC} s`}
             </p>
           </>
         )}

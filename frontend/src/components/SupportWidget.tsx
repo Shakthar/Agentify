@@ -203,7 +203,9 @@ export default function SupportWidget() {
         className="w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-700 text-white shadow-lg shadow-brand-200 dark:shadow-brand-900 flex items-center justify-center text-2xl transition-all hover:scale-105 active:scale-95 relative"
         aria-label="Abrir suporte"
       >
-        {open ? '×' : '💬'}
+        {open ? '×' : (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z" /></svg>
+        )}
         {!open && unread > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[14px] font-bold flex items-center justify-center">
             {unread}

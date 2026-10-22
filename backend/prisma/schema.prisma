@@ -641,3 +641,22 @@ model PlatformConfig {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+// ===== ANALYTICS (site público, sem cookies, sem IP em bruto) =====
+model PageView {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  path         String   @db.VarChar(300)
+  referrerHost String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  locale       String?
+  country      String?  @db.VarChar(2)
+  device       String   // mobile | tablet | desktop
+  visitorHash  String   // sha256(ip + ua + salt diário) — nunca o IP
+  isBot        Boolean  @default(false)
+
+  @@index([createdAt])
+  @@index([path])
+}

@@ -2,7 +2,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import { API_URL } from '../../utils/constants';
-import PublicChatWidget from '../../components/PublicChatWidget';
+import PublicChatWidget, { readableOn } from '../../components/PublicChatWidget';
 
 interface AgentPublicData {
   agentId: string;
@@ -33,56 +33,52 @@ export default function WhitelabelAgentPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-8 text-center">
-        <p className="text-5xl mb-4">🤖</p>
-        <h1 className="text-xl font-bold text-gray-700">Página não encontrada</h1>
-        <p className="text-gray-500 text-sm mt-2">Este agente não está disponível publicamente.</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-mist p-8 text-center text-ink" style={{ colorScheme: 'light' }}>
+        <h1 className="text-xl font-semibold">Página não encontrada</h1>
+        <p className="mt-2 text-sm text-ink-mute">Este assistente não está disponível publicamente.</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-mist" style={{ colorScheme: 'light' }} role="status" aria-label="A carregar">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-line border-t-brand-600" />
       </div>
     );
   }
 
+  const brand = data.brandColor || '#2346D8';
+  const onBrand = readableOn(brand);
+
   return (
     <>
       <Head>
-        <title>{data.agentName} — {data.companyName}</title>
-        <meta name="description" content={data.agentDescription ?? `Fala com ${data.agentName}`} />
+        <title>{data.companyName} · {data.agentName}</title>
+        <meta name="description" content={data.agentDescription ?? `Fale com ${data.agentName}`} />
+        <meta name="color-scheme" content="light" />
       </Head>
-      <div className="min-h-screen flex flex-col bg-gray-50">
-        {/* Branded header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4" style={{ borderBottomColor: data.brandColor }}>
-          <div className="max-w-2xl mx-auto flex items-center gap-3">
+      <div className="flex h-[100dvh] flex-col bg-mist text-ink" style={{ colorScheme: 'light' }}>
+        <header className="border-b border-line bg-white px-4 py-3 sm:px-6">
+          <div className="mx-auto flex max-w-2xl items-center gap-3 sm:px-4">
             {data.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.logoUrl} alt={data.companyName} className="h-8 object-contain" />
+              <img src={data.logoUrl} alt="" className="h-9 max-w-[9rem] object-contain" />
             ) : (
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: data.brandColor }}
-              >
-                <span className="text-white text-sm font-bold">
-                  {data.companyName.charAt(0).toUpperCase()}
-                </span>
-              </div>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold" style={{ backgroundColor: brand, color: onBrand }} aria-hidden="true">
+                {data.companyName.charAt(0).toUpperCase()}
+              </span>
             )}
-            <div>
-              <p className="text-xs text-gray-500 leading-tight">{data.companyName}</p>
-              <h1 className="text-sm font-semibold text-gray-900 leading-tight">{data.agentName}</h1>
+            <div className="min-w-0 leading-tight">
+              <h1 className="truncate text-base font-semibold">{data.companyName}</h1>
+              <p className="truncate text-xs text-ink-mute">{data.agentName}{data.agentDescription ? ` · ${data.agentDescription}` : ''}</p>
             </div>
           </div>
         </header>
 
-        {/* Chat */}
-        <main className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-0 sm:px-4 py-4">
-          <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <PublicChatWidget agentId={data.agentId} agentName={data.agentName} conversationId="" />
+        <main className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col sm:px-4 sm:py-4">
+          <div className="min-h-0 flex-1 overflow-hidden bg-white sm:rounded-2xl sm:border sm:border-line">
+            <PublicChatWidget agentId={data.agentId} agentName={data.agentName} conversationId="" brandColor={brand} bare />
           </div>
         </main>
       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import { useAgent } from '../hooks/useAgent';
+import { cx } from './app/ui';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTES, AVAILABLE_MODELS_BY_PLAN } from '../utils/constants';
 import api from '../utils/api';
@@ -10,25 +11,31 @@ const STEP_LABELS = ['Descrever', 'Rever IA', 'Modelo', 'Skills', 'Confirmar'];
 const TEMPLATES = [
   {
     label: 'Suporte ao Cliente',
-    icon: '🎧',
     description: 'Loja online de roupas femininas. Respondemos a dúvidas sobre encomendas, devoluções, tamanhos e disponibilidade de stock.',
   },
   {
     label: 'Vendas / SDR',
-    icon: '💼',
     description: 'Software B2B de gestão de frotas para empresas de logística. O agente qualifica leads, explica funcionalidades e agenda demos.',
   },
   {
     label: 'FAQ / Knowledge Base',
-    icon: '📚',
     description: 'Clínica de medicina estética. O agente responde perguntas frequentes sobre tratamentos, preços, preparação e cuidados pós-procedimento.',
   },
   {
     label: 'Agendamento',
-    icon: '📅',
     description: 'Barbearia com 3 barbeiros. O agente ajuda clientes a agendar cortes, ver disponibilidade e receber confirmações.',
   },
 ];
+
+const SKILL_NAMES: Record<string, string> = {
+  handoff: 'Handoff',
+  dataCollection: 'Recolha de dados',
+  scheduling: 'Agendamento',
+  fileUpload: 'Envio de ficheiros',
+  humorDetection: 'Deteção de humor',
+  payments: 'Pagamentos',
+  orders: 'Pedidos',
+};
 
 interface FormData {
   name: string;
@@ -186,351 +193,324 @@ export default function AgentCreator() {
   const back = () => setStep((s) => Math.max(s - 1, 0));
   const next = () => setStep((s) => Math.min(s + 1, 4));
 
+  const cleanLabel = (l: string) => l.replace(/^[^A-Za-z0-9\u00C0-\u024F]+/, '');
+  const selectedModel = models.find((m) => m.value === form.model);
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const creditsLeft = tenant ? Math.max(0, tenant.creditsTotal - tenant.creditsUsed) : null;
+  const activeSkills = Object.entries(form.skills).filter(([, v]) => v).map(([k]) => SKILL_NAMES[k] ?? k);
+  const previewName = form.name.trim() || 'O seu agente';
+  const previewGreeting = form.description.trim()
+    ? `Olá! Sou o assistente de ${previewName}. ${form.description.trim()}`
+    : `Olá! Sou o assistente de ${previewName}. Em que posso ajudar?`;
+  const nowHm = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+
+  const fieldLabel = 'mb-1 block text-sm font-medium text-app-ink';
+  const sectionTitle = 'text-base font-semibold text-app-ink';
+
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Step indicator */}
-      <div className="flex items-center gap-1 mb-8 overflow-x-auto pb-1">
-        {STEP_LABELS.map((label, i) => (
-          <div key={label} className="flex items-center gap-1 shrink-0">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-              i < step ? 'bg-brand-600 text-white' :
-              i === step ? 'bg-brand-100 text-brand-700 border-2 border-brand-500' :
-              'bg-gray-100 text-gray-400'
-            }`}>
-              {i < step ? '✓' : i + 1}
-            </div>
-            <span className={`text-xs whitespace-nowrap ${i === step ? 'text-brand-700 font-medium' : 'text-gray-400'}`}>
-              {label}
-            </span>
-            {i < STEP_LABELS.length - 1 && <div className="w-6 h-px bg-gray-200 mx-1" />}
-          </div>
-        ))}
-      </div>
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0">
+        {/* Passos */}
+        <ol className="mb-6 grid grid-cols-5 gap-2" aria-label="Passos">
+          {STEP_LABELS.map((label, i) => (
+            <li key={label} aria-current={i === step ? 'step' : undefined}>
+              <div className={cx('h-0.5 rounded-full', i <= step ? 'bg-app-ink' : 'bg-app-rule')} />
+              <p className={cx('mt-2 truncate text-xs', i === step ? 'font-semibold text-app-ink' : i < step ? 'text-app-muted' : 'text-app-faint')}>
+                <span className="num">{i + 1}</span> {label}
+              </p>
+            </li>
+          ))}
+        </ol>
 
-      <form onSubmit={handleSubmit}>
-
-        {/* STEP 0: Descrever negócio */}
-        {step === 0 && (
-          <div className="space-y-5">
-            {templateSystemPrompt && (
-              <div className="flex items-start gap-2 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-lg">
-                <span className="text-base shrink-0">📚</span>
-                <div className="text-sm text-brand-700 dark:text-brand-300">
-                  <span className="font-medium">Template &quot;{templateName ?? 'Setor'}&quot; carregado.</span> Descreve o teu negócio e a IA adapta este template especificamente para ti — substituindo todos os campos genéricos com as tuas informações reais.
+        <form onSubmit={handleSubmit}>
+          {/* STEP 0: Descrever negócio */}
+          {step === 0 && (
+            <div className="space-y-8">
+              {templateSystemPrompt && (
+                <div className="rounded-lg bg-app-accent-soft px-4 py-3 text-sm text-app-ink">
+                  <span className="font-semibold">Modelo &quot;{templateName ?? 'Setor'}&quot; carregado.</span>{' '}
+                  Descreva o negócio e a IA adapta-o com os dados reais, substituindo os campos genéricos.
                 </div>
-              </div>
-            )}
-            <div className="card">
-              <h2 className="text-lg font-semibold mb-1">Descreve o teu negócio</h2>
-              <p className="text-sm text-gray-500 mb-4">
-                {templateSystemPrompt ? 'A IA vai adaptar o template ao teu negócio, preenchendo todos os detalhes com as tuas informações reais.' : 'A IA vai gerar automaticamente o nome, descrição e system prompt do agente.'}
-              </p>
-              <textarea
-                className="input resize-none"
-                rows={6}
-                value={businessDescription}
-                onChange={(e) => setBusinessDescription(e.target.value)}
-                placeholder="Ex: Loja online de calçado desportivo. Vendemos Nike, Adidas e New Balance. O agente deve ajudar clientes com dúvidas sobre tamanhos, prazos de entrega e trocas/devoluções. Tom amigável e informal."
-              />
-              <div className="flex justify-between items-center mt-1">
-                <p className={`text-xs ${businessDescription.length < 20 ? 'text-gray-400' : 'text-green-600'}`}>
-                  {businessDescription.length} / 2000 {businessDescription.length < 20 ? `(mín. 20)` : '✓'}
-                </p>
-              </div>
-              {generateError && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3">
-                  {generateError}
-                </p>
               )}
-              <button
-                type="button"
-                className="btn-primary w-full mt-4 py-3"
-                onClick={handleGenerate}
-                disabled={businessDescription.trim().length < 20 || generating}
-              >
-                {generating ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    A gerar com IA...
-                  </span>
-                ) : '✨ Gerar agente com IA'}
-              </button>
-            </div>
-
-            {/* Criar a partir de um documento real (SOP, FAQ, lista de preços, etc) */}
-            <div className="card">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-base">📄</span>
-                <h2 className="text-base font-semibold">Ou cria a partir de um documento</h2>
-              </div>
-              <p className="text-sm text-gray-500 mb-3">
-                Carrega um documento real do teu negócio (PDF, Word, CSV ou texto — ex: um manual de procedimentos,
-                FAQ, lista de preços ou catálogo) e a IA constrói o agente com base apenas na informação real que lá está.
-              </p>
-              <label className={`btn-secondary w-full py-3 flex items-center justify-center gap-2 cursor-pointer ${uploadingDoc ? 'opacity-60 pointer-events-none' : ''}`}>
-                {uploadingDoc ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-                    A ler o documento...
-                  </span>
-                ) : '📤 Carregar documento'}
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.csv,.txt,.md"
-                  className="hidden"
-                  disabled={uploadingDoc}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (file) handleGenerateFromDocument(file);
-                  }}
+              <section>
+                <h2 className={sectionTitle}>Descreva o negócio</h2>
+                <p className="mb-3 mt-1 text-sm text-app-muted">
+                  {templateSystemPrompt ? 'A IA adapta o modelo ao seu negócio, preenchendo todos os detalhes.' : 'A IA escreve o nome, a descrição e as instruções do agente.'}
+                </p>
+                <textarea
+                  className="input resize-none"
+                  rows={6}
+                  value={businessDescription}
+                  onChange={(e) => setBusinessDescription(e.target.value)}
+                  maxLength={2000}
+                  placeholder="Ex: Tasca em Alfama com 40 lugares. Fazemos reservas, menu do dia e take-away. O agente responde a horários, alergénios e reservas, em tom simpático."
                 />
-              </label>
-            </div>
-
-            {/* Templates */}
-            <div>
-              <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Templates de exemplo</p>
-              <div className="grid grid-cols-2 gap-2">
-                {TEMPLATES.map((t) => (
-                  <button
-                    key={t.label}
-                    type="button"
-                    onClick={() => setBusinessDescription(t.description)}
-                    className="text-left p-3 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-colors"
-                  >
-                    <p className="text-sm font-medium">{t.icon} {t.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{t.description}</p>
+                <p className={cx('num mt-1 text-xs', businessDescription.length < 20 ? 'text-app-faint' : 'text-app-pos')}>
+                  {businessDescription.length} / 2000{businessDescription.length < 20 ? ' (mínimo 20)' : ''}
+                </p>
+                {generateError && <p className="mt-3 rounded-lg bg-app-neg-soft px-3 py-2 text-sm text-app-neg">{generateError}</p>}
+                <div className="mt-4 flex flex-wrap items-center gap-4">
+                  <button type="button" className="btn-primary" onClick={handleGenerate} disabled={businessDescription.trim().length < 20 || generating}>
+                    {generating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        A gerar…
+                      </span>
+                    ) : 'Gerar agente com IA'}
                   </button>
+                  <button type="button" onClick={() => { setForm(DEFAULT_FORM); setStep(1); }} className="text-sm text-app-muted underline underline-offset-2 hover:text-app-ink">
+                    Prefiro escrever manualmente
+                  </button>
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-xs text-app-muted">Ou parta de um exemplo</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {TEMPLATES.map((t) => (
+                    <button
+                      key={t.label}
+                      type="button"
+                      onClick={() => setBusinessDescription(t.description)}
+                      className="rounded-lg border border-app-edge p-3 text-left transition-colors hover:bg-app-raised"
+                    >
+                      <p className="text-sm font-medium text-app-ink">{t.label}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-app-muted">{t.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="border-t border-app-rule pt-6">
+                <h2 className={sectionTitle}>Ou carregue um documento</h2>
+                <p className="mb-3 mt-1 text-sm text-app-muted">
+                  Manual de procedimentos, FAQ, lista de preços ou catálogo (PDF, Word, CSV ou texto). O agente é construído só com o que lá estiver.
+                </p>
+                <label className={cx('btn-secondary cursor-pointer', uploadingDoc && 'pointer-events-none opacity-60')}>
+                  {uploadingDoc ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      A ler o documento…
+                    </span>
+                  ) : 'Carregar documento'}
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.csv,.txt,.md"
+                    className="hidden"
+                    disabled={uploadingDoc}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) handleGenerateFromDocument(file);
+                    }}
+                  />
+                </label>
+              </section>
+            </div>
+          )}
+
+          {/* STEP 1: Rever / editar sugestão IA */}
+          {step === 1 && (
+            <div className="space-y-5">
+              <div>
+                <h2 className={sectionTitle}>Rever e editar</h2>
+                <p className="mt-1 text-sm text-app-muted">Texto sugerido pela IA. Edite à vontade; a pré-visualização ao lado atualiza.</p>
+              </div>
+              <div>
+                <label className={fieldLabel}>Nome *</label>
+                <input className="input" value={form.name} onChange={(e) => update('name', e.target.value)} maxLength={100} />
+              </div>
+              <div>
+                <label className={fieldLabel}>Descrição</label>
+                <input className="input" value={form.description} onChange={(e) => update('description', e.target.value)} maxLength={500} />
+              </div>
+              <div>
+                <label className={fieldLabel}>Instruções (system prompt)</label>
+                <textarea
+                  className="input resize-none font-mono text-xs leading-relaxed"
+                  rows={12}
+                  value={form.systemPrompt}
+                  onChange={(e) => update('systemPrompt', e.target.value)}
+                />
+                <p className="num mt-1 text-xs text-app-faint">{form.systemPrompt.length} / 10000</p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Modelo */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <h2 className={sectionTitle}>Modelo de IA</h2>
+              <div className="overflow-hidden rounded-xl border border-app-edge">
+                {models.map((m, i) => (
+                  <label key={m.value} className={cx('flex cursor-pointer items-start gap-3 p-4 transition-colors', i > 0 && 'border-t border-app-rule', form.model === m.value ? 'bg-app-accent-soft' : 'hover:bg-app-raised')}>
+                    <input type="radio" className="mt-1 shrink-0 accent-[rgb(var(--app-accent))]" checked={form.model === m.value} onChange={() => update('model', m.value)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-app-ink">{cleanLabel(m.label)}</span>
+                        {m.badge && <span className="rounded-full bg-app-raised px-2 py-0.5 text-xs text-app-muted">{m.badge}</span>}
+                      </div>
+                      <p className="mt-0.5 text-xs text-app-muted">{m.description}</p>
+                    </div>
+                  </label>
                 ))}
               </div>
-            </div>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => { setForm(DEFAULT_FORM); setStep(1); }}
-                className="text-sm text-gray-400 hover:text-gray-600 underline"
-              >
-                Prefiro escrever manualmente
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 1: Rever / editar sugestão IA */}
-        {step === 1 && (
-          <div className="card space-y-5">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="bg-brand-100 text-brand-700 text-xs px-2 py-0.5 rounded-full font-medium">✨ Gerado por IA</span>
-              <h2 className="text-lg font-semibold">Rever e editar</h2>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-              <input className="input" value={form.name} onChange={(e) => update('name', e.target.value)} maxLength={100} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-              <input className="input" value={form.description} onChange={(e) => update('description', e.target.value)} maxLength={500} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                System Prompt
-                <span className="text-xs text-gray-400 font-normal ml-2">Podes editar livremente</span>
-              </label>
-              <textarea
-                className="input resize-none font-mono text-xs leading-relaxed"
-                rows={12}
-                value={form.systemPrompt}
-                onChange={(e) => update('systemPrompt', e.target.value)}
-              />
-              <p className="text-xs text-gray-400 mt-1">{form.systemPrompt.length} / 10000</p>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: Modelo */}
-        {step === 2 && (
-          <div className="card space-y-5">
-            <h2 className="text-lg font-semibold">Modelo de IA</h2>
-            <div className="space-y-2">
-              {models.map((m) => (
-                <label key={m.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  form.model === m.value ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'
-                }`}>
-                  <input type="radio" className="accent-brand-600 mt-0.5 shrink-0" checked={form.model === m.value} onChange={() => update('model', m.value)} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{m.label}</span>
-                      {m.badge && <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">{m.badge}</span>}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Temperatura: <span className="text-brand-600">{form.temperature}</span>
-                </label>
-                <input type="range" min="0" max="2" step="0.1" value={form.temperature}
-                  onChange={(e) => update('temperature', parseFloat(e.target.value))}
-                  className="w-full accent-brand-600" />
-                <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                  <span>Preciso</span><span>Criativo</span>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label className={fieldLabel}>Temperatura: <span className="num text-app-accent">{form.temperature}</span></label>
+                  <input type="range" min="0" max="2" step="0.1" value={form.temperature} onChange={(e) => update('temperature', parseFloat(e.target.value))} className="w-full accent-[rgb(var(--app-accent))]" />
+                  <div className="mt-0.5 flex justify-between text-xs text-app-faint"><span>Preciso</span><span>Criativo</span></div>
+                </div>
+                <div>
+                  <label className={fieldLabel}>Máx. tokens por resposta</label>
+                  <select className="input" value={form.maxTokens} onChange={(e) => update('maxTokens', parseInt(e.target.value))}>
+                    {[500, 1000, 2000, 4000, 8000].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Máx. tokens</label>
-                <select className="input" value={form.maxTokens} onChange={(e) => update('maxTokens', parseInt(e.target.value))}>
-                  {[500, 1000, 2000, 4000, 8000].map((v) => <option key={v} value={v}>{v}</option>)}
-                </select>
-              </div>
             </div>
-          </div>
-        )}
-
-        {/* STEP 3: Skills */}
-        {step === 3 && (() => {
-          const planOrder = ['free','starter','business','enterprise'];
-          const planIdx = planOrder.indexOf(plan);
-          const SKILLS_DEF = [
-            { key: 'handoff'        as keyof FormData['skills'], icon: '🔀', label: 'Handoff com resumo IA',  desc: 'Escala para humano com resumo automático da conversa.', minPlan: 'free',    addonPrice: null as string | null },
-            { key: 'dataCollection' as keyof FormData['skills'], icon: '📋', label: 'Recolha de dados',        desc: 'Formulário conversacional estruturado para captar info.', minPlan: 'free',    addonPrice: null },
-            { key: 'scheduling'     as keyof FormData['skills'], icon: '📅', label: 'Agendamento',             desc: 'Agenda reuniões via Google Calendar / Calendly.', minPlan: 'starter', addonPrice: '€7/mês' },
-            { key: 'fileUpload'     as keyof FormData['skills'], icon: '📁', label: 'Envio de ficheiros',      desc: 'O agente envia PDFs, catálogos e documentos na conversa.', minPlan: 'starter', addonPrice: '€5/mês' },
-            { key: 'humorDetection' as keyof FormData['skills'], icon: '😊', label: 'Deteção de humor',        desc: 'Analisa o sentimento do utilizador e adapta o tom do agente.', minPlan: 'starter', addonPrice: '€9/mês' },
-            { key: 'payments'       as keyof FormData['skills'], icon: '💳', label: 'Pagamentos (MB Way)',    desc: 'Cobrar via MB Way diretamente na conversa. Custo por transação.', minPlan: 'starter', addonPrice: '+€15/mês' },
-            { key: 'orders'         as keyof FormData['skills'], icon: '🧾', label: 'Pedidos / KDS',          desc: 'Painel de encomendas em tempo real (Kitchen Display System).', minPlan: 'starter', addonPrice: null },
-          ];
-          return (
-            <div className="card space-y-3">
-              <div className="mb-1">
-                <h2 className="text-lg font-semibold">Skills</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Ativa as capacidades para este agente. Skills marcadas como <span className="text-green-700 font-medium">Grátis</span> estão sempre disponíveis; as restantes requerem plano ou addon.</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {SKILLS_DEF.map(({ key, icon, label, desc, minPlan, addonPrice }) => {
-                  const minIdx = planOrder.indexOf(minPlan);
-                  const locked = planIdx < minIdx;
-                  const active = form.skills[key];
-                  return (
-                    <div key={key} className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${
-                      locked
-                        ? 'border-orange-100 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-900/10'
-                        : active
-                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}>
-                      <span className="text-xl shrink-0 mt-0.5">{icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight">{label}</span>
-                            {minPlan === 'free' && (
-                              <span className="text-[14px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full font-medium">Grátis</span>
-                            )}
-                            {locked && addonPrice && (
-                              <span className="text-[14px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">Addon {addonPrice}</span>
-                            )}
-                            {locked && !addonPrice && (
-                              <span className="text-[14px] bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
-                            )}
-                            {!locked && minPlan !== 'free' && (
-                              <span className="text-[14px] bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded-full">{minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            disabled={locked}
-                            onClick={() => !locked && updateSkill(key, !active)}
-                            aria-label={(active ? 'Desativar ' : 'Ativar ') + label}
-                            className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-                              locked ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-40'
-                              : active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
-                            }`}
-                          >
-                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-150 ${active && !locked ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-snug">{desc}</p>
-                        {locked && addonPrice && (
-                          <p className="text-[15px] text-orange-500 dark:text-orange-400 mt-1">Podes ativar como addon após criar o agente.</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* STEP 4: Confirmar */}
-        {step === 4 && (
-          <div className="card space-y-4">
-            <h2 className="text-lg font-semibold">Confirmar criação</h2>
-            <dl className="space-y-3 text-sm">
-              {[
-                { label: 'Nome',        value: form.name },
-                { label: 'Descrição',   value: form.description || '—' },
-                { label: 'Modelo',      value: form.model },
-                { label: 'Temperatura', value: String(form.temperature) },
-                { label: 'Máx. tokens', value: String(form.maxTokens) },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex gap-2">
-                  <dt className="text-gray-500 w-28 shrink-0">{label}</dt>
-                  <dd className="font-medium text-gray-900">{value}</dd>
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <dt className="text-gray-500 w-28 shrink-0">Skills</dt>
-                <dd className="flex flex-wrap gap-1">
-                  {Object.entries(form.skills).filter(([, v]) => v).map(([k]) => (
-                    <span key={k} className="bg-brand-100 text-brand-700 text-xs px-2 py-0.5 rounded-full">{k}</span>
-                  ))}
-                  {Object.values(form.skills).every((v) => !v) && <span className="text-gray-400 text-xs">Nenhuma</span>}
-                </dd>
-              </div>
-            </dl>
-            <div className="bg-gray-50 rounded-lg p-3 mt-2">
-              <p className="text-xs font-medium text-gray-500 mb-1">System Prompt</p>
-              <p className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-8 font-mono leading-relaxed">{form.systemPrompt}</p>
-            </div>
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
-            )}
-          </div>
-        )}
-
-        {/* Navigation */}
-        <div className="flex justify-between mt-6">
-          {step > 0 ? (
-            <button type="button" className="btn-secondary" onClick={back}>Voltar</button>
-          ) : <div />}
-
-          {step === 0 ? null : step < 4 ? (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={next}
-              disabled={step === 1 && (form.name.length < 1 || form.systemPrompt.length < 10)}
-            >
-              Continuar
-            </button>
-          ) : (
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  A criar...
-                </span>
-              ) : 'Criar agente'}
-            </button>
           )}
+
+          {/* STEP 3: Skills */}
+          {step === 3 && (() => {
+            const planOrder = ['free', 'starter', 'business', 'enterprise'];
+            const planIdx = planOrder.indexOf(plan);
+            const SKILLS_DEF = [
+              { key: 'handoff'        as keyof FormData['skills'], label: 'Handoff com resumo IA', desc: 'Escala para uma pessoa com resumo automático da conversa.', minPlan: 'free',    addonPrice: null as string | null },
+              { key: 'dataCollection' as keyof FormData['skills'], label: 'Recolha de dados',      desc: 'Formulário conversacional para captar contactos e pedidos.', minPlan: 'free',    addonPrice: null },
+              { key: 'scheduling'     as keyof FormData['skills'], label: 'Agendamento',           desc: 'Marca reuniões e reservas via Google Calendar ou Calendly.', minPlan: 'starter', addonPrice: '€7/mês' },
+              { key: 'fileUpload'     as keyof FormData['skills'], label: 'Envio de ficheiros',    desc: 'Envia PDFs, catálogos e ementas na conversa.', minPlan: 'starter', addonPrice: '€5/mês' },
+              { key: 'humorDetection' as keyof FormData['skills'], label: 'Deteção de humor',      desc: 'Lê o sentimento do cliente e adapta o tom das respostas.', minPlan: 'starter', addonPrice: '€9/mês' },
+              { key: 'payments'       as keyof FormData['skills'], label: 'Pagamentos (MB Way)',   desc: 'Cobra por MB Way na própria conversa. Custo por transação.', minPlan: 'starter', addonPrice: '+€15/mês' },
+              { key: 'orders'         as keyof FormData['skills'], label: 'Pedidos / KDS',         desc: 'Painel de encomendas em tempo real para a cozinha.', minPlan: 'starter', addonPrice: null },
+            ];
+            return (
+              <div>
+                <h2 className={sectionTitle}>Skills</h2>
+                <p className="mb-4 mt-1 text-sm text-app-muted">Ligue só o que o agente precisa. As que o plano {planLabel} não inclui podem ser ativadas como addon depois de criar o agente.</p>
+                <ul className="overflow-hidden rounded-xl border border-app-edge">
+                  {SKILLS_DEF.map(({ key, label, desc, minPlan, addonPrice }, i) => {
+                    const locked = planIdx < planOrder.indexOf(minPlan);
+                    const active = form.skills[key];
+                    return (
+                      <li key={key} className={cx('flex items-start gap-4 p-4', i > 0 && 'border-t border-app-rule')}>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className={cx('text-sm font-medium', locked ? 'text-app-muted' : 'text-app-ink')}>{label}</span>
+                            {minPlan === 'free' && <span className="text-xs text-app-pos">Incluída</span>}
+                            {locked && addonPrice && <span className="text-xs text-app-warn">Addon {addonPrice}</span>}
+                            {locked && !addonPrice && <span className="text-xs text-app-faint">Plano {minPlan.charAt(0).toUpperCase() + minPlan.slice(1)}+</span>}
+                          </div>
+                          <p className="mt-0.5 text-xs text-app-muted">{desc}</p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={active && !locked}
+                          disabled={locked}
+                          onClick={() => !locked && updateSkill(key, !active)}
+                          aria-label={(active ? 'Desativar ' : 'Ativar ') + label}
+                          className={cx('mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors', active && !locked ? 'justify-end' : 'justify-start', locked ? 'cursor-not-allowed bg-app-raised opacity-60' : active ? 'bg-app-accent' : 'bg-app-control')}
+                        >
+                          <span className="h-5 w-5 rounded-full bg-app-sheet" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })()}
+
+          {/* STEP 4: Confirmar */}
+          {step === 4 && (
+            <div className="space-y-5">
+              <h2 className={sectionTitle}>Confirmar criação</h2>
+              <dl className="divide-y divide-app-rule border-y border-app-rule text-sm">
+                {[
+                  { label: 'Nome', value: form.name },
+                  { label: 'Descrição', value: form.description || '—' },
+                  { label: 'Modelo', value: selectedModel ? cleanLabel(selectedModel.label) : form.model },
+                  { label: 'Temperatura', value: String(form.temperature) },
+                  { label: 'Máx. tokens', value: String(form.maxTokens) },
+                  { label: 'Skills', value: activeSkills.length ? activeSkills.join(', ') : 'Nenhuma' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex gap-4 py-2.5">
+                    <dt className="w-28 shrink-0 text-app-muted">{label}</dt>
+                    <dd className="min-w-0 font-medium text-app-ink">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="rounded-lg bg-app-raised p-3">
+                <p className="mb-1 text-xs font-medium text-app-muted">Instruções</p>
+                <p className="line-clamp-8 whitespace-pre-wrap font-mono text-xs leading-relaxed text-app-ink">{form.systemPrompt}</p>
+              </div>
+              {error && <p className="rounded-lg bg-app-neg-soft px-3 py-2 text-sm text-app-neg">{error}</p>}
+            </div>
+          )}
+
+          {/* Navegação */}
+          {step > 0 && (
+            <div className="mt-8 border-t border-app-rule pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <button type="button" className="btn-secondary" onClick={back}>Voltar</button>
+                {step < 4 ? (
+                  <button type="button" className="btn-primary" onClick={next} disabled={step === 1 && (form.name.length < 1 || form.systemPrompt.length < 10)}>
+                    Continuar
+                  </button>
+                ) : (
+                  <button type="submit" className="btn-primary" disabled={saving}>
+                    {saving ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        A criar…
+                      </span>
+                    ) : 'Criar agente'}
+                  </button>
+                )}
+              </div>
+              <p className="num mt-3 text-xs text-app-muted">
+                Plano {planLabel}
+                {creditsLeft !== null && <> · {creditsLeft.toLocaleString('pt-PT')} créditos disponíveis</>}
+                {' '}· {models.length} modelo{models.length !== 1 ? 's' : ''} no plano
+              </p>
+            </div>
+          )}
+        </form>
+      </div>
+
+      {/* Pré-visualização */}
+      <aside className="lg:sticky lg:top-6 lg:self-start" aria-label="Pré-visualização">
+        <p className="mb-2 text-xs text-app-muted">Pré-visualização no WhatsApp (exemplo)</p>
+        <div className="overflow-hidden rounded-xl border border-app-edge">
+          <div className="flex items-center gap-3 bg-wa-header px-4 py-2.5 text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-semibold">{previewName[0]?.toUpperCase()}</span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{previewName}</p>
+              <p className="text-xs text-white/80">online</p>
+            </div>
+          </div>
+          <div className="space-y-2 bg-wa-wall px-3 py-4">
+            <div className="ml-auto max-w-[80%] rounded-lg rounded-tr-sm bg-wa-bubble px-3 py-1.5 text-sm text-wa-text">
+              Boa tarde, têm mesa para hoje?
+              <span className="num ml-2 text-xs text-wa-meta">{nowHm}</span>
+            </div>
+            <div className="max-w-[85%] rounded-lg rounded-tl-sm bg-white px-3 py-1.5 text-sm text-wa-text">
+              {previewGreeting}
+              <span className="num ml-2 text-xs text-wa-meta">{nowHm}</span>
+            </div>
+          </div>
         </div>
-      </form>
+
+        <dl className="mt-4 space-y-2 text-sm">
+          <div className="flex justify-between gap-3"><dt className="text-app-muted">Modelo</dt><dd className="truncate font-medium text-app-ink">{selectedModel ? cleanLabel(selectedModel.label) : '—'}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-app-muted">Skills ligadas</dt><dd className="num font-medium text-app-ink">{activeSkills.length}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-app-muted">Plano</dt><dd className="font-medium text-app-ink">{planLabel}</dd></div>
+          {creditsLeft !== null && (
+            <div className="flex justify-between gap-3"><dt className="text-app-muted">Créditos disponíveis</dt><dd className="num font-medium text-app-ink">{creditsLeft.toLocaleString('pt-PT')}</dd></div>
+          )}
+        </dl>
+      </aside>
     </div>
   );
 }

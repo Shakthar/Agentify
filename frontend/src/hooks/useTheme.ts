@@ -4,6 +4,11 @@ type Theme = 'light' | 'dark' | 'system';
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
+  // Só a app (/dashboard) segue o tema; páginas públicas ficam claras.
+  if (!window.location.pathname.includes('/dashboard')) {
+    root.classList.remove('dark');
+    return;
+  }
   if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     root.classList.add('dark');
   } else {

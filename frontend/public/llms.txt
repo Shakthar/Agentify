@@ -1,0 +1,32 @@
+# Agentfy
+
+> Agentfy is a Portuguese SaaS platform that lets any business create an AI agent for customer service on WhatsApp (official Meta WhatsApp Cloud API, no ban risk), Instagram, Telegram and website chat. The agent answers 24/7 in the customer's language, takes orders and payments (MB WAY, Multibanco, PIX), books appointments in Google Calendar and hands the conversation to a person with a summary when needed. Data is hosted in the EU (GDPR). Setup takes under 10 minutes and there is no lock-in.
+
+Site: https://agentfy.shaklabs.tech
+Languages: Portuguese (default), Spanish (/es), English (/en)
+Contact: contact@solutions.shaklabs.tech
+Company: ShakLabs, Lda. (Portugal)
+
+## Key facts
+
+- Plans (monthly, EUR): Free EUR 0 (1,000 credits once), Starter EUR 49 (18,000 credits, about 450 conversations), Business EUR 129 (49,000 credits, 3 agents), Enterprise EUR 349 (134,000 credits, 10 agents, white-label included). Brazil prices are in BRL (Starter R$279, Business R$729, Enterprise R$1,959).
+- 1 credit is about 1,000 tokens on Claude Haiku. An average conversation uses about 40 credits. Sending messages does not use credits; Meta bills its own per-message fees to the number owner.
+- 1 agent = 1 WhatsApp number; the same agent also answers on Instagram, Telegram and website chat.
+- AI models: Claude Haiku/Sonnet/Opus and GPT-4o Mini/GPT-4o depending on plan, with auto-routing.
+- Cancel any time; no contracts.
+
+## Pages
+
+- [Home](https://agentfy.shaklabs.tech/): product overview, comparison with Meta Business AI, pricing, FAQ
+- [FAQ](https://agentfy.shaklabs.tech/faq): setup, WhatsApp and Meta API, channels, plans and credits, orders and payments, data and GDPR, team and support
+- [For restaurants and delivery](https://agentfy.shaklabs.tech/para/restaurantes)
+- [For clinics](https://agentfy.shaklabs.tech/para/clinicas)
+- [For salons and beauty](https://agentfy.shaklabs.tech/para/saloes)
+- [For online shops](https://agentfy.shaklabs.tech/para/lojas)
+- [Pricing (plain text)](https://agentfy.shaklabs.tech/pricing.md)
+
+## Legal
+
+- [Privacy Policy](https://agentfy.shaklabs.tech/privacy-policy)
+- [Terms of Service](https://agentfy.shaklabs.tech/terms-of-service)
+- [Data deletion](https://agentfy.shaklabs.tech/data-deletion)
